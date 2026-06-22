@@ -1,0 +1,18 @@
+.DS_Store
+node_modules/
+dist/
+build/
+DerivedData/
+*.xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/xcshareddata/swiftpm/Package.resolved
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# HealthLink local runtime
+.healthlink/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal

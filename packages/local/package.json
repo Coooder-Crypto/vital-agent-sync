@@ -1,0 +1,37 @@
+{
+  "name": "@healthlink/local",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local HealthLink Agent server for pairing, ingest, storage, and MCP tools.",
+  "type": "module",
+  "bin": {
+    "healthlink-local": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "public",
+    "migrations",
+    "README.md"
+  ],
+  "scripts": {
+    "dev": "tsx src/cli.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/cli.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.13.0",
+    "better-sqlite3": "^11.10.0",
+    "fastify": "^5.3.3",
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.0.3",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}
