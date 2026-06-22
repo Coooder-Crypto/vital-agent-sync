@@ -1,0 +1,44 @@
+name: HealthLink
+options:
+  bundleIdPrefix: app.healthlink
+  deploymentTarget:
+    iOS: "17.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "0.1.0"
+    DEVELOPMENT_TEAM: ""
+targets:
+  HealthLink:
+    type: application
+    platform: iOS
+    sources:
+      - App
+    resources:
+      - Resources
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: HealthLink
+        LSRequiresIPhoneOS: true
+        NSCalendarsFullAccessUsageDescription: HealthLink reads your calendar availability to build redacted daily context for your authorized agents.
+        NSCalendarsUsageDescription: HealthLink reads your calendar availability to build redacted daily context for your authorized agents.
+        NSHealthShareUsageDescription: HealthLink reads selected Apple Health data to sync daily summaries to your authorized agent server.
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+    entitlements:
+      path: App/HealthLink.entitlements
+      properties:
+        com.apple.developer.healthkit: true
+        com.apple.developer.healthkit.background-delivery: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.healthlink.ios
+        PRODUCT_NAME: HealthLink
+        INFOPLIST_FILE: App/Info.plist
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_USER_SCRIPT_SANDBOXING: "YES"
+    scheme:
+      testTargets: []
