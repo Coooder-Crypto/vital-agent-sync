@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import type { HealthLinkDatabase } from "./database.js";
 
 export const defaultScopes = [
   "health.daily_summary.write",
@@ -45,8 +46,7 @@ export type ConfirmPairingResult = {
 };
 
 export class PairingStore {
-  private readonly sessions = new Map<string, PairingRecord>();
-  private readonly devices = new Map<string, PairedDevice>();
+  constructor(private readonly database: HealthLinkDatabase) {}
 
   createSession(input: {
     serverUrl: string;
@@ -73,17 +73,67 @@ export class PairingStore {
       expires_at: new Date(now.getTime() + expiresInSeconds * 1000)
     };
 
-    this.sessions.set(code, session);
+    this.database.sqlite.prepare(`
+      insert into pairing_sessions (
+        code,
+        pairing_url,
+        server_url,
+        agent_name,
+        requested_scopes_json,
+        expires_in_seconds,
+        created_at,
+        expires_at,
+        consumed_at
+      ) values (
+        @code,
+        @pairingUrl,
+        @serverUrl,
+        @agentName,
+        @requestedScopesJson,
+        @expiresInSeconds,
+        @createdAt,
+        @expiresAt,
+        null
+      )
+    `).run({
+      code: session.pairing_code,
+      pairingUrl: session.pairing_url,
+      serverUrl: session.server_url,
+      agentName: session.agent_name,
+      requestedScopesJson: JSON.stringify(session.requested_scopes),
+      expiresInSeconds: session.expires_in_seconds,
+      createdAt: session.created_at.toISOString(),
+      expiresAt: session.expires_at.toISOString()
+    });
+
     return toPublicSession(session);
   }
 
   getSession(code: string): PairingRecord | undefined {
-    const session = this.sessions.get(normalizePairingCode(code));
+    const row = this.database.sqlite.prepare(`
+      select
+        code,
+        pairing_url as pairingUrl,
+        server_url as serverUrl,
+        agent_name as agentName,
+        requested_scopes_json as requestedScopesJson,
+        expires_in_seconds as expiresInSeconds,
+        created_at as createdAt,
+        expires_at as expiresAt,
+        consumed_at as consumedAt
+      from pairing_sessions
+      where code = ?
+    `).get(normalizePairingCode(code)) as PairingSessionRow | undefined;
+
+    const session = row ? rowToPairingRecord(row) : undefined;
     if (!session) {
       return undefined;
     }
     if (isExpired(session)) {
-      this.sessions.delete(session.pairing_code);
+      this.database.sqlite.prepare(`
+        delete from pairing_sessions
+        where code = ? and consumed_at is null
+      `).run(session.pairing_code);
       return undefined;
     }
     return session;
@@ -106,17 +156,56 @@ export class PairingStore {
     }
 
     const deviceToken = `hl_dev_${randomBytes(32).toString("base64url")}`;
+    const consumedAt = new Date();
     const device: PairedDevice = {
       device_id: `dev_${randomUUID().replaceAll("-", "")}`,
       device_name: input.device_name,
       device_platform: input.device_platform,
       token_hash: hashToken(deviceToken),
       accepted_scopes: [...input.accepted_scopes],
-      created_at: new Date()
+      created_at: consumedAt
     };
 
-    session.consumed_at = new Date();
-    this.devices.set(device.device_id, device);
+    const persist = this.database.sqlite.transaction(() => {
+      const updateResult = this.database.sqlite.prepare(`
+        update pairing_sessions
+        set consumed_at = ?
+        where code = ? and consumed_at is null
+      `).run(consumedAt.toISOString(), session.pairing_code);
+
+      if (updateResult.changes !== 1) {
+        throw new PairingError("pairing_already_used", "Pairing code has already been used.");
+      }
+
+      this.database.sqlite.prepare(`
+        insert into devices (
+          id,
+          name,
+          platform,
+          token_hash,
+          scopes_json,
+          created_at,
+          revoked_at
+        ) values (
+          @id,
+          @name,
+          @platform,
+          @tokenHash,
+          @scopesJson,
+          @createdAt,
+          null
+        )
+      `).run({
+        id: device.device_id,
+        name: device.device_name,
+        platform: device.device_platform,
+        tokenHash: device.token_hash,
+        scopesJson: JSON.stringify(device.accepted_scopes),
+        createdAt: device.created_at.toISOString()
+      });
+    });
+
+    persist();
 
     return {
       device_id: device.device_id,
@@ -145,13 +234,24 @@ export class PairingStore {
   }
 
   private pruneExpiredSessions(): void {
-    for (const session of this.sessions.values()) {
-      if (isExpired(session)) {
-        this.sessions.delete(session.pairing_code);
-      }
-    }
+    this.database.sqlite.prepare(`
+      delete from pairing_sessions
+      where consumed_at is null and expires_at <= ?
+    `).run(new Date().toISOString());
   }
 }
+
+type PairingSessionRow = {
+  code: string;
+  pairingUrl: string;
+  serverUrl: string;
+  agentName: string;
+  requestedScopesJson: string;
+  expiresInSeconds: number;
+  createdAt: string;
+  expiresAt: string;
+  consumedAt: string | null;
+};
 
 function createPairingCode(): string {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -177,6 +277,25 @@ function toPublicSession(session: PairingRecord): PairingSession {
     requested_scopes: session.requested_scopes,
     expires_in_seconds: session.expires_in_seconds
   };
+}
+
+function rowToPairingRecord(row: PairingSessionRow): PairingRecord {
+  return {
+    pairing_code: row.code,
+    pairing_url: row.pairingUrl,
+    server_url: row.serverUrl,
+    agent_name: row.agentName,
+    requested_scopes: parseScopes(row.requestedScopesJson),
+    expires_in_seconds: row.expiresInSeconds,
+    created_at: new Date(row.createdAt),
+    expires_at: new Date(row.expiresAt),
+    consumed_at: row.consumedAt ? new Date(row.consumedAt) : undefined
+  };
+}
+
+function parseScopes(value: string): string[] {
+  const parsed = JSON.parse(value) as unknown;
+  return Array.isArray(parsed) ? parsed.filter((scope): scope is string => typeof scope === "string") : [];
 }
 
 function hashToken(token: string): string {

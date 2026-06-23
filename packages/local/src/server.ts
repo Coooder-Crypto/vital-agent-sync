@@ -2,6 +2,14 @@ import Fastify from "fastify";
 import { networkInterfaces } from "node:os";
 import QRCode from "qrcode";
 import { z } from "zod";
+import { openHealthLinkDatabase } from "./database.js";
+import {
+  HealthIngestError,
+  authenticateDevice,
+  getHealthStatus,
+  ingestHealthSync,
+  parseHealthSyncPayload
+} from "./health-ingest.js";
 import { PairingError, PairingStore } from "./pairing.js";
 
 export type LocalServerOptions = {
@@ -15,13 +23,26 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
     logger: true
   });
   const advertisedUrl = `http://${getAdvertisedHost(options.host)}:${options.port}`;
-  const pairings = new PairingStore();
+  const database = openHealthLinkDatabase({
+    path: options.databasePath
+  });
+  const pairings = new PairingStore(database);
 
-  app.get("/health/status", async () => ({
-    ok: true,
-    service: "healthlink-local",
-    status: "running"
-  }));
+  app.addHook("onClose", async () => {
+    database.close();
+  });
+
+  app.get("/health/status", async () => getHealthStatus(database));
+
+  app.post("/health/sync", async (request, reply) => {
+    try {
+      const device = authenticateDevice(database, request.headers.authorization);
+      const payload = parseHealthSyncPayload(request.body);
+      return ingestHealthSync(database, device, payload);
+    } catch (error) {
+      return sendHealthIngestError(reply, error);
+    }
+  });
 
   app.get("/pair", async (_request, reply) => {
     const session = pairings.createSession({
@@ -81,7 +102,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
     port: options.port
   });
 
-  printStartupInfo(options);
+  printStartupInfo(options, database.path);
 }
 
 const pairingStatusParamsSchema = z.object({
@@ -106,6 +127,31 @@ function sendPairingError(reply: {
   throw error;
 }
 
+function sendHealthIngestError(reply: {
+  code: (statusCode: number) => { send: (payload: unknown) => unknown };
+}, error: unknown): unknown {
+  if (error instanceof HealthIngestError) {
+    const statusCode = healthIngestStatusCode(error.code);
+    return reply.code(statusCode).send(errorResponse(error.code, error.message));
+  }
+
+  throw error;
+}
+
+function healthIngestStatusCode(code: HealthIngestError["code"]): number {
+  switch (code) {
+  case "missing_authorization":
+  case "invalid_authorization":
+  case "invalid_token":
+    return 401;
+  case "device_mismatch":
+  case "missing_scope":
+    return 403;
+  case "invalid_payload":
+    return 400;
+  }
+}
+
 function errorResponse(code: string, message: string): {
   ok: false;
   error: {
@@ -122,7 +168,7 @@ function errorResponse(code: string, message: string): {
   };
 }
 
-function printStartupInfo(options: LocalServerOptions): void {
+function printStartupInfo(options: LocalServerOptions, databasePath: string): void {
   const loopback = `http://127.0.0.1:${options.port}`;
   const lan = `http://${getAdvertisedHost(options.host)}:${options.port}`;
   console.log("");
@@ -132,7 +178,7 @@ function printStartupInfo(options: LocalServerOptions): void {
   console.log(`LAN address:  ${lan}`);
   console.log(`Local API:    ${loopback}`);
   console.log(`Bind host:    ${options.host}`);
-  console.log(`Database:     ${options.databasePath ?? "~/.healthlink/healthlink.sqlite"}`);
+  console.log(`Database:     ${databasePath}`);
   console.log("");
 }
 
