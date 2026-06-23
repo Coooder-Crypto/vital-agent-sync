@@ -25,6 +25,9 @@ targets:
         NSCalendarsFullAccessUsageDescription: HealthLink reads your calendar availability to build redacted daily context for your authorized agents.
         NSCalendarsUsageDescription: HealthLink reads your calendar availability to build redacted daily context for your authorized agents.
         NSHealthShareUsageDescription: HealthLink reads selected Apple Health data to sync daily summaries to your authorized agent server.
+        NSLocalNetworkUsageDescription: HealthLink connects to your local Agent server on your network after you approve pairing.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

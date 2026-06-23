@@ -33,23 +33,45 @@ final class SyncCoordinator: ObservableObject {
                 throw GatewayError.missingAPIToken
             }
 
+            guard let deviceID = settings.pairedDeviceID else {
+                throw GatewayError.missingPairedDevice
+            }
+
             let client = GatewayAPIClient(serverURL: serverURL, apiToken: token)
             let dates = self.datesToSync(daysBack: daysBack)
+            var healthSummaries: [DailyHealthSummary] = []
+            var calendarSummaries: [DailyCalendarSummary] = []
 
             for date in dates {
                 if settings.uploadHealthEnabled {
                     let healthSummary = try await self.healthService.buildDailySummary(for: date)
                     self.latestHealthSummary = healthSummary
-                    try await client.uploadHealthSummary(healthSummary)
-                    self.status.lastHealthSyncAt = Date()
+                    healthSummaries.append(healthSummary)
                 }
 
                 if settings.uploadCalendarEnabled {
                     let calendarSummary = self.calendarService.buildDailySummary(for: date)
                     self.latestCalendarSummary = calendarSummary
-                    try await client.uploadCalendarSummary(calendarSummary)
-                    self.status.lastCalendarSyncAt = Date()
+                    calendarSummaries.append(calendarSummary)
                 }
+            }
+
+            let payload = HealthSyncPayload(
+                device_id: deviceID,
+                sync_id: self.makeSyncID(),
+                generated_at: ISO8601DateFormatter.gatewayDateTime.string(from: Date()),
+                timezone: TimeZone.current.identifier,
+                health_daily_summaries: healthSummaries,
+                calendar_daily_summaries: calendarSummaries
+            )
+
+            _ = try await client.uploadHealthSync(payload)
+            let syncedAt = Date()
+            if !healthSummaries.isEmpty {
+                self.status.lastHealthSyncAt = syncedAt
+            }
+            if !calendarSummaries.isEmpty {
+                self.status.lastCalendarSyncAt = syncedAt
             }
         }
     }
@@ -61,6 +83,10 @@ final class SyncCoordinator: ObservableObject {
         return stride(from: clamped, through: 0, by: -1).compactMap {
             calendar.date(byAdding: .day, value: -$0, to: today)
         }
+    }
+
+    private func makeSyncID() -> String {
+        "sync_\(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased())"
     }
 
     private func run(_ operation: @escaping () async throws -> Void) async {
