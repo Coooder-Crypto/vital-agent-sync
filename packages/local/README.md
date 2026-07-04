@@ -36,7 +36,9 @@ npx -y @healthlink/local --db ~/.healthlink/healthlink.sqlite
 npx -y @healthlink/local mcp
 npx -y @healthlink/local print-mcp-config
 npx -y @healthlink/local print-agent-config --agent generic
+npx -y @healthlink/local print-skill
 npx -y @healthlink/local install-hermes
+npx -y @healthlink/local install-hermes-skill
 npx -y @healthlink/local status
 npx -y @healthlink/local doctor --agent hermes --transport lan
 ```
@@ -153,15 +155,21 @@ Hermes can install such a skill as an experience enhancement, but generic MCP-co
 npx -y @healthlink/local print-mcp-config
 npx -y @healthlink/local print-agent-config --agent generic
 npx -y @healthlink/local print-agent-config --agent hermes
+npx -y @healthlink/local print-skill
 npx -y @healthlink/local install-hermes
+npx -y @healthlink/local install-hermes-skill
 npx -y @healthlink/local init --agent hermes
-npx -y @healthlink/local init --hermes
+npx -y @healthlink/local init --hermes --install-skill
 npx -y @healthlink/local doctor --agent hermes
 npx -y @healthlink/local doctor --transport lan
 ```
 
 `print-mcp-config` and `print-agent-config --agent generic` print standard `mcpServers.healthlink` JSON. `print-agent-config --agent hermes` prints a Hermes-style `mcp_servers.healthlink` YAML snippet. `install-hermes` backs up `~/.hermes/config.yaml`, writes `mcp_servers.healthlink`, and uses the same local database and tool surface as `@healthlink/local mcp`. `init --agent hermes` and `init --hermes` perform the same Hermes install step as part of the foreground pairing flow.
 
+`print-skill` prints the portable HealthLink skill Markdown. `install-hermes-skill` writes it to `~/.hermes/skills/health/healthlink-personal-context/SKILL.md` with a timestamped backup when replacing an existing file. Use `init --hermes --install-skill` to install both MCP config and the Hermes skill in the same local pairing flow.
+
 Use `status` to inspect the local database and paired devices. Use `doctor` to check Node.js, the SQLite database, MCP command generation, the selected Agent adapter, and the selected transport provider.
 
-Transport providers are selected with `--transport`. `lan` is the default and current fully implemented provider. Future transports such as `tailscale`, `cloudflare`, `ngrok`, and `public_https` can be selected for diagnostics and can advertise an explicit endpoint with `--server-url` until their native provider implementations land.
+Transport providers are selected with `--transport`. `lan` is the default provider. `tailscale` can advertise the local 100.64.0.0/10 IPv4 address when Tailscale is active. Future transports such as `cloudflare`, `ngrok`, and `public_https` can be selected for diagnostics and can advertise an explicit endpoint with `--server-url` until their native provider implementations land.
+
+The source-device API is available at `/source-devices` and `/source-devices/:source_device_id/revoke`. The older `/devices` endpoints remain for compatibility with the current iOS app.

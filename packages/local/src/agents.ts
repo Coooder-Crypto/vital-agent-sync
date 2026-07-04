@@ -8,6 +8,7 @@ import {
   type McpCommandConfig,
   type McpConfigOptions
 } from "./mcp-config.js";
+import { installHermesHealthLinkSkill, type SkillInstallOptions, type SkillInstallResult } from "./skill.js";
 
 export const AGENT_ADAPTER_IDS = [
   "generic",
@@ -39,6 +40,7 @@ export type AgentAdapter = {
   displayName: string;
   detect(options?: AgentAdapterOptions): AgentInstallStatus;
   installMcp(config: McpConfigOptions, options?: AgentAdapterOptions): AgentInstallResult;
+  installSkill?(options?: AgentAdapterOptions): SkillInstallResult;
   formatMcpConfig(config: McpConfigOptions): string;
   reloadHint(): string;
 };
@@ -46,6 +48,7 @@ export type AgentAdapter = {
 export type AgentAdapterOptions = {
   hermesConfigPath?: string;
   hermesHome?: string;
+  hermesSkillPath?: string;
 };
 
 export function getAgentAdapter(id: AgentAdapterId): AgentAdapter {
@@ -126,6 +129,9 @@ const hermesAgentAdapter: AgentAdapter = {
       message: `HealthLink MCP installed for Hermes in ${result.configPath}`
     };
   },
+  installSkill(options) {
+    return installHermesHealthLinkSkill(toHermesSkillOptions(options));
+  },
   formatMcpConfig(config) {
     return YAML.stringify({
       mcp_servers: {
@@ -164,5 +170,12 @@ function createResearchAgentAdapter(id: "openclaw" | "workbuddy"): AgentAdapter 
     reloadHint() {
       return `${displayName} reload behavior is still under adapter research. Use that agent's MCP reload or restart flow.`;
     }
+  };
+}
+
+function toHermesSkillOptions(options: AgentAdapterOptions | undefined): SkillInstallOptions {
+  return {
+    hermesHome: options?.hermesHome,
+    skillPath: options?.hermesSkillPath
   };
 }

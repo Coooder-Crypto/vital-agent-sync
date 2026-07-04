@@ -175,7 +175,7 @@ feedback_events
 Source adapters should only know how to collect data and sync normalized payloads. They should not know about Hermes, OpenClaw, or other Agents.
 
 - [ ] Rename internal "device" language toward "source device" in docs and types.
-- [ ] Keep backward compatibility for current `/devices` endpoint while introducing source-device naming.
+- [x] Keep backward compatibility for current `/devices` endpoint while introducing source-device naming.
 - [x] Define `source_platform` values:
   - `ios`
   - `android`
@@ -232,11 +232,11 @@ MCP is the product protocol. Skills are optional instructions that improve natur
 
 Tasks:
 
-- [ ] Add a bundled HealthLink skill Markdown template.
-- [ ] Add `healthlink-local print-skill --format markdown`.
-- [ ] Add `healthlink-local install-hermes-skill`.
-- [ ] Add `healthlink-local init --hermes --install-skill`.
-- [ ] Define a generic skill contract:
+- [x] Add a bundled HealthLink skill Markdown template.
+- [x] Add `healthlink-local print-skill --format markdown`.
+- [x] Add `healthlink-local install-hermes-skill`.
+- [x] Add `healthlink-local init --hermes --install-skill`.
+- [x] Define a generic skill contract:
   - when to call `get_personal_context`
   - how to use lower-level tools
   - freshness reporting
@@ -265,16 +265,16 @@ Tasks:
 - [x] Move LAN advertised URL logic behind `TransportProvider`.
 - [x] Add `--transport lan` explicitly.
 - [x] Keep current LAN behavior as default.
-- [ ] Add Tailscale detection:
+- [x] Add Tailscale detection:
   - local Tailscale IP
-  - MagicDNS name
   - reachability hints
+- [ ] Add Tailscale MagicDNS name support.
 - [ ] Add tunnel provider design:
   - Cloudflare Tunnel
   - ngrok
   - user-provided tunnel URL
 - [ ] Add public HTTPS mode docs.
-- [ ] Add pairing status payload field `transport`.
+- [x] Add pairing status payload field `transport`.
 - [x] Add `healthlink-local doctor --transport <id>`.
 
 ## iOS Auto Sync TODO
@@ -339,7 +339,7 @@ Phase 2:
 Phase 3:
 
 - [ ] Add foreground auto-sync.
-- [ ] Add bundled skill installer.
+- [x] Add bundled skill installer.
 - [ ] Add agent audit logging.
 
 Phase 4:

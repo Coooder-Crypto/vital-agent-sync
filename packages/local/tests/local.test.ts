@@ -17,7 +17,16 @@ import {
 } from "../src/health-query.js";
 import { getHermesMcpInstallStatus, installHermesMcpConfig } from "../src/mcp-config.js";
 import { PairingStore } from "../src/pairing.js";
-import { SOURCE_PLATFORM_CAPABILITIES } from "../src/source-devices.js";
+import {
+  SOURCE_PLATFORM_CAPABILITIES,
+  listSourceDevices,
+  revokeSourceDevice
+} from "../src/source-devices.js";
+import {
+  buildHealthLinkSkillMarkdown,
+  installHermesHealthLinkSkill,
+  readInstalledHermesSkill
+} from "../src/skill.js";
 import { renderTerminalQr } from "../src/terminal-qr.js";
 import { createTransportProvider } from "../src/transports.js";
 
@@ -28,8 +37,12 @@ test("pairing creates a scoped device that can sync and be queried", () => {
       const pairings = new PairingStore(database);
       const session = pairings.createSession({
         serverUrl: "http://127.0.0.1:8787",
-        agentName: "Test Agent"
+        agentName: "Test Agent",
+        transport: "lan"
       });
+      const pairingStatus = pairings.getStatus(session.pairing_code);
+      assert.equal(pairingStatus.transport, "lan");
+      assert.match(session.pairing_url, /transport=lan/);
       const confirmed = pairings.confirm({
         pairing_code: session.pairing_code,
         device_name: "Test iPhone",
@@ -113,6 +126,35 @@ test("revoked device token can no longer authenticate", () => {
         /invalid or revoked/
       );
       assert.equal(listDevices(database)[0]?.device_id, confirmed.device_id);
+    } finally {
+      database.close();
+    }
+  });
+});
+
+test("source-device wrapper preserves device compatibility", () => {
+  withTempDatabase((databasePath) => {
+    const database = openHealthLinkDatabase({ path: databasePath });
+    try {
+      const pairings = new PairingStore(database);
+      const session = pairings.createSession({
+        serverUrl: "http://127.0.0.1:8787",
+        agentName: "Test Agent"
+      });
+      const confirmed = pairings.confirm({
+        pairing_code: session.pairing_code,
+        device_name: "Test iPhone",
+        device_platform: "ios",
+        accepted_scopes: session.requested_scopes
+      });
+
+      const sourceDevice = listSourceDevices(database)[0];
+      assert.equal(sourceDevice?.source_device_id, confirmed.device_id);
+      assert.equal(sourceDevice?.legacy_device_id, confirmed.device_id);
+      assert.equal(sourceDevice?.platform, "ios");
+
+      const revoked = revokeSourceDevice(database, confirmed.device_id);
+      assert.equal(revoked?.revoked_at !== null, true);
     } finally {
       database.close();
     }
@@ -271,6 +313,26 @@ test("Agent adapters expose generic MCP config and Hermes install behavior", () 
     assert.equal(installed.id, "hermes");
     assert.equal(status.installed, true);
     assert.match(hermes.formatMcpConfig({ databasePath: join(tempDir, "healthlink.sqlite") }), /mcp_servers:/);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("HealthLink skill can be printed and installed for Hermes", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-skill-test-"));
+  try {
+    const skillPath = join(tempDir, "skills", "health", "healthlink-personal-context", "SKILL.md");
+    const markdown = buildHealthLinkSkillMarkdown();
+    assert.match(markdown, /name: healthlink-personal-context/);
+    assert.match(markdown, /get_personal_context/);
+
+    const first = installHermesHealthLinkSkill({ skillPath });
+    const second = installHermesHealthLinkSkill({ skillPath });
+    const installed = readInstalledHermesSkill({ skillPath });
+
+    assert.equal(first.skillPath, skillPath);
+    assert.ok(second.backupPath);
+    assert.match(installed ?? "", /HealthLink Personal Context/);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }

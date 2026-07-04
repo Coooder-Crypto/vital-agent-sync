@@ -37,6 +37,9 @@ export function createTransportProvider(options: TransportProviderOptions): Tran
   if (id === "lan") {
     return createLanTransportProvider(options);
   }
+  if (id === "tailscale") {
+    return createTailscaleTransportProvider(options);
+  }
 
   return createFutureTransportProvider({ ...options, id });
 }
@@ -69,6 +72,44 @@ function createLanTransportProvider(options: TransportProviderOptions): Transpor
           ? "No non-internal IPv4 address was found; iPhone pairing may need a manual --server-url."
           : `Advertising ${advertisedUrl}`,
         advertisedUrl
+      };
+    }
+  };
+}
+
+function createTailscaleTransportProvider(options: TransportProviderOptions): TransportProvider {
+  return {
+    id: "tailscale",
+    label: "Tailscale",
+    async getAdvertisedUrl() {
+      if (options.serverUrl) {
+        return normalizeServerUrl(options.serverUrl);
+      }
+      const address = findTailscaleIpv4();
+      if (!address) {
+        throw new Error("Tailscale transport could not find a local 100.64.0.0/10 IPv4 address. Pass --server-url or use --transport lan.");
+      }
+      return `http://${address}:${options.port}`;
+    },
+    async healthCheck() {
+      if (options.serverUrl) {
+        return {
+          status: "warn",
+          detail: "Using explicit --server-url for Tailscale; native MagicDNS detection is not implemented yet.",
+          advertisedUrl: normalizeServerUrl(options.serverUrl)
+        };
+      }
+      const address = findTailscaleIpv4();
+      if (!address) {
+        return {
+          status: "fail",
+          detail: "No local Tailscale IPv4 address was found. Start Tailscale, pass --server-url, or use --transport lan."
+        };
+      }
+      return {
+        status: "ok",
+        detail: `Advertising http://${address}:${options.port} from local Tailscale IPv4. MagicDNS support is still planned.`,
+        advertisedUrl: `http://${address}:${options.port}`
       };
     }
   };
@@ -129,6 +170,25 @@ function getAdvertisedHost(bindHost: string): string {
   }
 
   return "127.0.0.1";
+}
+
+function findTailscaleIpv4(): string | undefined {
+  for (const addresses of Object.values(networkInterfaces())) {
+    for (const address of addresses ?? []) {
+      if (address.family === "IPv4" && !address.internal && isTailscaleIpv4(address.address)) {
+        return address.address;
+      }
+    }
+  }
+  return undefined;
+}
+
+function isTailscaleIpv4(address: string): boolean {
+  const parts = address.split(".").map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return false;
+  }
+  return parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127;
 }
 
 function normalizeServerUrl(serverUrl: string): string {

@@ -11,7 +11,7 @@ import {
   parseHealthSyncPayload
 } from "./health-ingest.js";
 import { PairingError, PairingStore } from "./pairing.js";
-import { SOURCE_PLATFORMS } from "./source-devices.js";
+import { SOURCE_PLATFORMS, listSourceDevices, revokeSourceDevice } from "./source-devices.js";
 import { type TerminalQrRenderResult, renderTerminalQr } from "./terminal-qr.js";
 import { createTransportProvider, TRANSPORT_PROVIDER_IDS, type TransportProviderId } from "./transports.js";
 
@@ -55,6 +55,11 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
     devices: listDevices(database)
   }));
 
+  app.get("/source-devices", async () => ({
+    ok: true,
+    source_devices: listSourceDevices(database)
+  }));
+
   app.post("/devices/:device_id/revoke", async (request, reply) => {
     const params = deviceParamsSchema.safeParse(request.params);
     if (!params.success) {
@@ -81,6 +86,32 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
     }
   });
 
+  app.post("/source-devices/:source_device_id/revoke", async (request, reply) => {
+    const params = sourceDeviceParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return reply.code(400).send(errorResponse("invalid_params", "source_device_id is required."));
+    }
+
+    try {
+      const device = authenticateDevice(database, request.headers.authorization);
+      if (device.device_id !== params.data.source_device_id) {
+        return reply.code(403).send(errorResponse("source_device_mismatch", "Source device token cannot revoke another source device."));
+      }
+
+      const revoked = revokeSourceDevice(database, params.data.source_device_id);
+      if (!revoked) {
+        return reply.code(404).send(errorResponse("source_device_not_found", "Source device was not found."));
+      }
+
+      return {
+        ok: true,
+        source_device: revoked
+      };
+    } catch (error) {
+      return sendHealthIngestError(reply, error);
+    }
+  });
+
   app.post("/health/sync", async (request, reply) => {
     try {
       const device = authenticateDevice(database, request.headers.authorization);
@@ -94,7 +125,8 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
   app.get("/pair", async (_request, reply) => {
     const session = pairings.createSession({
       serverUrl: advertisedUrl,
-      agentName
+      agentName,
+      transport: transport.id
     });
     const qrDataUrl = await QRCode.toDataURL(session.pairing_url, {
       margin: 1,
@@ -121,7 +153,8 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
 
     return pairings.createSession({
       serverUrl: body.data.server_url ?? advertisedUrl,
-      agentName: body.data.agent_name ?? agentName
+      agentName: body.data.agent_name ?? agentName,
+      transport: body.data.transport ?? transport.id
     });
   });
 
@@ -159,7 +192,8 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
   const initialSession = options.mode === "init"
     ? pairings.createSession({
         serverUrl: advertisedUrl,
-        agentName
+        agentName,
+        transport: transport.id
       })
     : undefined;
 
@@ -182,6 +216,10 @@ const pairingStatusParamsSchema = z.object({
 
 const deviceParamsSchema = z.object({
   device_id: z.string().min(1)
+});
+
+const sourceDeviceParamsSchema = z.object({
+  source_device_id: z.string().min(1)
 });
 
 const confirmPairingSchema = z.object({

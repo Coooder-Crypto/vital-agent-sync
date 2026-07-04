@@ -9,19 +9,22 @@ import { listDevices } from "./devices.js";
 import { getHealthStatus } from "./health-ingest.js";
 import { startLocalServer } from "./server.js";
 import { startMcpServer } from "./mcp.js";
+import { buildHealthLinkSkillMarkdown } from "./skill.js";
 import { createTransportProvider, isTransportProviderId, type TransportProviderId } from "./transports.js";
 
 type CliOptions = {
-  command: "server" | "init" | "mcp" | "print-mcp-config" | "print-agent-config" | "install-hermes" | "status" | "doctor";
+  command: "server" | "init" | "mcp" | "print-mcp-config" | "print-agent-config" | "print-skill" | "install-hermes" | "install-hermes-skill" | "status" | "doctor";
   port: number;
   host: string;
   installHermes: boolean;
+  installSkill: boolean;
   agentId: AgentAdapterId;
   transportId: TransportProviderId;
   databasePath?: string;
   serverUrl?: string;
   agentName?: string;
   hermesConfigPath?: string;
+  hermesSkillPath?: string;
 };
 
 function parseArgs(argv: string[]): CliOptions {
@@ -30,13 +33,14 @@ function parseArgs(argv: string[]): CliOptions {
     port: 8787,
     host: "0.0.0.0",
     installHermes: false,
+    installSkill: false,
     agentId: "generic",
     transportId: "lan"
   };
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (arg === "server" || arg === "init" || arg === "mcp" || arg === "print-mcp-config" || arg === "print-agent-config" || arg === "install-hermes" || arg === "status" || arg === "doctor") {
+    if (arg === "server" || arg === "init" || arg === "mcp" || arg === "print-mcp-config" || arg === "print-agent-config" || arg === "print-skill" || arg === "install-hermes" || arg === "install-hermes-skill" || arg === "status" || arg === "doctor") {
       options.command = arg;
     } else if (arg === "--port") {
       options.port = Number(argv[index + 1]);
@@ -70,9 +74,20 @@ function parseArgs(argv: string[]): CliOptions {
     } else if (arg === "--hermes-config") {
       options.hermesConfigPath = argv[index + 1];
       index += 1;
+    } else if (arg === "--hermes-skill-path") {
+      options.hermesSkillPath = argv[index + 1];
+      index += 1;
+    } else if (arg === "--format") {
+      const value = argv[index + 1];
+      if (value !== "markdown") {
+        throw new Error("Expected --format markdown.");
+      }
+      index += 1;
     } else if (arg === "--hermes" || arg === "--install-hermes") {
       options.installHermes = true;
       options.agentId = "hermes";
+    } else if (arg === "--install-skill") {
+      options.installSkill = true;
     }
   }
 
@@ -108,6 +123,11 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (options.command === "print-skill") {
+    process.stdout.write(buildHealthLinkSkillMarkdown());
+    return;
+  }
+
   if (options.command === "install-hermes") {
     const adapter = getAgentAdapter("hermes");
     const result = adapter.installMcp({
@@ -126,6 +146,24 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (options.command === "install-hermes-skill") {
+    const adapter = getAgentAdapter("hermes");
+    const result = adapter.installSkill?.({
+      hermesSkillPath: options.hermesSkillPath
+    });
+    if (!result) {
+      throw new Error("Hermes adapter does not support skill installation.");
+    }
+    console.log("HealthLink skill installed for Hermes");
+    console.log(`Skill: ${result.skillPath}`);
+    if (result.backupPath) {
+      console.log(`Backup: ${result.backupPath}`);
+    }
+    console.log("");
+    console.log("Restart Hermes or reload skills to make the HealthLink skill visible.");
+    return;
+  }
+
   if (options.command === "status") {
     printStatus(options);
     return;
@@ -138,11 +176,19 @@ async function main(): Promise<void> {
 
   const agent = getAgentAdapter(options.agentId);
   const shouldInstallAgent = options.command === "init" && (options.installHermes || options.agentId === "hermes");
+  if (options.installSkill && options.agentId !== "hermes") {
+    throw new Error("--install-skill currently supports --agent hermes only.");
+  }
   const agentInstall = shouldInstallAgent
     ? agent.installMcp({
         databasePath: options.databasePath
       }, {
         hermesConfigPath: options.hermesConfigPath
+      })
+    : undefined;
+  const skillInstall = options.command === "init" && options.installSkill
+    ? agent.installSkill?.({
+        hermesSkillPath: options.hermesSkillPath
       })
     : undefined;
 
@@ -170,10 +216,14 @@ async function main(): Promise<void> {
         console.log(`  backup: ${agentInstall.backupPath}`);
       }
       console.log(`  ${agent.reloadHint()}`);
+      if (skillInstall) {
+        console.log(`  installed HealthLink skill in ${skillInstall.skillPath}`);
+      }
     } else {
       console.log("  healthlink-local init --agent hermes");
       console.log("  healthlink-local init --hermes");
       console.log("  healthlink-local install-hermes");
+      console.log("  healthlink-local install-hermes-skill");
     }
     console.log("");
   }

@@ -1,3 +1,6 @@
+import { listDevices, revokeDevice, type DeviceSummary } from "./devices.js";
+import type { HealthLinkDatabase } from "./database.js";
+
 export const SOURCE_PLATFORMS = [
   "ios",
   "android",
@@ -13,6 +16,18 @@ export type SourceCapability = {
   syncCadence: "manual" | "foreground" | "background_best_effort" | "connector_defined";
   freshness: "near_realtime" | "periodic" | "manual";
   missingDataBehavior: string;
+};
+
+export type SourceDeviceSummary = {
+  source_device_id: string;
+  name: string;
+  platform: SourcePlatform | string;
+  accepted_scopes: string[];
+  created_at: string;
+  revoked_at: string | null;
+  last_sync_at: string | null;
+  sync_count: number;
+  legacy_device_id: string;
 };
 
 export const SOURCE_PLATFORM_CAPABILITIES: Record<SourcePlatform, SourceCapability> = {
@@ -50,4 +65,27 @@ export const SOURCE_PLATFORM_CAPABILITIES: Record<SourcePlatform, SourceCapabili
 
 export function isSourcePlatform(value: string): value is SourcePlatform {
   return SOURCE_PLATFORMS.includes(value as SourcePlatform);
+}
+
+export function listSourceDevices(database: HealthLinkDatabase): SourceDeviceSummary[] {
+  return listDevices(database).map(toSourceDeviceSummary);
+}
+
+export function revokeSourceDevice(database: HealthLinkDatabase, sourceDeviceId: string): SourceDeviceSummary | undefined {
+  const device = revokeDevice(database, sourceDeviceId);
+  return device ? toSourceDeviceSummary(device) : undefined;
+}
+
+function toSourceDeviceSummary(device: DeviceSummary): SourceDeviceSummary {
+  return {
+    source_device_id: device.device_id,
+    name: device.device_name,
+    platform: device.device_platform,
+    accepted_scopes: device.accepted_scopes,
+    created_at: device.created_at,
+    revoked_at: device.revoked_at,
+    last_sync_at: device.last_sync_at,
+    sync_count: device.sync_count,
+    legacy_device_id: device.device_id
+  };
 }

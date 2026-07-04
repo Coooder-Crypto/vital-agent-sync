@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { HealthLinkDatabase } from "./database.js";
 import type { SourcePlatform } from "./source-devices.js";
+import type { TransportProviderId } from "./transports.js";
 
 export const defaultScopes = [
   "health.daily_summary.write",
@@ -14,6 +15,7 @@ export type PairingSession = {
   pairing_url: string;
   server_url: string;
   agent_name: string;
+  transport: TransportProviderId;
   requested_scopes: string[];
   expires_in_seconds: number;
   expires_at: string;
@@ -53,6 +55,7 @@ export class PairingStore {
   createSession(input: {
     serverUrl: string;
     agentName: string;
+    transport?: TransportProviderId;
     expiresInSeconds?: number;
   }): PairingSession {
     this.pruneExpiredSessions();
@@ -62,6 +65,7 @@ export class PairingStore {
     const pairingUrl = new URL("healthlink://pair");
     pairingUrl.searchParams.set("server", input.serverUrl);
     pairingUrl.searchParams.set("code", code);
+    pairingUrl.searchParams.set("transport", input.transport ?? "lan");
 
     const now = new Date();
     const session: PairingRecord = {
@@ -69,6 +73,7 @@ export class PairingStore {
       pairing_url: pairingUrl.toString(),
       server_url: input.serverUrl,
       agent_name: input.agentName,
+      transport: input.transport ?? "lan",
       requested_scopes: [...defaultScopes],
       expires_in_seconds: expiresInSeconds,
       created_at: now,
@@ -81,6 +86,7 @@ export class PairingStore {
         pairing_url,
         server_url,
         agent_name,
+        transport,
         requested_scopes_json,
         expires_in_seconds,
         created_at,
@@ -91,6 +97,7 @@ export class PairingStore {
         @pairingUrl,
         @serverUrl,
         @agentName,
+        @transport,
         @requestedScopesJson,
         @expiresInSeconds,
         @createdAt,
@@ -102,6 +109,7 @@ export class PairingStore {
       pairingUrl: session.pairing_url,
       serverUrl: session.server_url,
       agentName: session.agent_name,
+      transport: session.transport,
       requestedScopesJson: JSON.stringify(session.requested_scopes),
       expiresInSeconds: session.expires_in_seconds,
       createdAt: session.created_at.toISOString(),
@@ -118,6 +126,7 @@ export class PairingStore {
         pairing_url as pairingUrl,
         server_url as serverUrl,
         agent_name as agentName,
+        transport,
         requested_scopes_json as requestedScopesJson,
         expires_in_seconds as expiresInSeconds,
         created_at as createdAt,
@@ -220,6 +229,7 @@ export class PairingStore {
     pairing_code: string;
     server_url: string;
     agent_name: string;
+    transport: TransportProviderId;
     requested_scopes: string[];
     status: "pending" | "confirmed";
     expires_at: string;
@@ -234,6 +244,7 @@ export class PairingStore {
       pairing_code: session.pairing_code,
       server_url: session.server_url,
       agent_name: session.agent_name,
+      transport: session.transport,
       requested_scopes: session.requested_scopes,
       status: session.consumed_at ? "confirmed" : "pending",
       expires_at: session.expires_at.toISOString(),
@@ -254,6 +265,7 @@ type PairingSessionRow = {
   pairingUrl: string;
   serverUrl: string;
   agentName: string;
+  transport: TransportProviderId;
   requestedScopesJson: string;
   expiresInSeconds: number;
   createdAt: string;
@@ -282,6 +294,7 @@ function toPublicSession(session: PairingRecord): PairingSession {
     pairing_url: session.pairing_url,
     server_url: session.server_url,
     agent_name: session.agent_name,
+    transport: session.transport,
     requested_scopes: session.requested_scopes,
     expires_in_seconds: session.expires_in_seconds,
     expires_at: session.expires_at.toISOString()
@@ -294,6 +307,7 @@ function rowToPairingRecord(row: PairingSessionRow): PairingRecord {
     pairing_url: row.pairingUrl,
     server_url: row.serverUrl,
     agent_name: row.agentName,
+    transport: row.transport,
     requested_scopes: parseScopes(row.requestedScopesJson),
     expires_in_seconds: row.expiresInSeconds,
     created_at: new Date(row.createdAt),
