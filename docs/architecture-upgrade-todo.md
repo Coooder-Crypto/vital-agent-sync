@@ -283,20 +283,20 @@ Expected product behavior is "authorize once, then keep syncing automatically." 
 
 Foreground auto-sync:
 
-- [ ] Add Auto Sync setting, default on after pairing.
-- [ ] Add minimum sync interval setting, default 30 minutes.
-- [ ] Record:
+- [x] Add Auto Sync setting, default on after pairing.
+- [x] Add minimum sync interval setting, default 30 minutes.
+- [x] Record:
   - `lastAutoSyncAt`
   - `lastManualSyncAt`
   - `lastSyncAttemptAt`
   - `lastSyncError`
-- [ ] Trigger auto-sync after successful pairing.
-- [ ] Trigger auto-sync after HealthKit / Calendar permission grant.
-- [ ] Trigger auto-sync on app launch.
-- [ ] Trigger auto-sync when app returns to foreground.
-- [ ] Skip when already syncing, unpaired, missing token, missing permissions, or throttled.
-- [ ] Keep manual Sync button.
-- [ ] Show last sync and next eligible auto-sync in UI.
+- [x] Trigger auto-sync after successful pairing.
+- [x] Trigger auto-sync after HealthKit / Calendar permission grant.
+- [x] Trigger auto-sync on app launch.
+- [x] Trigger auto-sync when app returns to foreground.
+- [x] Skip when already syncing, unpaired, missing token, missing permissions, or throttled.
+- [x] Keep manual Sync button.
+- [x] Show last sync and next eligible auto-sync in UI.
 
 Background best-effort:
 
@@ -338,7 +338,7 @@ Phase 2:
 
 Phase 3:
 
-- [ ] Add foreground auto-sync.
+- [x] Add foreground auto-sync.
 - [x] Add bundled skill installer.
 - [ ] Add agent audit logging.
 

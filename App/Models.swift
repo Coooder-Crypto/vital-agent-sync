@@ -113,6 +113,7 @@ struct PairingStatusResponse: Codable {
     let pairing_code: String
     let server_url: String
     let agent_name: String
+    let transport: String?
     let requested_scopes: [String]
     let status: String
     let expires_at: String
