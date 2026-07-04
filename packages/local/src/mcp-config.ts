@@ -25,6 +25,13 @@ export type HermesInstallResult = {
   server: McpCommandConfig;
 };
 
+export type HermesMcpInstallStatus = {
+  configPath: string;
+  exists: boolean;
+  installed: boolean;
+  server?: unknown;
+};
+
 export function buildHealthLinkMcpServerConfig(options: McpConfigOptions = {}): McpCommandConfig {
   return {
     command: getCliCommandPath(),
@@ -53,11 +60,11 @@ export function formatStandardMcpConfig(options: McpConfigOptions = {}): string 
 }
 
 export function installHermesMcpConfig(options: HermesInstallOptions = {}): HermesInstallResult {
-  const configPath = resolveHomePath(options.configPath ?? join(options.hermesHome ?? process.env.HERMES_HOME ?? "~/.hermes", "config.yaml"));
+  const configPath = getHermesConfigPath(options);
   mkdirSync(dirname(configPath), { recursive: true });
 
   const existing = existsSync(configPath) ? readFileSync(configPath, "utf8") : "";
-  const backupPath = existsSync(configPath) ? `${configPath}.healthlink-backup-${timestampForFilename()}` : undefined;
+  const backupPath = existsSync(configPath) ? uniqueBackupPath(configPath) : undefined;
   if (backupPath) {
     copyFileSync(configPath, backupPath);
   }
@@ -82,6 +89,36 @@ export function installHermesMcpConfig(options: HermesInstallOptions = {}): Herm
     backupPath,
     server
   };
+}
+
+export function getHermesMcpInstallStatus(options: HermesInstallOptions = {}): HermesMcpInstallStatus {
+  const configPath = getHermesConfigPath(options);
+  if (!existsSync(configPath)) {
+    return {
+      configPath,
+      exists: false,
+      installed: false
+    };
+  }
+
+  const config = parseYamlRecord(readFileSync(configPath, "utf8"));
+  const mcpServers = isRecord(config.mcp_servers) ? config.mcp_servers : {};
+  const server = mcpServers.healthlink;
+  return {
+    configPath,
+    exists: true,
+    installed: isRecord(server),
+    server
+  };
+}
+
+function getHermesConfigPath(options: HermesInstallOptions = {}): string {
+  return resolveHomePath(options.configPath ?? join(options.hermesHome ?? process.env.HERMES_HOME ?? "~/.hermes", "config.yaml"));
+}
+
+function parseYamlRecord(value: string): Record<string, unknown> {
+  const parsed = YAML.parse(value) as unknown;
+  return isRecord(parsed) ? parsed : {};
 }
 
 function getCliCommandPath(): string {
@@ -111,6 +148,22 @@ function timestampForFilename(): string {
     .replaceAll(":", "")
     .replace(".", "")
     .replace("Z", "");
+}
+
+function uniqueBackupPath(configPath: string): string {
+  const base = `${configPath}.healthlink-backup-${timestampForFilename()}`;
+  if (!existsSync(base)) {
+    return base;
+  }
+
+  for (let index = 1; index < 1000; index += 1) {
+    const candidate = `${base}-${index}`;
+    if (!existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  throw new Error("Could not allocate a unique Hermes config backup path.");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -53,6 +53,21 @@ export function getAgentHealthStatus(database: HealthLinkDatabase): unknown {
   return getHealthStatus(database);
 }
 
+export function getPersonalContext(database: HealthLinkDatabase, options: QueryOptions = {}): unknown {
+  const days = clampDays(options.days);
+
+  return {
+    purpose: "Use this HealthLink context to answer personal status, energy, recovery, workout readiness, sleep, schedule pressure, and day-planning questions. Do not invent health or calendar facts that are not present here.",
+    status: getAgentHealthStatus(database),
+    focus_date: options.date ?? "latest_synced_date",
+    daily_health_summary: getDailyHealthSummary(database, { date: options.date }),
+    calendar_availability: getCalendarAvailability(database, { date: options.date }),
+    sleep_trend: getSleepTrend(database, { days }),
+    workout_load: getWorkoutLoad(database, { days }),
+    recovery_signals: getRecoverySignals(database, { days })
+  };
+}
+
 export function getDailyHealthSummary(database: HealthLinkDatabase, options: QueryOptions = {}): unknown {
   const health = findHealthDaily(database, options.date);
   if (!health) {
@@ -141,7 +156,16 @@ export function getSleepTrend(database: HealthLinkDatabase, options: QueryOption
       resting_heart_rate_bpm,
       active_energy_kcal,
       workout_minutes
-    from health_daily_summaries
+    from (
+      select
+        *,
+        row_number() over (
+          partition by date
+          order by updated_at desc, id desc
+        ) as row_number
+      from health_daily_summaries
+    )
+    where row_number = 1
     order by date desc
     limit ?
   `).all(days) as Pick<
@@ -164,7 +188,16 @@ export function getWorkoutLoad(database: HealthLinkDatabase, options: QueryOptio
       active_energy_kcal,
       avg_heart_rate_bpm,
       max_heart_rate_bpm
-    from health_daily_summaries
+    from (
+      select
+        *,
+        row_number() over (
+          partition by date
+          order by updated_at desc, id desc
+        ) as row_number
+      from health_daily_summaries
+    )
+    where row_number = 1
     order by date desc
     limit ?
   `).all(days) as Pick<
@@ -202,7 +235,16 @@ export function getRecoverySignals(database: HealthLinkDatabase, options: QueryO
       avg_heart_rate_bpm,
       active_energy_kcal,
       workout_minutes
-    from health_daily_summaries
+    from (
+      select
+        *,
+        row_number() over (
+          partition by date
+          order by updated_at desc, id desc
+        ) as row_number
+      from health_daily_summaries
+    )
+    where row_number = 1
     order by date desc
     limit ?
   `).all(days) as Pick<

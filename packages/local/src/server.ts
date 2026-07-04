@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import QRCode from "qrcode";
 import { z } from "zod";
 import { openHealthLinkDatabase } from "./database.js";
+import { listDevices, revokeDevice } from "./devices.js";
 import {
   HealthIngestError,
   authenticateDevice,
@@ -11,6 +12,7 @@ import {
 } from "./health-ingest.js";
 import { getAdvertisedServerUrl } from "./network.js";
 import { PairingError, PairingStore } from "./pairing.js";
+import { type TerminalQrRenderResult, renderTerminalQr } from "./terminal-qr.js";
 
 export type LocalServerOptions = {
   host: string;
@@ -41,6 +43,37 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
   });
 
   app.get("/health/status", async () => getHealthStatus(database));
+
+  app.get("/devices", async () => ({
+    ok: true,
+    devices: listDevices(database)
+  }));
+
+  app.post("/devices/:device_id/revoke", async (request, reply) => {
+    const params = deviceParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return reply.code(400).send(errorResponse("invalid_params", "device_id is required."));
+    }
+
+    try {
+      const device = authenticateDevice(database, request.headers.authorization);
+      if (device.device_id !== params.data.device_id) {
+        return reply.code(403).send(errorResponse("device_mismatch", "Device token cannot revoke another device."));
+      }
+
+      const revoked = revokeDevice(database, params.data.device_id);
+      if (!revoked) {
+        return reply.code(404).send(errorResponse("device_not_found", "Device was not found."));
+      }
+
+      return {
+        ok: true,
+        device: revoked
+      };
+    } catch (error) {
+      return sendHealthIngestError(reply, error);
+    }
+  });
 
   app.post("/health/sync", async (request, reply) => {
     try {
@@ -125,10 +158,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
     : undefined;
 
   const initialQr = initialSession
-    ? await QRCode.toString(initialSession.pairing_url, {
-        type: "terminal",
-        small: true
-      })
+    ? renderTerminalQr(initialSession.pairing_url)
     : undefined;
 
   printStartupInfo(options, database.path, advertisedUrl, initialSession, initialQr);
@@ -142,6 +172,10 @@ const startPairingSchema = z.object({
 
 const pairingStatusParamsSchema = z.object({
   pairing_code: z.string().min(1)
+});
+
+const deviceParamsSchema = z.object({
+  device_id: z.string().min(1)
 });
 
 const confirmPairingSchema = z.object({
@@ -212,7 +246,7 @@ function printStartupInfo(
     pairing_url: string;
     expires_in_seconds: number;
   },
-  initialQr?: string
+  initialQr?: TerminalQrRenderResult
 ): void {
   const loopback = `http://127.0.0.1:${options.port}`;
   console.log("");
@@ -231,7 +265,13 @@ function printStartupInfo(
     console.log(`Expires:      ${Math.round(initialSession.expires_in_seconds / 60)} minutes`);
     if (initialQr) {
       console.log("");
-      console.log(initialQr);
+      if (initialQr.rendered) {
+        console.log("Scan QR:");
+        console.log(initialQr.text);
+      } else {
+        console.log(`Scan QR: terminal is too narrow (${initialQr.requiredColumns} columns needed).`);
+        console.log(`Open ${loopback}/pair to scan the browser QR, or paste the Pairing URL in the app.`);
+      }
     }
   }
   console.log("");
