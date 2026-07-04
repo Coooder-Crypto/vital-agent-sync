@@ -69,6 +69,10 @@ Open the pairing page or scan the terminal QR code with HealthLink iOS, approve 
 
 The iPhone must use the LAN, Tailscale, tunnel, or public HTTPS address. `127.0.0.1` only works from the same machine as the receiver.
 
+Pairing is persistent. After the first setup, the iOS app keeps the server URL, device ID, and device token, while `@healthlink/local` stores synced summaries in the same SQLite database used by MCP. The Agent does not need to reload MCP after every sync; it reads the latest database rows the next time a tool is called.
+
+Expected product behavior is pair once, authorize once, then keep syncing automatically when the iOS app is active or iOS grants background refresh time. The current local receiver supports the server side of that flow; foreground/background auto-sync scheduling lives in the iOS app.
+
 ## Agent Integration
 
 Use MCP mode for Hermes or any MCP-compatible agent:
@@ -123,6 +127,22 @@ Available MCP tools:
 - `revoke_device`
 
 Use `get_personal_context` as the default high-level entry for natural language questions like "How am I today?", "How should I plan today?", "Should I exercise?", "Am I recovered?", or "Is my schedule overloaded?". It returns sync status, latest health, calendar availability, sleep trend, workout load, and recovery signals together.
+
+Agents only need `/reload-mcp` or a restart when the MCP config, database path, or tool implementation changes. New iOS syncs do not require reload.
+
+## Skill Layer
+
+MCP is the stable integration surface. Skills are optional instructions for agents that support them.
+
+A HealthLink skill should tell the agent to:
+
+- use `get_personal_context` first for broad health, recovery, schedule, exercise, or day-planning questions
+- use lower-level tools for specific follow-up questions
+- mention data freshness before giving advice
+- avoid medical diagnosis or prescriptions
+- keep calendar titles redacted
+
+Hermes can install such a skill as an experience enhancement, but generic MCP-compatible agents should still work with the MCP config alone.
 
 ## Install Helpers
 

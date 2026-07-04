@@ -2,6 +2,8 @@
 
 This document defines the target "foolproof" path for connecting HealthLink iOS to Hermes Agent or any other agent runtime.
 
+For the longer-term adapter architecture and implementation checklist covering Android, Xiaomi, OpenClaw, WorkBuddy, Tailscale, tunnels, and public HTTPS, see [architecture-upgrade-todo.md](architecture-upgrade-todo.md).
+
 ## Target User Experience
 
 ```text
@@ -9,12 +11,13 @@ This document defines the target "foolproof" path for connecting HealthLink iOS 
 2. HealthLink starts an Agent-side receiver and shows a QR code.
 3. User scans the QR code with the iOS app.
 4. User selects which data types to expose.
-5. User taps sync in the iOS app.
+5. User authorizes Apple Health / Calendar once.
 6. The Agent-side receiver stores the data locally.
-7. The agent reads the data through MCP tools.
+7. The iOS app syncs compact summaries manually or automatically.
+8. The agent reads the latest stored data through MCP tools.
 ```
 
-The user should not manually copy tokens, edit SQLite, or understand HealthKit. The only manual steps should be "run install", "scan QR", "approve scopes", and "sync".
+The user should not manually copy tokens, edit SQLite, or understand HealthKit. The only required setup steps should be "run install", "scan QR", "approve scopes", and "grant Apple permissions". Manual sync remains available, but the product expectation is pair once, authorize once, then keep the local Agent context fresh automatically when iOS allows it.
 
 ## Product Boundary
 
@@ -25,7 +28,7 @@ HealthLink iOS
   Apple permissions
   HealthKit / Calendar collection
   scope selection
-  user-initiated sync
+  manual and automatic sync
 
 @healthlink/local
   pairing QR
@@ -36,9 +39,82 @@ HealthLink iOS
 Agent runtime
   calls MCP tools
   generates analysis, reports, advice, or automations
+  may load optional HealthLink skills
 ```
 
 The agent never talks to HealthKit directly. The cloud should not become a health data warehouse by default.
+
+## Persistent Link Model
+
+HealthLink does not rely on a live socket between iOS and the Agent. Pairing creates persistent local state:
+
+```text
+iOS app
+  server URL
+  device_id
+  device token in Keychain
+
+@healthlink/local
+  paired devices
+  scoped token hashes
+  ~/.healthlink/healthlink.sqlite
+
+Hermes or another agent
+  MCP config pointing to healthlink-local mcp
+  optional HealthLink skill instructions
+```
+
+Normal use after setup is:
+
+```text
+iOS sync -> SQLite updated
+Agent question -> MCP tool reads SQLite
+```
+
+The Agent does not need to reload MCP after each sync. Reload or restart is only needed when the MCP configuration, tool code, database path, or skill files change.
+
+Reconnect or re-pair only when:
+
+- the user switches Agent machines
+- the database path changes
+- the device token is revoked
+- the user disconnects in the iOS app
+- local HealthLink data is deleted
+- Hermes config is removed or rewritten
+
+Product language:
+
+```text
+Pair once. HealthLink keeps your local Agent updated automatically. Ask your Agent anytime.
+```
+
+## Sync Lifecycle
+
+Current MVP:
+
+- user can trigger sync manually from the iOS app
+- sync writes compact summaries to `/health/sync`
+- MCP tools read the latest rows at query time
+
+Expected near-term iOS behavior:
+
+- auto sync immediately after successful pairing and permission grant
+- auto sync when the app launches or returns to foreground
+- throttle auto sync by a minimum interval, such as 30 minutes
+- skip auto sync when not paired, already syncing, missing permissions, or recently attempted
+- keep a manual Sync button for explicit refresh
+
+Background sync should be best-effort, not a strict schedule:
+
+- use `BGAppRefreshTask` / `BGProcessingTask` where appropriate
+- use HealthKit observer queries and background delivery where possible
+- never promise exact intervals like "every 30 minutes"
+
+Recommended UX copy:
+
+```text
+HealthLink syncs automatically after authorization and when iOS allows background refresh. You can also sync manually anytime.
+```
 
 ## Connection Modes
 
@@ -108,6 +184,7 @@ npx -y @healthlink/local init --hermes
 - Open or print the pairing page.
 - Print MCP config for common agents.
 - Tell the user to restart Hermes or run `/reload-mcp`.
+- Optional future behavior: install or update a HealthLink skill for Hermes.
 
 The generic receiver remains:
 
@@ -220,6 +297,32 @@ npx -y @healthlink/local doctor
 
 The helpers should not invent new protocols. They should write or print the same MCP command with the correct database path. `init --hermes` uses the same install logic as `install-hermes`, but folds it into the pairing flow so users do not need a separate config-writing command.
 
+## Skill Layer
+
+MCP is the product protocol. Skills are optional agent-specific instructions that improve natural-language tool use.
+
+HealthLink should provide a small, portable skill document for agents that support skills. Hermes can be the first-class target.
+
+Skill responsibilities:
+
+- recognize questions such as "How am I today?", "Should I exercise?", "How should I plan today?", "Am I recovered?", and "Is my schedule overloaded?"
+- call `get_personal_context` first for broad personal-context questions
+- use lower-level tools only for drill-down questions
+- report data freshness before analysis
+- combine health, sleep, activity, recovery, and calendar pressure
+- avoid diagnosis, prescriptions, or unsupported medical claims
+- keep calendar titles redacted
+
+Potential helper commands:
+
+```bash
+npx -y @healthlink/local print-skill --format markdown
+npx -y @healthlink/local install-hermes-skill
+npx -y @healthlink/local init --hermes --install-skill
+```
+
+These should remain additive. Non-Hermes agents should still work through generic MCP config alone.
+
 ## Current MCP Tools
 
 Current implemented tools:
@@ -249,8 +352,12 @@ Tool rules:
 Next work after the local pairing MVP should focus on lifecycle and transport:
 
 ```text
+P1  foreground auto sync with throttling
+P1  auto sync after pairing / permission grant
 P1  disconnect / revoke paired device
 P1  richer local diagnostics
+P1  optional Hermes skill installer
+P1  background refresh as best-effort, not guaranteed cadence
 P1  public HTTPS mode docs
 P2  tunnel mode
 P2  payload signatures and E2E encryption
@@ -260,4 +367,10 @@ The current local data path is implemented:
 
 ```text
 iOS app -> /health/sync -> SQLite -> MCP tools
+```
+
+The target steady-state behavior is:
+
+```text
+pair once -> authorize once -> auto/manual sync -> ask Agent anytime
 ```
