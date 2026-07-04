@@ -1,0 +1,330 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 54;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		2B33250869B670BA6812B874 /* HealthKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14B1BEB35D8D456E32FC2B53 /* HealthKitService.swift */; };
+		2E1F8A78BB9F708C8811A19E /* GatewaySettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BED9ABD6FF27E914E97C6BBA /* GatewaySettings.swift */; };
+		316F855ABA771838709BD654 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 957F3524B6F63E78719CE8B6 /* ContentView.swift */; };
+		483B374A50D62394A97A83A5 /* SyncCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EF525662AA44BB8138550CA /* SyncCoordinator.swift */; };
+		713FB525194F08B244C22A3F /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6953E1DC055E9F474CB2672 /* KeychainStore.swift */; };
+		747AD7F797273D80F6FF93C8 /* CalendarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2963D9DD0F2C4E6BB7B3B824 /* CalendarService.swift */; };
+		76150195B631A4AC1D21F579 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = B870017A5708F77F5B880D8F /* Models.swift */; };
+		BAAEB6647FD845A1F09898D4 /* GatewayAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D935E77B53468822C74DF1B5 /* GatewayAPIClient.swift */; };
+		F0E51CDEBF772E583DAD1E4C /* HealthLinkApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51A10E73D71237BE464C884 /* HealthLinkApp.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		14B1BEB35D8D456E32FC2B53 /* HealthKitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitService.swift; sourceTree = "<group>"; };
+		2963D9DD0F2C4E6BB7B3B824 /* CalendarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarService.swift; sourceTree = "<group>"; };
+		5659626769CB59BA7B1CF443 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		5EF525662AA44BB8138550CA /* SyncCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncCoordinator.swift; sourceTree = "<group>"; };
+		957F3524B6F63E78719CE8B6 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A6953E1DC055E9F474CB2672 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
+		B870017A5708F77F5B880D8F /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		BED9ABD6FF27E914E97C6BBA /* GatewaySettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewaySettings.swift; sourceTree = "<group>"; };
+		CC6FB8069B715AC38C078E16 /* HealthLink.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = HealthLink.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D935E77B53468822C74DF1B5 /* GatewayAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayAPIClient.swift; sourceTree = "<group>"; };
+		F51A10E73D71237BE464C884 /* HealthLinkApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthLinkApp.swift; sourceTree = "<group>"; };
+		F81455E757D7B11372F2829B /* HealthLink.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HealthLink.entitlements; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		2D05C55DA325132C12800298 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				2963D9DD0F2C4E6BB7B3B824 /* CalendarService.swift */,
+				957F3524B6F63E78719CE8B6 /* ContentView.swift */,
+				D935E77B53468822C74DF1B5 /* GatewayAPIClient.swift */,
+				BED9ABD6FF27E914E97C6BBA /* GatewaySettings.swift */,
+				14B1BEB35D8D456E32FC2B53 /* HealthKitService.swift */,
+				5659626769CB59BA7B1CF443 /* Info.plist */,
+				A6953E1DC055E9F474CB2672 /* KeychainStore.swift */,
+				B870017A5708F77F5B880D8F /* Models.swift */,
+				F81455E757D7B11372F2829B /* HealthLink.entitlements */,
+				F51A10E73D71237BE464C884 /* HealthLinkApp.swift */,
+				5EF525662AA44BB8138550CA /* SyncCoordinator.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		2F9589F18463030F2B8BBDA0 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				CC6FB8069B715AC38C078E16 /* HealthLink.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		8A46E53238367F648A91ADAE = {
+			isa = PBXGroup;
+			children = (
+				2D05C55DA325132C12800298 /* App */,
+				2F9589F18463030F2B8BBDA0 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		87A2A483845398E52C652332 /* HealthLink */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2886723D1759B0E55466CA8D /* Build configuration list for PBXNativeTarget "HealthLink" */;
+			buildPhases = (
+				F1C2E726ABC434654E929CA4 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = HealthLink;
+			productName = HealthLink;
+			productReference = CC6FB8069B715AC38C078E16 /* HealthLink.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		FE355DF87D65E72D0EFF6429 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					87A2A483845398E52C652332 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = B4FE6C86385F000624AF1999 /* Build configuration list for PBXProject "HealthLink" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 8A46E53238367F648A91ADAE;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				87A2A483845398E52C652332 /* HealthLink */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		F1C2E726ABC434654E929CA4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				747AD7F797273D80F6FF93C8 /* CalendarService.swift in Sources */,
+				316F855ABA771838709BD654 /* ContentView.swift in Sources */,
+				BAAEB6647FD845A1F09898D4 /* GatewayAPIClient.swift in Sources */,
+				2E1F8A78BB9F708C8811A19E /* GatewaySettings.swift in Sources */,
+				2B33250869B670BA6812B874 /* HealthKitService.swift in Sources */,
+				713FB525194F08B244C22A3F /* KeychainStore.swift in Sources */,
+				76150195B631A4AC1D21F579 /* Models.swift in Sources */,
+				F0E51CDEBF772E583DAD1E4C /* HealthLinkApp.swift in Sources */,
+				483B374A50D62394A97A83A5 /* SyncCoordinator.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		03100310BD98190FD0162448 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		269FC9700A35B613EC971A93 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/HealthLink.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.healthlink.ios;
+				PRODUCT_NAME = HealthLink;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		8313E58C1325B4C01228BB5E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		FAA699242D8D67BCCE3D3982 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/HealthLink.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.healthlink.ios;
+				PRODUCT_NAME = HealthLink;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		2886723D1759B0E55466CA8D /* Build configuration list for PBXNativeTarget "HealthLink" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FAA699242D8D67BCCE3D3982 /* Debug */,
+				269FC9700A35B613EC971A93 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B4FE6C86385F000624AF1999 /* Build configuration list for PBXProject "HealthLink" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8313E58C1325B4C01228BB5E /* Debug */,
+				03100310BD98190FD0162448 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = FE355DF87D65E72D0EFF6429 /* Project object */;
+}
