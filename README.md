@@ -4,7 +4,7 @@ HealthLink is a private iOS data gateway for agent systems. The MVP reads user-a
 
 It is intentionally not an agent. It is a user-controlled data connector.
 
-For the broader product plan covering local daemon, MCP, tunnel mode, self-hosting, pairing, scopes, and packaging, see [docs/product-plan.md](docs/product-plan.md). For the target "install, scan QR, sync, agent reads data" UX, see [docs/agent-connection.md](docs/agent-connection.md).
+For the broader product plan covering local daemon, MCP, tunnel mode, self-hosting, pairing, scopes, and packaging, see [docs/product-plan.md](docs/product-plan.md). For the target "install, scan QR, sync, agent reads data" UX, see [docs/agent-connection.md](docs/agent-connection.md). For the multi-source, multi-agent, multi-transport upgrade TODO, see [docs/architecture-upgrade-todo.md](docs/architecture-upgrade-todo.md).
 
 ## Scope
 
@@ -23,6 +23,9 @@ For the broader product plan covering local daemon, MCP, tunnel mode, self-hosti
   - paired server URL in `UserDefaults`
   - paired device ID in `UserDefaults`
   - device token in Keychain
+- Sync lifecycle:
+  - current MVP supports manual user-triggered sync
+  - target UX is pair once, authorize once, then auto-sync when the app is active or iOS grants background time
 - Upload endpoint:
   - `POST /health/sync`
 - Agent access:
@@ -53,7 +56,7 @@ The current local development loop is:
 ```text
 iPhone app
   -> HealthKit / Calendar summaries
-  -> POST /health/sync
+  -> POST /health/sync on manual or automatic sync
   -> @healthlink/local
   -> SQLite
   -> MCP tools
@@ -75,6 +78,8 @@ node packages/local/dist/cli.js init --hermes
 ```
 
 `init --hermes` starts the local receiver, prints the iPhone pairing QR, backs up and writes `~/.hermes/config.yaml`, and points Hermes at the same HealthLink database. After pairing and syncing, restart Hermes or run `/reload-mcp`.
+
+After that first setup, Hermes does not need to reconnect for every sync. iOS writes new summaries to the same local database, and Hermes MCP tools read the latest rows when the user asks a question.
 
 Agent integration helpers:
 
@@ -109,6 +114,30 @@ HealthKit requires a real iPhone for meaningful testing. In Xcode:
 6. Scan the pairing QR in the app Settings tab.
 7. Confirm the server/scopes, then grant Health and Calendar permissions.
 8. Sync once, then restart Hermes or run `/reload-mcp`.
+9. Ask Hermes a natural-language question, such as `我今天状态怎么样？`.
+
+Normal use after setup:
+
+```text
+iOS syncs latest summaries -> ~/.healthlink/healthlink.sqlite
+Hermes calls HealthLink MCP -> reads the latest summaries
+```
+
+No repeated QR scan, `install-hermes`, or `/reload-mcp` is needed unless the pairing, database path, MCP configuration, or skill files change.
+
+## Agent Skills
+
+MCP is the stable integration contract. Skills are optional agent-side usage guidance that help an AI decide when to call HealthLink and how to format analysis.
+
+For Hermes, the preferred skill behavior is:
+
+- use `get_personal_context` first for broad questions about today, energy, recovery, exercise readiness, schedule pressure, or planning
+- call lower-level tools only for follow-up details
+- mention data freshness before analysis
+- avoid medical diagnosis or prescriptions
+- keep calendar titles redacted
+
+Product installs should keep the generic MCP path available for non-Hermes agents, while Hermes-first setup can install or update a HealthLink skill as an experience enhancement.
 
 ## Sync Contract
 
@@ -163,9 +192,10 @@ Unified payload:
 
 ## Next Steps
 
+- Add foreground auto sync after pairing, app launch, and app foregrounding with throttling.
 - Add `HKAnchoredObjectQuery` for incremental sample sync.
-- Add `HKObserverQuery` and background delivery as a best-effort trigger.
-- Add disconnect / revoke paired device.
+- Add `HKObserverQuery`, `BGAppRefreshTask`, and background delivery as best-effort triggers.
+- Add an optional bundled HealthLink skill installer for Hermes.
 - Add automated iOS UI coverage after real-device workflow stabilizes.
 - Add tunnel and public HTTPS transports.
 - Add Reminders summaries.
