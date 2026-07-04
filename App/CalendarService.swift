@@ -91,10 +91,17 @@ final class CalendarService {
         var free: [DateInterval] = []
 
         for busy in busyIntervals {
-            let boundedBusy = DateInterval(start: max(busy.start, windowStart), end: min(busy.end, windowEnd))
-            guard boundedBusy.end > windowStart, boundedBusy.start < windowEnd else {
+            guard busy.end > windowStart, busy.start < windowEnd else {
                 continue
             }
+
+            let boundedStart = max(busy.start, windowStart)
+            let boundedEnd = min(busy.end, windowEnd)
+            guard boundedEnd > boundedStart else {
+                continue
+            }
+
+            let boundedBusy = DateInterval(start: boundedStart, end: boundedEnd)
             if boundedBusy.start > cursor {
                 free.append(DateInterval(start: cursor, end: boundedBusy.start))
             }

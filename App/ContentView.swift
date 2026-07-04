@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ContentView: View {
     var body: some View {
@@ -136,6 +137,8 @@ struct HeaderPanel: View {
 }
 
 struct PermissionPanel: View {
+    @Environment(\.openURL) private var openURL
+
     @ObservedObject var sync: SyncCoordinator
 
     var body: some View {
@@ -159,6 +162,17 @@ struct PermissionPanel: View {
                     Task { await sync.requestCalendarAuthorization() }
                 }
             }
+
+            Button {
+                openURL(URL(string: UIApplication.openSettingsURLString)!)
+            } label: {
+                Label("Open iOS Settings", systemImage: "gearshape")
+                    .font(.footnote.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .tint(GatewayStyle.primary)
+            .disabled(sync.isSyncing)
         }
     }
 }
@@ -227,6 +241,22 @@ struct SyncPanel: View {
                         date: sync.status.lastCalendarSyncAt
                     )
                 }
+
+                if let message = sync.status.lastSuccessMessage {
+                    StatusMessage(
+                        message: message,
+                        systemImage: "checkmark.circle",
+                        color: GatewayStyle.success
+                    )
+                }
+
+                if let message = sync.status.lastError {
+                    StatusMessage(
+                        message: message,
+                        systemImage: "exclamationmark.triangle",
+                        color: GatewayStyle.warning
+                    )
+                }
             }
             .padding(14)
             .background(GatewayStyle.surface)
@@ -236,6 +266,27 @@ struct SyncPanel: View {
                     .stroke(GatewayStyle.border, lineWidth: 1)
             )
         }
+    }
+}
+
+struct StatusMessage: View {
+    let message: String
+    let systemImage: String
+    let color: Color
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: systemImage)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(color)
+                .frame(width: 16)
+
+            Text(message)
+                .font(.footnote)
+                .foregroundStyle(GatewayStyle.mutedText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -340,6 +391,45 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("Pairing") {
+                    TextField("healthlink://pair?server=...&code=...", text: $settings.pairingURLText)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+
+                    Button {
+                        Task { await settings.confirmPairing() }
+                    } label: {
+                        if settings.isPairing {
+                            Label("Pairing", systemImage: "arrow.triangle.2.circlepath")
+                        } else {
+                            Label("Pair Device", systemImage: "qrcode.viewfinder")
+                        }
+                    }
+                    .disabled(settings.isPairing || settings.pairingURLText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                    HStack {
+                        Label(pairingStatus, systemImage: pairingIcon)
+                            .foregroundStyle(pairingColor)
+                        Spacer()
+                    }
+                    .font(.footnote)
+
+                    if let deviceID = settings.pairedDeviceID {
+                        Text(deviceID)
+                            .font(.footnote.monospaced())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+
+                    if let message = settings.pairingMessage {
+                        Text(message)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 Section("Server") {
                     TextField("Server URL", text: $settings.serverURLText)
                         .textInputAutocapitalization(.never)
@@ -403,6 +493,18 @@ struct SettingsView: View {
 
     private var tokenColor: Color {
         settings.apiTokenText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? GatewayStyle.warning : GatewayStyle.success
+    }
+
+    private var pairingStatus: String {
+        settings.isPaired ? "Device paired" : "No paired device"
+    }
+
+    private var pairingIcon: String {
+        settings.isPaired ? "iphone.gen3" : "iphone.slash"
+    }
+
+    private var pairingColor: Color {
+        settings.isPaired ? GatewayStyle.success : GatewayStyle.warning
     }
 }
 

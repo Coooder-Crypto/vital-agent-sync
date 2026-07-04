@@ -53,14 +53,85 @@ struct SyncStatus: Codable {
     var lastHealthSyncAt: Date?
     var lastCalendarSyncAt: Date?
     var lastError: String?
+    var lastSuccessMessage: String?
 
-    static let empty = SyncStatus(lastHealthSyncAt: nil, lastCalendarSyncAt: nil, lastError: nil)
+    static let empty = SyncStatus(
+        lastHealthSyncAt: nil,
+        lastCalendarSyncAt: nil,
+        lastError: nil,
+        lastSuccessMessage: nil
+    )
+}
+
+struct PairingLink {
+    let serverURL: URL
+    let pairingCode: String
+
+    init(rawValue: String) throws {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let components = URLComponents(string: trimmed),
+              components.scheme == "healthlink",
+              components.host == "pair" else {
+            throw GatewayError.invalidPairingURL
+        }
+
+        let queryItems = components.queryItems ?? []
+        let serverValue = queryItems.first { $0.name == "server" }?.value
+        let codeValue = queryItems.first { $0.name == "code" }?.value
+
+        guard let serverValue,
+              let serverURL = URL(string: serverValue),
+              let scheme = serverURL.scheme,
+              ["http", "https"].contains(scheme) else {
+            throw GatewayError.invalidPairingURL
+        }
+
+        guard let codeValue,
+              !codeValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw GatewayError.invalidPairingURL
+        }
+
+        self.serverURL = serverURL
+        self.pairingCode = codeValue.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+    }
+}
+
+struct PairConfirmRequest: Codable {
+    let pairing_code: String
+    let device_name: String
+    let device_platform: String
+    let accepted_scopes: [String]
+}
+
+struct PairConfirmResponse: Codable {
+    let device_id: String
+    let device_token: String
+    let server_time: String
+}
+
+struct HealthSyncPayload: Codable {
+    let device_id: String
+    let sync_id: String
+    let generated_at: String
+    let timezone: String
+    let health_daily_summaries: [DailyHealthSummary]
+    let calendar_daily_summaries: [DailyCalendarSummary]
+}
+
+struct HealthSyncResponse: Codable {
+    let ok: Bool
+    let accepted_sync_id: String
+    let health_daily_count: Int
+    let calendar_daily_count: Int
+    let idempotent: Bool
 }
 
 enum GatewayError: LocalizedError {
     case healthKitUnavailable
     case missingServerURL
     case missingAPIToken
+    case missingPairedDevice
+    case invalidPairingURL
     case invalidServerResponse(Int)
 
     var errorDescription: String? {
@@ -71,6 +142,10 @@ enum GatewayError: LocalizedError {
             return "Server URL is not configured."
         case .missingAPIToken:
             return "API token is not configured."
+        case .missingPairedDevice:
+            return "Device is not paired."
+        case .invalidPairingURL:
+            return "Pairing URL is invalid."
         case .invalidServerResponse(let statusCode):
             return "Server returned HTTP \(statusCode)."
         }
