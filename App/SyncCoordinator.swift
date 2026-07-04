@@ -13,12 +13,14 @@ final class SyncCoordinator: ObservableObject {
     func requestHealthAuthorization() async {
         await run {
             try await self.healthService.requestAuthorization()
+            self.status.lastSuccessMessage = "Health permission request completed"
         }
     }
 
     func requestCalendarAuthorization() async {
         await run {
             try await self.calendarService.requestAuthorization()
+            self.status.lastSuccessMessage = "Calendar permission granted"
         }
     }
 
@@ -65,7 +67,7 @@ final class SyncCoordinator: ObservableObject {
                 calendar_daily_summaries: calendarSummaries
             )
 
-            _ = try await client.uploadHealthSync(payload)
+            let response = try await client.uploadHealthSync(payload)
             let syncedAt = Date()
             if !healthSummaries.isEmpty {
                 self.status.lastHealthSyncAt = syncedAt
@@ -73,6 +75,7 @@ final class SyncCoordinator: ObservableObject {
             if !calendarSummaries.isEmpty {
                 self.status.lastCalendarSyncAt = syncedAt
             }
+            self.status.lastSuccessMessage = "Uploaded \(response.health_daily_count) health / \(response.calendar_daily_count) calendar"
         }
     }
 
@@ -92,6 +95,7 @@ final class SyncCoordinator: ObservableObject {
     private func run(_ operation: @escaping () async throws -> Void) async {
         isSyncing = true
         status.lastError = nil
+        status.lastSuccessMessage = nil
         defer { isSyncing = false }
 
         do {

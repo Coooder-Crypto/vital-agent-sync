@@ -53,8 +53,14 @@ struct SyncStatus: Codable {
     var lastHealthSyncAt: Date?
     var lastCalendarSyncAt: Date?
     var lastError: String?
+    var lastSuccessMessage: String?
 
-    static let empty = SyncStatus(lastHealthSyncAt: nil, lastCalendarSyncAt: nil, lastError: nil)
+    static let empty = SyncStatus(
+        lastHealthSyncAt: nil,
+        lastCalendarSyncAt: nil,
+        lastError: nil,
+        lastSuccessMessage: nil
+    )
 }
 
 struct PairingLink {
