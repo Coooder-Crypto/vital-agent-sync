@@ -131,6 +131,13 @@ Current development command:
 npm run dev:local
 ```
 
+Implemented local MVP command:
+
+```bash
+npm run build:local
+node packages/local/dist/cli.js init
+```
+
 ## Pairing QR Payload
 
 The QR should carry a pairing URL or equivalent JSON payload:
@@ -191,12 +198,11 @@ Published package config:
 }
 ```
 
-Planned helpers:
+Implemented helpers:
 
 ```bash
-npx -y @healthlink/local install-hermes
-npx -y @healthlink/local install-claude
 npx -y @healthlink/local print-mcp-config
+npx -y @healthlink/local install-hermes
 ```
 
 The helpers should not invent new protocols. They should write or print the same MCP command with the correct database path.
@@ -223,20 +229,16 @@ Tool rules:
 
 ## Development Priorities
 
-Next work should focus on setup and pairing UX:
+Next work after the local pairing MVP should focus on lifecycle and transport:
 
 ```text
-P0  @healthlink/local init
-P0  in-app QR scanner
-P0  pairing confirmation screen with scopes
-P0  print-mcp-config / install-hermes helper
 P1  disconnect / revoke paired device
 P1  public HTTPS mode docs
 P2  tunnel mode
 P2  payload signatures and E2E encryption
 ```
 
-The current local data path is already proven:
+The current local data path is implemented:
 
 ```text
 iOS app -> /health/sync -> SQLite -> MCP tools
