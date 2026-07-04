@@ -387,23 +387,31 @@ struct EmptySummaryPanel: View {
 
 struct SettingsView: View {
     @EnvironmentObject private var settings: GatewaySettings
+    @State private var isShowingScanner = false
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Pairing") {
+                    Button {
+                        isShowingScanner = true
+                    } label: {
+                        Label("Scan Pairing QR", systemImage: "qrcode.viewfinder")
+                    }
+                    .disabled(settings.isPairing)
+
                     TextField("healthlink://pair?server=...&code=...", text: $settings.pairingURLText)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
 
                     Button {
-                        Task { await settings.confirmPairing() }
+                        Task { await settings.preparePairingFromText() }
                     } label: {
                         if settings.isPairing {
-                            Label("Pairing", systemImage: "arrow.triangle.2.circlepath")
+                            Label("Checking Pairing", systemImage: "arrow.triangle.2.circlepath")
                         } else {
-                            Label("Pair Device", systemImage: "qrcode.viewfinder")
+                            Label("Use Pairing URL", systemImage: "link")
                         }
                     }
                     .disabled(settings.isPairing || settings.pairingURLText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -480,6 +488,24 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
             }
             .navigationTitle("Settings")
+            .sheet(isPresented: $isShowingScanner) {
+                PairingScannerView { value in
+                    isShowingScanner = false
+                    Task { await settings.preparePairing(rawValue: value) }
+                }
+            }
+            .sheet(item: $settings.pendingPairing) { preview in
+                PairingConfirmationView(
+                    preview: preview,
+                    isPairing: settings.isPairing,
+                    onCancel: {
+                        settings.cancelPendingPairing()
+                    },
+                    onConfirm: {
+                        Task { await settings.confirmPairing(preview) }
+                    }
+                )
+            }
         }
     }
 
@@ -505,6 +531,52 @@ struct SettingsView: View {
 
     private var pairingColor: Color {
         settings.isPaired ? GatewayStyle.success : GatewayStyle.warning
+    }
+}
+
+struct PairingConfirmationView: View {
+    let preview: PairingPreview
+    let isPairing: Bool
+    let onCancel: () -> Void
+    let onConfirm: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Agent") {
+                    LabeledContent("Name", value: preview.status.agent_name)
+                    LabeledContent("Server", value: preview.status.server_url)
+                    LabeledContent("Code", value: preview.status.pairing_code)
+                    LabeledContent("Expires", value: preview.status.expires_at)
+                }
+
+                Section("Scopes") {
+                    ForEach(preview.status.requested_scopes, id: \.self) { scope in
+                        Label(scope, systemImage: "checkmark.circle")
+                    }
+                }
+            }
+            .navigationTitle("Confirm Pairing")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", action: onCancel)
+                        .disabled(isPairing)
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        onConfirm()
+                    } label: {
+                        if isPairing {
+                            Text("Pairing")
+                        } else {
+                            Text("Pair")
+                        }
+                    }
+                    .disabled(isPairing)
+                }
+            }
+        }
     }
 }
 

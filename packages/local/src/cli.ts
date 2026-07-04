@@ -1,11 +1,20 @@
+#!/usr/bin/env node
+import {
+  formatStandardMcpConfig,
+  installHermesMcpConfig,
+  buildHealthLinkMcpServerConfig
+} from "./mcp-config.js";
 import { startLocalServer } from "./server.js";
 import { startMcpServer } from "./mcp.js";
 
 type CliOptions = {
-  command: "server" | "mcp";
+  command: "server" | "init" | "mcp" | "print-mcp-config" | "install-hermes";
   port: number;
   host: string;
   databasePath?: string;
+  serverUrl?: string;
+  agentName?: string;
+  hermesConfigPath?: string;
 };
 
 function parseArgs(argv: string[]): CliOptions {
@@ -17,8 +26,8 @@ function parseArgs(argv: string[]): CliOptions {
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (arg === "mcp") {
-      options.command = "mcp";
+    if (arg === "server" || arg === "init" || arg === "mcp" || arg === "print-mcp-config" || arg === "install-hermes") {
+      options.command = arg;
     } else if (arg === "--port") {
       options.port = Number(argv[index + 1]);
       index += 1;
@@ -27,6 +36,15 @@ function parseArgs(argv: string[]): CliOptions {
       index += 1;
     } else if (arg === "--db") {
       options.databasePath = argv[index + 1];
+      index += 1;
+    } else if (arg === "--server-url") {
+      options.serverUrl = argv[index + 1];
+      index += 1;
+    } else if (arg === "--agent-name") {
+      options.agentName = argv[index + 1];
+      index += 1;
+    } else if (arg === "--hermes-config") {
+      options.hermesConfigPath = argv[index + 1];
       index += 1;
     }
   }
@@ -48,11 +66,48 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (options.command === "print-mcp-config") {
+    process.stdout.write(formatStandardMcpConfig({
+      databasePath: options.databasePath
+    }));
+    return;
+  }
+
+  if (options.command === "install-hermes") {
+    const result = installHermesMcpConfig({
+      databasePath: options.databasePath,
+      configPath: options.hermesConfigPath
+    });
+    console.log("HealthLink MCP installed for Hermes");
+    console.log(`Config: ${result.configPath}`);
+    if (result.backupPath) {
+      console.log(`Backup: ${result.backupPath}`);
+    }
+    console.log("");
+    console.log("Restart Hermes or run /reload-mcp to load the healthlink tools.");
+    return;
+  }
+
   await startLocalServer({
     host: options.host,
     port: options.port,
-    databasePath: options.databasePath
+    databasePath: options.databasePath,
+    serverUrl: options.serverUrl,
+    agentName: options.agentName,
+    mode: options.command === "init" ? "init" : "server"
   });
+
+  if (options.command === "init") {
+    const server = buildHealthLinkMcpServerConfig({
+      databasePath: options.databasePath
+    });
+    console.log("Agent MCP:");
+    console.log(`  ${server.command} ${server.args.join(" ")}`);
+    console.log("");
+    console.log("Hermes:");
+    console.log("  healthlink-local install-hermes");
+    console.log("");
+  }
 }
 
 main().catch((error: unknown) => {

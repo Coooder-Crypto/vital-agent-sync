@@ -28,6 +28,8 @@
 	<string>HealthLink reads your calendar availability to build redacted daily context for your authorized agents.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>HealthLink reads selected Apple Health data to sync daily summaries to your authorized agent server.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>HealthLink scans pairing QR codes shown by your local Agent server.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>HealthLink connects to your local Agent server on your network after you approve pairing.</string>
 	<key>NSAppTransportSecurity</key>

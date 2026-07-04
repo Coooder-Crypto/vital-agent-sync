@@ -8,6 +8,7 @@ final class GatewaySettings: ObservableObject {
     @Published private(set) var pairedDeviceID: String?
     @Published private(set) var acceptedScopes: [String]
     @Published private(set) var isPairing = false
+    @Published var pendingPairing: PairingPreview?
     @Published var pairingMessage: String?
     @Published var uploadHealthEnabled: Bool
     @Published var uploadCalendarEnabled: Bool
@@ -51,31 +52,55 @@ final class GatewaySettings: ObservableObject {
         pairedDeviceID != nil && !apiTokenText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    func confirmPairing() async {
-        let rawPairingURL = pairingURLText
+    func preparePairingFromText() async {
+        await preparePairing(rawValue: pairingURLText)
+    }
+
+    func preparePairing(rawValue: String) async {
         isPairing = true
         pairingMessage = nil
         defer { isPairing = false }
 
         do {
-            let link = try PairingLink(rawValue: rawPairingURL)
+            let link = try PairingLink(rawValue: rawValue)
+            let status = try await GatewayAPIClient.getPairingStatus(link: link)
+            guard status.status == "pending" else {
+                throw GatewayError.invalidPairingURL
+            }
+            pendingPairing = PairingPreview(link: link, status: status)
+        } catch {
+            pairingMessage = error.localizedDescription
+        }
+    }
+
+    func confirmPairing(_ preview: PairingPreview) async {
+        isPairing = true
+        pairingMessage = nil
+        defer { isPairing = false }
+
+        do {
             let response = try await GatewayAPIClient.confirmPairing(
-                link: link,
+                link: preview.link,
                 deviceName: "HealthLink iOS",
-                acceptedScopes: Self.defaultAcceptedScopes
+                acceptedScopes: preview.status.requested_scopes
             )
 
             savePairing(
-                serverURL: link.serverURL,
+                serverURL: preview.link.serverURL,
                 deviceID: response.device_id,
                 deviceToken: response.device_token,
-                acceptedScopes: Self.defaultAcceptedScopes
+                acceptedScopes: preview.status.requested_scopes
             )
             pairingURLText = ""
+            pendingPairing = nil
             pairingMessage = "Paired"
         } catch {
             pairingMessage = error.localizedDescription
         }
+    }
+
+    func cancelPendingPairing() {
+        pendingPairing = nil
     }
 
     func save() {

@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 54;
+	objectVersion = 56;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -27,7 +27,7 @@
 		A6953E1DC055E9F474CB2672 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		B870017A5708F77F5B880D8F /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		BED9ABD6FF27E914E97C6BBA /* GatewaySettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewaySettings.swift; sourceTree = "<group>"; };
-		CC6FB8069B715AC38C078E16 /* HealthLink.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = HealthLink.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CC6FB8069B715AC38C078E16 /* HealthLink.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HealthLink.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D935E77B53468822C74DF1B5 /* GatewayAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayAPIClient.swift; sourceTree = "<group>"; };
 		F51A10E73D71237BE464C884 /* HealthLinkApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthLinkApp.swift; sourceTree = "<group>"; };
 		F81455E757D7B11372F2829B /* HealthLink.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HealthLink.entitlements; sourceTree = "<group>"; };
@@ -96,7 +96,6 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					87A2A483845398E52C652332 = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -204,6 +203,7 @@
 				CODE_SIGN_ENTITLEMENTS = App/HealthLink.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = A947TJV48Y;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -290,6 +290,7 @@
 				CODE_SIGN_ENTITLEMENTS = App/HealthLink.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = A947TJV48Y;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

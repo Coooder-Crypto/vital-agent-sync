@@ -50,6 +50,24 @@ final class GatewayAPIClient {
         return try JSONDecoder().decode(PairConfirmResponse.self, from: data)
     }
 
+    static func getPairingStatus(link: PairingLink) async throws -> PairingStatusResponse {
+        var components = URLComponents(url: endpoint(baseURL: link.serverURL, path: "/pair/status/\(link.pairingCode)"), resolvingAgainstBaseURL: false)
+        components?.percentEncodedQuery = nil
+        guard let url = components?.url else {
+            throw GatewayError.invalidPairingURL
+        }
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw GatewayError.invalidServerResponse(-1)
+        }
+        guard 200..<300 ~= httpResponse.statusCode else {
+            throw GatewayError.invalidServerResponse(httpResponse.statusCode)
+        }
+
+        return try JSONDecoder().decode(PairingStatusResponse.self, from: data)
+    }
+
     private func post<T: Encodable>(_ payload: T, path: String) async throws {
         let _: EmptyResponse = try await post(payload, path: path)
     }

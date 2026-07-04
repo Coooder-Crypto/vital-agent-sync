@@ -15,9 +15,10 @@ export type PairingSession = {
   agent_name: string;
   requested_scopes: string[];
   expires_in_seconds: number;
+  expires_at: string;
 };
 
-export type PairingRecord = PairingSession & {
+export type PairingRecord = Omit<PairingSession, "expires_at"> & {
   created_at: Date;
   expires_at: Date;
   consumed_at?: Date;
@@ -216,6 +217,9 @@ export class PairingStore {
 
   getStatus(code: string): {
     pairing_code: string;
+    server_url: string;
+    agent_name: string;
+    requested_scopes: string[];
     status: "pending" | "confirmed";
     expires_at: string;
     consumed_at?: string;
@@ -227,6 +231,9 @@ export class PairingStore {
 
     return {
       pairing_code: session.pairing_code,
+      server_url: session.server_url,
+      agent_name: session.agent_name,
+      requested_scopes: session.requested_scopes,
       status: session.consumed_at ? "confirmed" : "pending",
       expires_at: session.expires_at.toISOString(),
       consumed_at: session.consumed_at?.toISOString()
@@ -275,7 +282,8 @@ function toPublicSession(session: PairingRecord): PairingSession {
     server_url: session.server_url,
     agent_name: session.agent_name,
     requested_scopes: session.requested_scopes,
-    expires_in_seconds: session.expires_in_seconds
+    expires_in_seconds: session.expires_in_seconds,
+    expires_at: session.expires_at.toISOString()
   };
 }
 

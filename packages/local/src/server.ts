@@ -1,5 +1,4 @@
 import Fastify from "fastify";
-import { networkInterfaces } from "node:os";
 import QRCode from "qrcode";
 import { z } from "zod";
 import { openHealthLinkDatabase } from "./database.js";
@@ -10,19 +9,28 @@ import {
   ingestHealthSync,
   parseHealthSyncPayload
 } from "./health-ingest.js";
+import { getAdvertisedServerUrl } from "./network.js";
 import { PairingError, PairingStore } from "./pairing.js";
 
 export type LocalServerOptions = {
   host: string;
   port: number;
   databasePath?: string;
+  serverUrl?: string;
+  agentName?: string;
+  mode?: "server" | "init";
 };
 
 export async function startLocalServer(options: LocalServerOptions): Promise<void> {
   const app = Fastify({
     logger: true
   });
-  const advertisedUrl = `http://${getAdvertisedHost(options.host)}:${options.port}`;
+  const advertisedUrl = getAdvertisedServerUrl({
+    bindHost: options.host,
+    port: options.port,
+    serverUrl: options.serverUrl
+  });
+  const agentName = options.agentName ?? "Local Agent";
   const database = openHealthLinkDatabase({
     path: options.databasePath
   });
@@ -47,7 +55,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
   app.get("/pair", async (_request, reply) => {
     const session = pairings.createSession({
       serverUrl: advertisedUrl,
-      agentName: "Local Agent"
+      agentName
     });
     const qrDataUrl = await QRCode.toDataURL(session.pairing_url, {
       margin: 1,
@@ -66,10 +74,17 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
       }));
   });
 
-  app.post("/pair/start", async () => pairings.createSession({
-    serverUrl: advertisedUrl,
-    agentName: "Local Agent"
-  }));
+  app.post("/pair/start", async (request, reply) => {
+    const body = startPairingSchema.safeParse(request.body ?? {});
+    if (!body.success) {
+      return reply.code(400).send(errorResponse("invalid_payload", body.error.issues[0]?.message ?? "Invalid payload."));
+    }
+
+    return pairings.createSession({
+      serverUrl: body.data.server_url ?? advertisedUrl,
+      agentName: body.data.agent_name ?? agentName
+    });
+  });
 
   app.get("/pair/status/:pairing_code", async (request, reply) => {
     const params = pairingStatusParamsSchema.safeParse(request.params);
@@ -102,8 +117,28 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
     port: options.port
   });
 
-  printStartupInfo(options, database.path);
+  const initialSession = options.mode === "init"
+    ? pairings.createSession({
+        serverUrl: advertisedUrl,
+        agentName
+      })
+    : undefined;
+
+  const initialQr = initialSession
+    ? await QRCode.toString(initialSession.pairing_url, {
+        type: "terminal",
+        small: true
+      })
+    : undefined;
+
+  printStartupInfo(options, database.path, advertisedUrl, initialSession, initialQr);
 }
+
+const startPairingSchema = z.object({
+  agent_name: z.string().trim().min(1).max(120).optional(),
+  transport: z.enum(["lan", "tailscale", "tunnel", "public_https"]).optional(),
+  server_url: z.string().url().optional()
+});
 
 const pairingStatusParamsSchema = z.object({
   pairing_code: z.string().min(1)
@@ -168,34 +203,38 @@ function errorResponse(code: string, message: string): {
   };
 }
 
-function printStartupInfo(options: LocalServerOptions, databasePath: string): void {
+function printStartupInfo(
+  options: LocalServerOptions,
+  databasePath: string,
+  advertisedUrl: string,
+  initialSession?: {
+    pairing_code: string;
+    pairing_url: string;
+    expires_in_seconds: number;
+  },
+  initialQr?: string
+): void {
   const loopback = `http://127.0.0.1:${options.port}`;
-  const lan = `http://${getAdvertisedHost(options.host)}:${options.port}`;
   console.log("");
   console.log("HealthLink Local running");
   console.log("");
   console.log(`Pairing page: ${loopback}/pair`);
-  console.log(`LAN address:  ${lan}`);
+  console.log(`LAN address:  ${advertisedUrl}`);
   console.log(`Local API:    ${loopback}`);
   console.log(`Bind host:    ${options.host}`);
   console.log(`Database:     ${databasePath}`);
-  console.log("");
-}
-
-function getAdvertisedHost(bindHost: string): string {
-  if (bindHost !== "0.0.0.0" && bindHost !== "::") {
-    return bindHost;
-  }
-
-  for (const addresses of Object.values(networkInterfaces())) {
-    for (const address of addresses ?? []) {
-      if (address.family === "IPv4" && !address.internal) {
-        return address.address;
-      }
+  if (initialSession) {
+    console.log("");
+    console.log("Pair with iPhone:");
+    console.log(`Pairing code: ${initialSession.pairing_code}`);
+    console.log(`Pairing URL:  ${initialSession.pairing_url}`);
+    console.log(`Expires:      ${Math.round(initialSession.expires_in_seconds / 60)} minutes`);
+    if (initialQr) {
+      console.log("");
+      console.log(initialQr);
     }
   }
-
-  return "127.0.0.1";
+  console.log("");
 }
 
 function renderPairingPage(input: {

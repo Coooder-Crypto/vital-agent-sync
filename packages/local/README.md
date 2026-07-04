@@ -27,18 +27,21 @@ Current package commands:
 
 ```bash
 npx -y @healthlink/local
+npx -y @healthlink/local init
 npx -y @healthlink/local --port 8787
 npx -y @healthlink/local --db ~/.healthlink/healthlink.sqlite
 npx -y @healthlink/local mcp
+npx -y @healthlink/local print-mcp-config
+npx -y @healthlink/local install-hermes
 ```
 
-Target foolproof command:
+Foolproof local pairing command:
 
 ```bash
 npx -y @healthlink/local init
 ```
 
-`init` should start the receiver, create a pairing session, show the QR page, and print MCP config for agents.
+`init` starts the receiver, creates a pairing session, prints a terminal QR code, shows the QR page URL, and prints MCP config hints for agents. It runs in the foreground.
 
 ## Pairing And Sync
 
@@ -59,7 +62,7 @@ Local API:    http://127.0.0.1:8787
 Database:     ~/.healthlink/healthlink.sqlite
 ```
 
-Open the pairing page, scan the QR code with HealthLink iOS, approve the pairing, then sync from the iOS app.
+Open the pairing page or scan the terminal QR code with HealthLink iOS, approve the pairing, then sync from the iOS app.
 
 The iPhone must use the LAN, Tailscale, tunnel, or public HTTPS address. `127.0.0.1` only works from the same machine as the receiver.
 
@@ -113,12 +116,11 @@ Available MCP tools:
 - `get_workout_load`
 - `get_recovery_signals`
 
-## Planned Install Helpers
+## Install Helpers
 
 ```bash
 npx -y @healthlink/local print-mcp-config
 npx -y @healthlink/local install-hermes
-npx -y @healthlink/local install-claude
 ```
 
-These helpers should only write or print MCP configuration. They should use the same local database and tool surface as `@healthlink/local mcp`.
+`print-mcp-config` prints standard `mcpServers.healthlink` JSON. `install-hermes` backs up `~/.hermes/config.yaml`, writes `mcp_servers.healthlink`, and uses the same local database and tool surface as `@healthlink/local mcp`.
