@@ -1,4 +1,5 @@
 import { startLocalServer } from "./server.js";
+import { startMcpServer } from "./mcp.js";
 
 type CliOptions = {
   command: "server" | "mcp";
@@ -41,7 +42,10 @@ async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
 
   if (options.command === "mcp") {
-    throw new Error("MCP mode is not implemented yet.");
+    await startMcpServer({
+      databasePath: options.databasePath
+    });
+    return;
   }
 
   await startLocalServer({
@@ -56,4 +60,3 @@ main().catch((error: unknown) => {
   console.error(`HealthLink Local failed: ${message}`);
   process.exitCode = 1;
 });
-
