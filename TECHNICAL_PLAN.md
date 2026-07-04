@@ -30,7 +30,7 @@ Combine v0.1 and v0.2 into one Local Pairing MVP.
 The goal is to make a user install and pair quickly:
 
 ```bash
-npx -y @healthlink/local
+npx -y @healthlink/local init
 ```
 
 Then:
@@ -46,11 +46,13 @@ Then:
 8. Agent queries data through local MCP tools.
 ```
 
+The current development command is `npm run dev:local`. The published-package target is `npx -y @healthlink/local init`.
+
 This gives a complete end-to-end product path before adding background sync, remote tunnel mode, or hosted cloud.
 
 ## 3. Repository And Package Plan
 
-The current repository contains only the iOS app. The next step is to add a Node package for the Agent side.
+The current repository contains the iOS app and the first Agent-side Node package.
 
 Recommended early structure:
 
@@ -94,7 +96,7 @@ Later split:
 
 ### CLI
 
-The package should expose:
+The package exposes:
 
 ```bash
 npx -y @healthlink/local
@@ -103,6 +105,14 @@ npx -y @healthlink/local --db ~/.healthlink/healthlink.sqlite
 npx -y @healthlink/local mcp
 ```
 
+The target setup command is:
+
+```bash
+npx -y @healthlink/local init
+```
+
+`init` should wrap server startup, pairing session creation, QR display, and MCP config output.
+
 Default startup output:
 
 ```text
@@ -110,9 +120,11 @@ HealthLink Local running
 
 Pairing page: http://127.0.0.1:8787/pair
 LAN address:  http://192.168.1.23:8787
-MCP server:   http://127.0.0.1:8787/mcp
+MCP command:  npx -y @healthlink/local mcp
 Database:     ~/.healthlink/healthlink.sqlite
 ```
+
+MCP currently runs over stdio, not HTTP.
 
 ### Server Binding
 
@@ -422,20 +434,23 @@ audit_log(
 
 ## 8. MCP Tools
 
-For the Local Pairing MVP, expose a very small tool surface:
+For the Local Pairing MVP, expose a small MCP stdio tool surface.
+
+Implemented tools:
 
 ```text
-getDailyHealthSummary(date)
-getCalendarAvailability(date)
-getCurrentContext()
+healthlink_status
+get_daily_health_summary
+get_calendar_availability
+get_sleep_trend
+get_workout_load
+get_recovery_signals
 ```
 
 Next tools:
 
 ```text
-getSleepTrend(days)
-getWorkoutLoad(days)
-getRecoverySignals(days)
+get_current_context
 generateWeeklyHealthReport()
 listDevices()
 revokeDevice(device_id)
@@ -448,7 +463,7 @@ Tool rules:
 - Do not return calendar event titles, notes, locations, or attendees by default.
 - If data is missing or stale, return a structured status instead of hallucinating.
 
-Example `getCurrentContext()` response:
+Example future `get_current_context` response:
 
 ```json
 {
@@ -569,6 +584,8 @@ Exit criteria:
 - `npx` or local package command starts the server.
 - `/health/status` returns JSON.
 
+Status: complete.
+
 ### Milestone B: Pairing MVP
 
 - Add `/pair/start`.
@@ -581,6 +598,8 @@ Exit criteria:
 
 - User can pair iOS app without manually typing token.
 - iOS stores server URL and device token.
+
+Status: mostly complete. Current iOS flow supports pasted pairing URL; in-app QR scanner is still needed.
 
 ### Milestone C: Unified Sync
 
@@ -595,19 +614,38 @@ Exit criteria:
 - Server stores idempotent rows.
 - `/health/status` shows last sync.
 
+Status: complete for manual sync.
+
 ### Milestone D: First MCP Tools
 
 - Add MCP server entry point.
 - Implement `getDailyHealthSummary`.
 - Implement `getCalendarAvailability`.
-- Implement `getCurrentContext`.
+- Implement trend and recovery query tools.
 
 Exit criteria:
 
 - Local Agent can query HealthLink through MCP.
 - Tool responses include freshness metadata.
 
-### Milestone E: Hardening
+Status: partially complete. MCP stdio exists and tools can query SQLite; freshness metadata needs to be normalized across all tools.
+
+### Milestone E: Foolproof Agent Linking
+
+- Add `@healthlink/local init`.
+- Add `print-mcp-config`.
+- Add `install-hermes`.
+- Add `install-claude` or generic MCP install docs.
+- Add in-app QR scanner.
+- Add pairing confirmation screen with scopes.
+
+Exit criteria:
+
+- User can ask an agent to install HealthLink or run one command.
+- User scans QR instead of copying a pairing URL.
+- Agent config can be written or printed without hand-authoring JSON.
+
+### Milestone F: Hardening
 
 - Add token revocation.
 - Add audit log entries.
@@ -625,12 +663,13 @@ Exit criteria:
 After Local Pairing MVP:
 
 ```text
-v0.3  HealthKit incremental sync with anchors
-v0.4  Background best-effort sync and retry queue
-v0.5  Rich MCP tools and weekly report generation
-v0.6  Tailscale / Cloudflare Tunnel / self-hosted HTTPS support
-v0.7  Device key signatures for sync payloads
-v0.8  Optional raw sample scopes for advanced users
+v0.3  Foolproof install: init command, QR scanner, MCP config helpers
+v0.4  HealthKit incremental sync with anchors
+v0.5  Background best-effort sync and retry queue
+v0.6  Rich MCP tools and weekly report generation
+v0.7  Tailscale / Cloudflare Tunnel / self-hosted HTTPS support
+v0.8  Device key signatures for sync payloads
+v0.9  Optional raw sample scopes for advanced users
 ```
 
 Avoid building a HealthLink-hosted cloud until the local product loop is proven.
@@ -641,15 +680,24 @@ The current iOS app already has:
 
 - HealthKit daily summary builder.
 - Calendar daily summary builder.
-- Manual server settings.
+- Paired server settings.
 - Keychain token storage.
 - Manual sync UI.
+- Unified `/health/sync` upload.
+
+The current Agent-side package already has:
+
+- Local HTTP receiver.
+- QR pairing page.
+- Pairing confirm endpoint.
+- SQLite storage.
+- MCP stdio tools.
 
 The next code work should be:
 
-1. Add `@healthlink/local`.
-2. Add QR pairing endpoints and page.
-3. Add iOS pairing parser and confirmation UI.
-4. Replace old per-summary upload endpoints with unified `/health/sync`.
-5. Add first MCP tools.
-
+1. Add `@healthlink/local init`.
+2. Add iOS QR scanner.
+3. Add iOS pairing confirmation UI with scopes.
+4. Add `print-mcp-config`.
+5. Add `install-hermes`.
+6. Add disconnect/revoke flow.
