@@ -103,6 +103,30 @@ final class GatewaySettings: ObservableObject {
         pendingPairing = nil
     }
 
+    func disconnect(revokeRemote: Bool = true) async {
+        isPairing = true
+        pairingMessage = nil
+        defer { isPairing = false }
+
+        let deviceID = pairedDeviceID
+        let serverURL = self.serverURL
+        let token = apiTokenText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        do {
+            if revokeRemote,
+               let deviceID,
+               let serverURL,
+               !token.isEmpty {
+                let client = GatewayAPIClient(serverURL: serverURL, apiToken: token)
+                _ = try await client.revokeDevice(deviceID: deviceID)
+            }
+            try clearPairing()
+            pairingMessage = "Disconnected"
+        } catch {
+            pairingMessage = error.localizedDescription
+        }
+    }
+
     func save() {
         defaults.set(serverURLText.trimmingCharacters(in: .whitespacesAndNewlines), forKey: Keys.serverURL)
         defaults.set(uploadHealthEnabled, forKey: Keys.uploadHealthEnabled)
@@ -132,5 +156,14 @@ final class GatewaySettings: ObservableObject {
         } catch {
             pairingMessage = error.localizedDescription
         }
+    }
+
+    private func clearPairing() throws {
+        apiTokenText = ""
+        pairedDeviceID = nil
+        acceptedScopes = Self.defaultAcceptedScopes
+        defaults.removeObject(forKey: Keys.pairedDeviceID)
+        defaults.removeObject(forKey: Keys.acceptedScopes)
+        try keychain.delete(account: Keys.apiToken)
     }
 }

@@ -143,6 +143,22 @@ struct HealthSyncResponse: Codable {
     let idempotent: Bool
 }
 
+struct DeviceSummaryResponse: Codable {
+    let device_id: String
+    let device_name: String
+    let device_platform: String
+    let accepted_scopes: [String]
+    let created_at: String
+    let revoked_at: String?
+    let last_sync_at: String?
+    let sync_count: Int
+}
+
+struct DeviceRevokeResponse: Codable {
+    let ok: Bool
+    let device: DeviceSummaryResponse
+}
+
 enum GatewayError: LocalizedError {
     case healthKitUnavailable
     case missingServerURL
@@ -164,6 +180,12 @@ enum GatewayError: LocalizedError {
         case .invalidPairingURL:
             return "Pairing URL is invalid."
         case .invalidServerResponse(let statusCode):
+            if statusCode == 401 {
+                return "Server rejected this device token. Pair again."
+            }
+            if statusCode == 403 {
+                return "Server rejected this request. Check device pairing and scopes."
+            }
             return "Server returned HTTP \(statusCode)."
         }
     }

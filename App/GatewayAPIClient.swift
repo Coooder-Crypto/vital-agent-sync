@@ -24,6 +24,11 @@ final class GatewayAPIClient {
         try await post(payload, path: "/health/sync")
     }
 
+    func revokeDevice(deviceID: String) async throws -> DeviceRevokeResponse {
+        struct EmptyPayload: Encodable {}
+        return try await post(EmptyPayload(), path: "/devices/\(deviceID)/revoke")
+    }
+
     static func confirmPairing(link: PairingLink, deviceName: String, acceptedScopes: [String]) async throws -> PairConfirmResponse {
         let payload = PairConfirmRequest(
             pairing_code: link.pairingCode,
