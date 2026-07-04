@@ -10,15 +10,17 @@ import {
   ingestHealthSync,
   parseHealthSyncPayload
 } from "./health-ingest.js";
-import { getAdvertisedServerUrl } from "./network.js";
 import { PairingError, PairingStore } from "./pairing.js";
+import { SOURCE_PLATFORMS } from "./source-devices.js";
 import { type TerminalQrRenderResult, renderTerminalQr } from "./terminal-qr.js";
+import { createTransportProvider, TRANSPORT_PROVIDER_IDS, type TransportProviderId } from "./transports.js";
 
 export type LocalServerOptions = {
   host: string;
   port: number;
   databasePath?: string;
   serverUrl?: string;
+  transport?: TransportProviderId;
   agentName?: string;
   mode?: "server" | "init";
 };
@@ -27,11 +29,14 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
   const app = Fastify({
     logger: true
   });
-  const advertisedUrl = getAdvertisedServerUrl({
+  const transport = createTransportProvider({
+    id: options.transport,
     bindHost: options.host,
     port: options.port,
     serverUrl: options.serverUrl
   });
+  await transport.start?.();
+  const advertisedUrl = await transport.getAdvertisedUrl();
   const agentName = options.agentName ?? "Local Agent";
   const database = openHealthLinkDatabase({
     path: options.databasePath
@@ -39,6 +44,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
   const pairings = new PairingStore(database);
 
   app.addHook("onClose", async () => {
+    await transport.stop?.();
     database.close();
   });
 
@@ -161,12 +167,12 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
     ? renderTerminalQr(initialSession.pairing_url)
     : undefined;
 
-  printStartupInfo(options, database.path, advertisedUrl, initialSession, initialQr);
+  printStartupInfo(options, database.path, advertisedUrl, transport.label, initialSession, initialQr);
 }
 
 const startPairingSchema = z.object({
   agent_name: z.string().trim().min(1).max(120).optional(),
-  transport: z.enum(["lan", "tailscale", "tunnel", "public_https"]).optional(),
+  transport: z.enum(TRANSPORT_PROVIDER_IDS).optional(),
   server_url: z.string().url().optional()
 });
 
@@ -181,7 +187,7 @@ const deviceParamsSchema = z.object({
 const confirmPairingSchema = z.object({
   pairing_code: z.string().min(1),
   device_name: z.string().trim().min(1).max(120),
-  device_platform: z.literal("ios"),
+  device_platform: z.enum(SOURCE_PLATFORMS),
   accepted_scopes: z.array(z.string().min(1)).min(1)
 });
 
@@ -241,6 +247,7 @@ function printStartupInfo(
   options: LocalServerOptions,
   databasePath: string,
   advertisedUrl: string,
+  transportLabel: string,
   initialSession?: {
     pairing_code: string;
     pairing_url: string;
@@ -253,7 +260,7 @@ function printStartupInfo(
   console.log("HealthLink Local running");
   console.log("");
   console.log(`Pairing page: ${loopback}/pair`);
-  console.log(`LAN address:  ${advertisedUrl}`);
+  console.log(`${transportLabel} address:  ${advertisedUrl}`);
   console.log(`Local API:    ${loopback}`);
   console.log(`Bind host:    ${options.host}`);
   console.log(`Database:     ${databasePath}`);

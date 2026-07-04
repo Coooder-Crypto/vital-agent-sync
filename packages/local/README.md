@@ -28,14 +28,17 @@ Current package commands:
 ```bash
 npx -y @healthlink/local
 npx -y @healthlink/local init
+npx -y @healthlink/local init --agent hermes
 npx -y @healthlink/local init --hermes
+npx -y @healthlink/local init --transport lan
 npx -y @healthlink/local --port 8787
 npx -y @healthlink/local --db ~/.healthlink/healthlink.sqlite
 npx -y @healthlink/local mcp
 npx -y @healthlink/local print-mcp-config
+npx -y @healthlink/local print-agent-config --agent generic
 npx -y @healthlink/local install-hermes
 npx -y @healthlink/local status
-npx -y @healthlink/local doctor
+npx -y @healthlink/local doctor --agent hermes --transport lan
 ```
 
 Foolproof local pairing command:
@@ -44,7 +47,7 @@ Foolproof local pairing command:
 npx -y @healthlink/local init --hermes
 ```
 
-`init` starts the receiver, creates a pairing session, prints a terminal QR code, shows the QR page URL, and prints MCP config hints for agents. It runs in the foreground. Add `--hermes` to also back up and write `~/.hermes/config.yaml` before the receiver starts, so Hermes uses the same default database after restart or `/reload-mcp`.
+`init` starts the receiver, creates a pairing session, prints a terminal QR code, shows the QR page URL, and prints MCP config hints for agents. It runs in the foreground. Add `--agent hermes` or the compatible `--hermes` alias to also back up and write `~/.hermes/config.yaml` before the receiver starts, so Hermes uses the same default database after restart or `/reload-mcp`.
 
 ## Pairing And Sync
 
@@ -144,14 +147,21 @@ A HealthLink skill should tell the agent to:
 
 Hermes can install such a skill as an experience enhancement, but generic MCP-compatible agents should still work with the MCP config alone.
 
-## Install Helpers
+## Adapter Helpers
 
 ```bash
 npx -y @healthlink/local print-mcp-config
+npx -y @healthlink/local print-agent-config --agent generic
+npx -y @healthlink/local print-agent-config --agent hermes
 npx -y @healthlink/local install-hermes
+npx -y @healthlink/local init --agent hermes
 npx -y @healthlink/local init --hermes
+npx -y @healthlink/local doctor --agent hermes
+npx -y @healthlink/local doctor --transport lan
 ```
 
-`print-mcp-config` prints standard `mcpServers.healthlink` JSON. `install-hermes` backs up `~/.hermes/config.yaml`, writes `mcp_servers.healthlink`, and uses the same local database and tool surface as `@healthlink/local mcp`. `init --hermes` performs the same Hermes install step as part of the foreground pairing flow.
+`print-mcp-config` and `print-agent-config --agent generic` print standard `mcpServers.healthlink` JSON. `print-agent-config --agent hermes` prints a Hermes-style `mcp_servers.healthlink` YAML snippet. `install-hermes` backs up `~/.hermes/config.yaml`, writes `mcp_servers.healthlink`, and uses the same local database and tool surface as `@healthlink/local mcp`. `init --agent hermes` and `init --hermes` perform the same Hermes install step as part of the foreground pairing flow.
 
-Use `status` to inspect the local database and paired devices. Use `doctor` to check Node.js, the SQLite database, MCP command generation, and whether Hermes has a HealthLink MCP entry.
+Use `status` to inspect the local database and paired devices. Use `doctor` to check Node.js, the SQLite database, MCP command generation, the selected Agent adapter, and the selected transport provider.
+
+Transport providers are selected with `--transport`. `lan` is the default and current fully implemented provider. Future transports such as `tailscale`, `cloudflare`, `ngrok`, and `public_https` can be selected for diagnostics and can advertise an explicit endpoint with `--server-url` until their native provider implementations land.

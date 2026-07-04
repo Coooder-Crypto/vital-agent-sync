@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { HealthLinkDatabase } from "./database.js";
+import type { SourcePlatform } from "./source-devices.js";
 
 export const defaultScopes = [
   "health.daily_summary.write",
@@ -27,14 +28,14 @@ export type PairingRecord = Omit<PairingSession, "expires_at"> & {
 export type ConfirmPairingInput = {
   pairing_code: string;
   device_name: string;
-  device_platform: "ios";
+  device_platform: SourcePlatform;
   accepted_scopes: string[];
 };
 
 export type PairedDevice = {
   device_id: string;
   device_name: string;
-  device_platform: "ios";
+  device_platform: SourcePlatform;
   token_hash: string;
   accepted_scopes: string[];
   created_at: Date;

@@ -176,7 +176,7 @@ Source adapters should only know how to collect data and sync normalized payload
 
 - [ ] Rename internal "device" language toward "source device" in docs and types.
 - [ ] Keep backward compatibility for current `/devices` endpoint while introducing source-device naming.
-- [ ] Define `source_platform` values:
+- [x] Define `source_platform` values:
   - `ios`
   - `android`
   - `xiaomi`
@@ -185,7 +185,7 @@ Source adapters should only know how to collect data and sync normalized payload
 - [ ] Define a provider-neutral health summary schema.
 - [ ] Add Health Connect mapping design for Android.
 - [ ] Add Xiaomi / Mi Fitness connector research notes.
-- [ ] Add connector capability metadata:
+- [x] Add connector capability metadata:
   - supported metrics
   - sync cadence
   - freshness
@@ -210,10 +210,10 @@ type AgentAdapter = {
 
 Tasks:
 
-- [ ] Move Hermes config writing behind `AgentAdapter`.
-- [ ] Add `healthlink-local init --agent hermes` as an alias for `--hermes`.
-- [ ] Keep `healthlink-local init --hermes` for compatibility.
-- [ ] Add `healthlink-local print-agent-config --agent generic`.
+- [x] Move Hermes config writing behind `AgentAdapter`.
+- [x] Add `healthlink-local init --agent hermes` as an alias for `--hermes`.
+- [x] Keep `healthlink-local init --hermes` for compatibility.
+- [x] Add `healthlink-local print-agent-config --agent generic`.
 - [ ] Add OpenClaw adapter research:
   - config location
   - MCP format
@@ -223,8 +223,8 @@ Tasks:
   - config location
   - tool integration format
   - prompt/rule package format
-- [ ] Add `healthlink-local doctor --agent <id>`.
-- [ ] Add tests using temporary agent homes/config files.
+- [x] Add `healthlink-local doctor --agent <id>`.
+- [x] Add tests using temporary agent homes/config files.
 
 ## Skill Layer TODO
 
@@ -262,9 +262,9 @@ type TransportProvider = {
 
 Tasks:
 
-- [ ] Move LAN advertised URL logic behind `TransportProvider`.
-- [ ] Add `--transport lan` explicitly.
-- [ ] Keep current LAN behavior as default.
+- [x] Move LAN advertised URL logic behind `TransportProvider`.
+- [x] Add `--transport lan` explicitly.
+- [x] Keep current LAN behavior as default.
 - [ ] Add Tailscale detection:
   - local Tailscale IP
   - MagicDNS name
@@ -275,7 +275,7 @@ Tasks:
   - user-provided tunnel URL
 - [ ] Add public HTTPS mode docs.
 - [ ] Add pairing status payload field `transport`.
-- [ ] Add `healthlink-local doctor --transport <id>`.
+- [x] Add `healthlink-local doctor --transport <id>`.
 
 ## iOS Auto Sync TODO
 
@@ -327,13 +327,13 @@ Do not break the current local MVP.
 Phase 1:
 
 - [ ] Document architecture boundaries.
-- [ ] Add adapter interfaces without moving all code.
-- [ ] Keep existing commands working.
+- [x] Add adapter interfaces without moving all code.
+- [x] Keep existing commands working.
 
 Phase 2:
 
-- [ ] Move Hermes install logic into `AgentAdapter`.
-- [ ] Move LAN URL logic into `TransportProvider`.
+- [x] Move Hermes install logic into `AgentAdapter`.
+- [x] Move LAN URL logic into `TransportProvider`.
 - [ ] Rename docs/types from device to source device where safe.
 
 Phase 3:
