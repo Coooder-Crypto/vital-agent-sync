@@ -109,6 +109,23 @@ struct PairConfirmResponse: Codable {
     let server_time: String
 }
 
+struct PairingStatusResponse: Codable {
+    let pairing_code: String
+    let server_url: String
+    let agent_name: String
+    let requested_scopes: [String]
+    let status: String
+    let expires_at: String
+    let consumed_at: String?
+}
+
+struct PairingPreview: Identifiable {
+    var id: String { link.pairingCode }
+
+    let link: PairingLink
+    let status: PairingStatusResponse
+}
+
 struct HealthSyncPayload: Codable {
     let device_id: String
     let sync_id: String
