@@ -3,10 +3,12 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 import { openHealthLinkDatabase } from "./database.js";
+import { listDevices, revokeDevice } from "./devices.js";
 import {
   getAgentHealthStatus,
   getCalendarAvailability,
   getDailyHealthSummary,
+  getPersonalContext,
   getRecoverySignals,
   getSleepTrend,
   getWorkoutLoad
@@ -30,16 +32,29 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
     "healthlink_status",
     {
       title: "HealthLink Status",
-      description: "Get HealthLink local sync status, paired device count, sync count, and latest sync time."
+      description: "Check whether HealthLink is connected and fresh. Use when the user asks if HealthLink is working, whether iPhone data has synced, how many devices are paired, or when the last sync happened."
     },
     async () => jsonResult(getAgentHealthStatus(database))
+  );
+
+  server.registerTool(
+    "get_personal_context",
+    {
+      title: "Get Personal Context",
+      description: "Best first tool for broad personal questions such as: how am I today, what is my energy level, should I work hard or rest, should I exercise, how should I plan today, how is my recovery, am I overloaded, or summarize my current state. It returns latest health, calendar availability, sleep trend, workout load, recovery signals, and sync status in one structured response.",
+      inputSchema: z.object({
+        date: dateSchema.describe("Optional focus date in YYYY-MM-DD format. Omit for the latest synced day."),
+        days: daysSchema.describe("Number of latest synced days for trend context. Defaults to 7, max 90.")
+      })
+    },
+    async ({ date, days }) => jsonResult(getPersonalContext(database, { date, days }))
   );
 
   server.registerTool(
     "get_daily_health_summary",
     {
       title: "Get Daily Health Summary",
-      description: "Get a daily Apple Health summary. If date is omitted, returns the latest synced date.",
+      description: "Get Apple Health daily summary data for questions about steps, sleep minutes, heart rate, active energy, workouts, physical activity, tiredness, body state, or today's health. If date is omitted, returns the latest synced date.",
       inputSchema: z.object({
         date: dateSchema.describe("Optional date in YYYY-MM-DD format.")
       })
@@ -51,7 +66,7 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
     "get_calendar_availability",
     {
       title: "Get Calendar Availability",
-      description: "Get redacted daily calendar availability. If date is omitted, returns the latest synced date.",
+      description: "Get redacted daily calendar availability for questions about schedule pressure, busy minutes, free windows, next event timing, whether there is time to exercise or focus, or how to plan the day. If date is omitted, returns the latest synced date.",
       inputSchema: z.object({
         date: dateSchema.describe("Optional date in YYYY-MM-DD format.")
       })
@@ -63,7 +78,7 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
     "get_sleep_trend",
     {
       title: "Get Sleep Trend",
-      description: "Get sleep and recovery-related daily metrics for the latest synced days.",
+      description: "Get recent sleep trend and recovery-adjacent metrics. Use for questions about sleep debt, whether sleep is improving or worsening, fatigue, recovery patterns, or recent energy trends.",
       inputSchema: z.object({
         days: daysSchema.describe("Number of latest synced days to return. Defaults to 7, max 90.")
       })
@@ -75,7 +90,7 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
     "get_workout_load",
     {
       title: "Get Workout Load",
-      description: "Get workout minutes, active energy, heart-rate load signals, and recent workout records.",
+      description: "Get recent workout and activity load. Use for questions about training load, whether to exercise today, whether recent activity is too low or too high, and how hard a workout should be.",
       inputSchema: z.object({
         days: daysSchema.describe("Number of latest synced days to return. Defaults to 7, max 90.")
       })
@@ -87,12 +102,41 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
     "get_recovery_signals",
     {
       title: "Get Recovery Signals",
-      description: "Get sleep, resting heart rate, activity, and workout-minute signals for recovery analysis.",
+      description: "Get recovery signals from sleep, resting heart rate, average heart rate, active energy, and workout minutes. Use for questions about readiness, overtraining, fatigue, rest needs, or whether the user should prioritize recovery.",
       inputSchema: z.object({
         days: daysSchema.describe("Number of latest synced days to return. Defaults to 7, max 90.")
       })
     },
     async ({ days }) => jsonResult(getRecoverySignals(database, { days }))
+  );
+
+  server.registerTool(
+    "list_devices",
+    {
+      title: "List HealthLink Devices",
+      description: "List paired HealthLink devices, revocation state, sync count, and latest sync time."
+    },
+    async () => jsonResult({
+      devices: listDevices(database)
+    })
+  );
+
+  server.registerTool(
+    "revoke_device",
+    {
+      title: "Revoke HealthLink Device",
+      description: "Revoke a paired HealthLink device so its token can no longer sync.",
+      inputSchema: z.object({
+        device_id: z.string().min(1).describe("Device ID to revoke.")
+      })
+    },
+    async ({ device_id }) => {
+      const device = revokeDevice(database, device_id);
+      return jsonResult({
+        ok: Boolean(device),
+        device: device ?? null
+      });
+    }
   );
 
   process.once("SIGINT", () => {

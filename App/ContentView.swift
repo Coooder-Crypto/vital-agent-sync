@@ -186,6 +186,28 @@ struct SyncPanel: View {
             SectionTitle("Sync")
 
             VStack(spacing: 14) {
+                if settings.isPaired {
+                    HStack(spacing: 10) {
+                        Image(systemName: "link.badge.plus")
+                            .foregroundStyle(GatewayStyle.primary)
+                            .frame(width: 22)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(settings.serverURLText.isEmpty ? "No server" : settings.serverURLText)
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(GatewayStyle.text)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+
+                            Text(settings.pairedDeviceID.map(shortDeviceID) ?? "No device")
+                                .font(.caption)
+                                .foregroundStyle(GatewayStyle.mutedText)
+                        }
+
+                        Spacer(minLength: 0)
+                    }
+                }
+
                 Button {
                     Task { await sync.sync(settings: settings) }
                 } label: {
@@ -266,6 +288,13 @@ struct SyncPanel: View {
                     .stroke(GatewayStyle.border, lineWidth: 1)
             )
         }
+    }
+
+    private func shortDeviceID(_ deviceID: String) -> String {
+        guard deviceID.count > 14 else {
+            return deviceID
+        }
+        return "\(deviceID.prefix(8))...\(deviceID.suffix(6))"
     }
 }
 
@@ -429,6 +458,21 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .truncationMode(.middle)
+                    }
+
+                    if settings.isPaired {
+                        VStack(alignment: .leading, spacing: 6) {
+                            LabeledContent("Server", value: settings.serverURLText.isEmpty ? "-" : settings.serverURLText)
+                            LabeledContent("Scopes", value: settings.acceptedScopes.joined(separator: ", "))
+                        }
+                        .font(.footnote)
+
+                        Button(role: .destructive) {
+                            Task { await settings.disconnect() }
+                        } label: {
+                            Label("Disconnect Device", systemImage: "iphone.slash")
+                        }
+                        .disabled(settings.isPairing)
                     }
 
                     if let message = settings.pairingMessage {

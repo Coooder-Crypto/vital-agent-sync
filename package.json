@@ -10,6 +10,7 @@
     "build": "npm run build --workspaces",
     "dev:local": "npm run dev --workspace @healthlink/local",
     "build:local": "npm run build --workspace @healthlink/local",
+    "test:local": "npm run test --workspace @healthlink/local",
     "typecheck": "npm run typecheck --workspaces"
   },
   "engines": {

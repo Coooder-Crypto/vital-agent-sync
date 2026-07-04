@@ -15,7 +15,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "87A2A483845398E52C652332"
+               BlueprintIdentifier = "CC253E6BE18A77DF054490D7"
                BuildableName = "HealthLink.app"
                BlueprintName = "HealthLink"
                ReferencedContainer = "container:HealthLink.xcodeproj">
@@ -32,7 +32,7 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "87A2A483845398E52C652332"
+            BlueprintIdentifier = "CC253E6BE18A77DF054490D7"
             BuildableName = "HealthLink.app"
             BlueprintName = "HealthLink"
             ReferencedContainer = "container:HealthLink.xcodeproj">
@@ -57,7 +57,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "87A2A483845398E52C652332"
+            BlueprintIdentifier = "CC253E6BE18A77DF054490D7"
             BuildableName = "HealthLink.app"
             BlueprintName = "HealthLink"
             ReferencedContainer = "container:HealthLink.xcodeproj">
@@ -76,7 +76,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "87A2A483845398E52C652332"
+            BlueprintIdentifier = "CC253E6BE18A77DF054490D7"
             BuildableName = "HealthLink.app"
             BlueprintName = "HealthLink"
             ReferencedContainer = "container:HealthLink.xcodeproj">

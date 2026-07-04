@@ -71,23 +71,30 @@ One-command local pairing loop:
 
 ```bash
 npm run build:local
-node packages/local/dist/cli.js init
+node packages/local/dist/cli.js init --hermes
 ```
+
+`init --hermes` starts the local receiver, prints the iPhone pairing QR, backs up and writes `~/.hermes/config.yaml`, and points Hermes at the same HealthLink database. After pairing and syncing, restart Hermes or run `/reload-mcp`.
 
 Agent integration helpers:
 
 ```bash
 node packages/local/dist/cli.js print-mcp-config
 node packages/local/dist/cli.js install-hermes
+node packages/local/dist/cli.js status
+node packages/local/dist/cli.js doctor
 ```
 
 Published package shape:
 
 ```bash
 npx -y @healthlink/local init
+npx -y @healthlink/local init --hermes
 npx -y @healthlink/local mcp
 npx -y @healthlink/local print-mcp-config
 npx -y @healthlink/local install-hermes
+npx -y @healthlink/local status
+npx -y @healthlink/local doctor
 ```
 
 ## Device Setup
@@ -98,9 +105,10 @@ HealthKit requires a real iPhone for meaningful testing. In Xcode:
 2. Set your Apple Developer Team.
 3. Keep the HealthKit capability enabled.
 4. Run on a physical iPhone.
-5. Run `node packages/local/dist/cli.js init` on the Agent machine.
+5. Run `node packages/local/dist/cli.js init --hermes` on the Agent machine.
 6. Scan the pairing QR in the app Settings tab.
 7. Confirm the server/scopes, then grant Health and Calendar permissions.
+8. Sync once, then restart Hermes or run `/reload-mcp`.
 
 ## Sync Contract
 
@@ -158,6 +166,7 @@ Unified payload:
 - Add `HKAnchoredObjectQuery` for incremental sample sync.
 - Add `HKObserverQuery` and background delivery as a best-effort trigger.
 - Add disconnect / revoke paired device.
+- Add automated iOS UI coverage after real-device workflow stabilizes.
 - Add tunnel and public HTTPS transports.
 - Add Reminders summaries.
 - Add a Watch app for quick feedback and training controls.
