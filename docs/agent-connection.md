@@ -90,22 +90,32 @@ The relay must be a transport layer, not a data platform. Payloads should be end
 
 ## CLI Shape
 
-The final install command should be:
+The Hermes-first local install command should be:
 
 ```bash
-npx -y @healthlink/local init
+npx -y @healthlink/local init --hermes
 ```
 
-`init` should:
+`init --hermes` should:
 
 - Check Node.js version.
 - Create `~/.healthlink/`.
 - Initialize SQLite.
+- Back up and write `~/.hermes/config.yaml`.
 - Generate or reuse local receiver identity.
 - Start the HTTP receiver.
 - Create a short-lived pairing session.
 - Open or print the pairing page.
 - Print MCP config for common agents.
+- Tell the user to restart Hermes or run `/reload-mcp`.
+
+The generic receiver remains:
+
+```bash
+npx -y @healthlink/local init
+```
+
+It starts the same receiver without writing a Hermes config.
 
 Expected output:
 
@@ -135,7 +145,7 @@ Implemented local MVP command:
 
 ```bash
 npm run build:local
-node packages/local/dist/cli.js init
+node packages/local/dist/cli.js init --hermes
 ```
 
 ## Pairing QR Payload
@@ -203,9 +213,12 @@ Implemented helpers:
 ```bash
 npx -y @healthlink/local print-mcp-config
 npx -y @healthlink/local install-hermes
+npx -y @healthlink/local init --hermes
+npx -y @healthlink/local status
+npx -y @healthlink/local doctor
 ```
 
-The helpers should not invent new protocols. They should write or print the same MCP command with the correct database path.
+The helpers should not invent new protocols. They should write or print the same MCP command with the correct database path. `init --hermes` uses the same install logic as `install-hermes`, but folds it into the pairing flow so users do not need a separate config-writing command.
 
 ## Current MCP Tools
 
@@ -213,15 +226,19 @@ Current implemented tools:
 
 ```text
 healthlink_status
+get_personal_context
 get_daily_health_summary
 get_calendar_availability
 get_sleep_trend
 get_workout_load
 get_recovery_signals
+list_devices
+revoke_device
 ```
 
 Tool rules:
 
+- Use `get_personal_context` first for broad natural-language questions about today, energy, recovery, exercise readiness, schedule pressure, and day planning.
 - Return compact summaries, not raw samples.
 - Include enough timestamps for freshness checks.
 - Redact calendar event titles by default.
@@ -233,6 +250,7 @@ Next work after the local pairing MVP should focus on lifecycle and transport:
 
 ```text
 P1  disconnect / revoke paired device
+P1  richer local diagnostics
 P1  public HTTPS mode docs
 P2  tunnel mode
 P2  payload signatures and E2E encryption

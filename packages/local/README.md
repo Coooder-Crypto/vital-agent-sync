@@ -28,20 +28,23 @@ Current package commands:
 ```bash
 npx -y @healthlink/local
 npx -y @healthlink/local init
+npx -y @healthlink/local init --hermes
 npx -y @healthlink/local --port 8787
 npx -y @healthlink/local --db ~/.healthlink/healthlink.sqlite
 npx -y @healthlink/local mcp
 npx -y @healthlink/local print-mcp-config
 npx -y @healthlink/local install-hermes
+npx -y @healthlink/local status
+npx -y @healthlink/local doctor
 ```
 
 Foolproof local pairing command:
 
 ```bash
-npx -y @healthlink/local init
+npx -y @healthlink/local init --hermes
 ```
 
-`init` starts the receiver, creates a pairing session, prints a terminal QR code, shows the QR page URL, and prints MCP config hints for agents. It runs in the foreground.
+`init` starts the receiver, creates a pairing session, prints a terminal QR code, shows the QR page URL, and prints MCP config hints for agents. It runs in the foreground. Add `--hermes` to also back up and write `~/.hermes/config.yaml` before the receiver starts, so Hermes uses the same default database after restart or `/reload-mcp`.
 
 ## Pairing And Sync
 
@@ -110,17 +113,25 @@ Published package MCP config:
 Available MCP tools:
 
 - `healthlink_status`
+- `get_personal_context`
 - `get_daily_health_summary`
 - `get_calendar_availability`
 - `get_sleep_trend`
 - `get_workout_load`
 - `get_recovery_signals`
+- `list_devices`
+- `revoke_device`
+
+Use `get_personal_context` as the default high-level entry for natural language questions like "How am I today?", "How should I plan today?", "Should I exercise?", "Am I recovered?", or "Is my schedule overloaded?". It returns sync status, latest health, calendar availability, sleep trend, workout load, and recovery signals together.
 
 ## Install Helpers
 
 ```bash
 npx -y @healthlink/local print-mcp-config
 npx -y @healthlink/local install-hermes
+npx -y @healthlink/local init --hermes
 ```
 
-`print-mcp-config` prints standard `mcpServers.healthlink` JSON. `install-hermes` backs up `~/.hermes/config.yaml`, writes `mcp_servers.healthlink`, and uses the same local database and tool surface as `@healthlink/local mcp`.
+`print-mcp-config` prints standard `mcpServers.healthlink` JSON. `install-hermes` backs up `~/.hermes/config.yaml`, writes `mcp_servers.healthlink`, and uses the same local database and tool surface as `@healthlink/local mcp`. `init --hermes` performs the same Hermes install step as part of the foreground pairing flow.
+
+Use `status` to inspect the local database and paired devices. Use `doctor` to check Node.js, the SQLite database, MCP command generation, and whether Hermes has a HealthLink MCP entry.
