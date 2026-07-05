@@ -203,6 +203,7 @@ struct ConnectionView: View {
 
     @State private var receiverStatus: ReceiverCheckState = .idle
     @State private var isAdvancedExpanded = false
+    @State private var receiverCheckTask: Task<Void, Never>?
 
     var body: some View {
         NavigationStack {
@@ -256,11 +257,31 @@ struct ConnectionView: View {
             }
             .navigationTitle("Connection")
             .navigationBarTitleDisplayMode(.inline)
-            .task(id: settings.serverURLText) {
-                if settings.isPaired {
-                    await checkReceiver()
-                }
+            .onAppear {
+                scheduleDeferredReceiverCheck()
             }
+            .onDisappear {
+                receiverCheckTask?.cancel()
+                receiverCheckTask = nil
+            }
+        }
+    }
+
+    private func scheduleDeferredReceiverCheck() {
+        guard settings.isPaired else {
+            return
+        }
+        if receiverStatus.hasResult {
+            return
+        }
+
+        receiverCheckTask?.cancel()
+        receiverCheckTask = Task {
+            try? await Task.sleep(nanoseconds: 450_000_000)
+            guard !Task.isCancelled else {
+                return
+            }
+            await checkReceiver()
         }
     }
 
@@ -903,6 +924,29 @@ struct SummaryPanel: View {
                     systemImage: "figure.strengthtraining.traditional"
                 )
 
+                MetricTile(
+                    title: "Exercise",
+                    value: minutes(health?.exercise_minutes),
+                    systemImage: "figure.run"
+                )
+
+                MetricTile(
+                    title: "Distance",
+                    value: meters(health?.distance_walking_running_m),
+                    systemImage: "map"
+                )
+
+                MetricTile(
+                    title: "HRV",
+                    value: milliseconds(health?.heart_rate_variability_ms),
+                    systemImage: "waveform.path.ecg"
+                )
+
+                MetricTile(
+                    title: "VO2 Max",
+                    value: decimal(health?.vo2_max_ml_kg_min),
+                    systemImage: "lungs"
+                )
             }
         }
     }
@@ -920,6 +964,24 @@ struct SummaryPanel: View {
     private func bpm(_ value: Double?) -> String {
         guard let value else { return "-" }
         return "\(Int(value.rounded()))"
+    }
+
+    private func meters(_ value: Double?) -> String {
+        guard let value else { return "-" }
+        if value >= 1000 {
+            return "\(String(format: "%.1f", value / 1000))km"
+        }
+        return "\(Int(value.rounded()))m"
+    }
+
+    private func milliseconds(_ value: Double?) -> String {
+        guard let value else { return "-" }
+        return "\(Int(value.rounded()))ms"
+    }
+
+    private func decimal(_ value: Double?) -> String {
+        guard let value else { return "-" }
+        return String(format: "%.1f", value)
     }
 }
 
@@ -1144,6 +1206,15 @@ enum ReceiverCheckState {
             return true
         }
         return false
+    }
+
+    var hasResult: Bool {
+        switch self {
+        case .online, .offline:
+            return true
+        case .idle, .checking:
+            return false
+        }
     }
 }
 
