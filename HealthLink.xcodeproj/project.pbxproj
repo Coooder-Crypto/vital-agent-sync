@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		172C68AE36D740A91CED1305 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4873A62EA7906736C2554781 /* KeychainStore.swift */; };
+		2E7F5422A9B640C2A31F3D5A /* BackgroundSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81C5730DA6AE4E4190F2E7B6 /* BackgroundSyncManager.swift */; };
 		4B19BCA2D357D31A053B8245 /* CalendarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC310AE20C093AF2EF2778FA /* CalendarService.swift */; };
 		56EA2FEB8F496F7A04F96C7C /* HealthKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA3D4F339843410296079D12 /* HealthKitService.swift */; };
 		5DB901C8D2A0D3BCEEBC92BC /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59FD2EA38EE5225C199F26D8 /* ContentView.swift */; };
@@ -26,6 +27,7 @@
 		4873A62EA7906736C2554781 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		4DF53C058557834D8F0959C4 /* HealthLink.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HealthLink.entitlements; sourceTree = "<group>"; };
 		59FD2EA38EE5225C199F26D8 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		81C5730DA6AE4E4190F2E7B6 /* BackgroundSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundSyncManager.swift; sourceTree = "<group>"; };
 		9040B578069F229843B3A050 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		9F4F265F7CEDBBF53FF2072F /* HealthLinkApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthLinkApp.swift; sourceTree = "<group>"; };
 		CC310AE20C093AF2EF2778FA /* CalendarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarService.swift; sourceTree = "<group>"; };
@@ -47,6 +49,7 @@
 		8C1EBA22457D26B555C7FAA7 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				81C5730DA6AE4E4190F2E7B6 /* BackgroundSyncManager.swift */,
 				CC310AE20C093AF2EF2778FA /* CalendarService.swift */,
 				59FD2EA38EE5225C199F26D8 /* ContentView.swift */,
 				4454AFE84260B3EDE5DCA50C /* GatewayAPIClient.swift */,
@@ -125,6 +128,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2E7F5422A9B640C2A31F3D5A /* BackgroundSyncManager.swift in Sources */,
 				4B19BCA2D357D31A053B8245 /* CalendarService.swift in Sources */,
 				5DB901C8D2A0D3BCEEBC92BC /* ContentView.swift in Sources */,
 				79FD7264F0FA917BD7934AA8 /* GatewayAPIClient.swift in Sources */,

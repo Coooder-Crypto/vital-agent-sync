@@ -44,7 +44,13 @@ final class GatewayAPIClient {
         request.httpBody = try encoder.encode(payload)
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch let error as URLError {
+            throw GatewayError.fromURL(error)
+        }
         guard let httpResponse = response as? HTTPURLResponse else {
             throw GatewayError.invalidServerResponse(-1)
         }
@@ -62,7 +68,13 @@ final class GatewayAPIClient {
             throw GatewayError.invalidPairingURL
         }
 
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(from: url)
+        } catch let error as URLError {
+            throw GatewayError.fromURL(error)
+        }
         guard let httpResponse = response as? HTTPURLResponse else {
             throw GatewayError.invalidServerResponse(-1)
         }
@@ -85,7 +97,13 @@ final class GatewayAPIClient {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiToken)", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch let error as URLError {
+            throw GatewayError.fromURL(error)
+        }
         guard let httpResponse = response as? HTTPURLResponse else {
             throw GatewayError.invalidServerResponse(-1)
         }

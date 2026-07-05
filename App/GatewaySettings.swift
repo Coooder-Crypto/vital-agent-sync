@@ -18,6 +18,7 @@ final class GatewaySettings: ObservableObject {
     @Published private(set) var lastManualSyncAt: Date?
     @Published private(set) var lastSyncAttemptAt: Date?
     @Published private(set) var lastSyncError: String?
+    @Published private(set) var lastBackgroundScheduleError: String?
     @Published var lastSavedMessage: String?
 
     private let defaults = UserDefaults.standard
@@ -36,6 +37,7 @@ final class GatewaySettings: ObservableObject {
         static let lastManualSyncAt = "gateway.lastManualSyncAt"
         static let lastSyncAttemptAt = "gateway.lastSyncAttemptAt"
         static let lastSyncError = "gateway.lastSyncError"
+        static let lastBackgroundScheduleError = "gateway.lastBackgroundScheduleError"
     }
 
     static let defaultAcceptedScopes = [
@@ -57,6 +59,7 @@ final class GatewaySettings: ObservableObject {
         self.lastManualSyncAt = defaults.object(forKey: Keys.lastManualSyncAt) as? Date
         self.lastSyncAttemptAt = defaults.object(forKey: Keys.lastSyncAttemptAt) as? Date
         self.lastSyncError = defaults.string(forKey: Keys.lastSyncError)
+        self.lastBackgroundScheduleError = defaults.string(forKey: Keys.lastBackgroundScheduleError)
     }
 
     var serverURL: URL? {
@@ -195,11 +198,22 @@ final class GatewaySettings: ObservableObject {
         defaults.set(now, forKey: Keys.lastSyncAttemptAt)
     }
 
+    func recordBackgroundScheduleError(_ error: String) {
+        lastBackgroundScheduleError = error
+        defaults.set(error, forKey: Keys.lastBackgroundScheduleError)
+    }
+
+    func clearBackgroundScheduleError() {
+        lastBackgroundScheduleError = nil
+        defaults.removeObject(forKey: Keys.lastBackgroundScheduleError)
+    }
+
     func recordAutoSyncResult(success: Bool, error: String?) {
         if success {
             let now = Date()
             lastAutoSyncAt = now
             lastSyncError = nil
+            clearBackgroundScheduleError()
             defaults.set(now, forKey: Keys.lastAutoSyncAt)
             defaults.removeObject(forKey: Keys.lastSyncError)
         } else {
@@ -213,6 +227,7 @@ final class GatewaySettings: ObservableObject {
             let now = Date()
             lastManualSyncAt = now
             lastSyncError = nil
+            clearBackgroundScheduleError()
             defaults.set(now, forKey: Keys.lastManualSyncAt)
             defaults.removeObject(forKey: Keys.lastSyncError)
         } else {
