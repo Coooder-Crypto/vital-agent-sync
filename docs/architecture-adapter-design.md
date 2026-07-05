@@ -374,7 +374,7 @@ Use only if refresh work becomes too heavy for `BGAppRefreshTask`.
 Conditions before adopting:
 
 - sync payload generation is consistently too slow for refresh windows
-- calendar/health aggregation requires larger batches
+- health aggregation requires larger batches
 - user-visible benefit is clear
 
 This should not be the first background implementation because it has higher system cost and more review surface.

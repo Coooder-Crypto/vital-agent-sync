@@ -17,28 +17,28 @@ export type SkillInstallResult = {
 export function buildHealthLinkSkillMarkdown(): string {
   return `---
 name: ${HEALTHLINK_SKILL_NAME}
-description: Use HealthLink MCP for personal health, recovery, schedule, and day-planning context.
+description: Use HealthLink MCP for personal health, recovery, and activity context.
 version: 0.1.0
 author: HealthLink
 license: MIT
 platforms: [linux, macos, windows]
 metadata:
   hermes:
-    tags: [healthlink, mcp, personal-context, health, calendar]
+    tags: [healthlink, mcp, personal-context, health]
 ---
 
 # HealthLink Personal Context
 
 ## Overview
 
-Use this skill when the user asks about their personal status, energy, recovery, sleep, workout readiness, schedule pressure, or how to plan the day. HealthLink is a user-controlled data gateway, not a medical provider.
+Use this skill when the user asks about their personal status, energy, recovery, sleep, workout readiness, or recent activity. HealthLink is a user-controlled data gateway, not a medical provider.
 
-HealthLink data comes from MCP tools. Do not invent health, calendar, sleep, workout, or recovery facts that are not present in tool output.
+HealthLink data comes from MCP tools. Do not invent health, sleep, workout, or recovery facts that are not present in tool output.
 
 ## When to Use
 
-- The user asks "How am I today?", "How should I plan today?", "Should I exercise?", "Am I recovered?", or similar.
-- The user asks for analysis that may benefit from sleep, activity, heart-rate, workout, or calendar availability context.
+- The user asks "How am I today?", "Should I exercise?", "Am I recovered?", or similar.
+- The user asks for analysis that may benefit from sleep, activity, heart-rate, HRV, VO2 max, blood oxygen, respiratory rate, body temperature, body composition, or workout context.
 - The user asks whether recent sync data is available.
 - The user asks to revoke, inspect, or troubleshoot connected HealthLink source devices.
 
@@ -46,20 +46,18 @@ Do not use this skill for diagnosis, prescriptions, emergency advice, or unsuppo
 
 ## Tool Strategy
 
-1. Call \`get_personal_context\` first for broad questions about today, recovery, energy, schedule pressure, or planning.
+1. Call \`get_personal_context\` first for broad questions about today, recovery, energy, or activity.
 2. Use lower-level tools only for follow-up detail:
-   - \`get_daily_health_summary\` for a specific date's health metrics.
-   - \`get_calendar_availability\` for busy/free time.
+   - \`get_daily_health_summary\` for a specific date's health metrics, including activity, sleep, heart, respiratory, temperature, and body-composition summaries when available.
    - \`get_sleep_trend\` for sleep continuity.
    - \`get_workout_load\` for workout and activity load.
-   - \`get_recovery_signals\` for sleep, heart-rate, activity, and workout-minutes context.
-   - \`get_weekly_summary\` for compact 7-day health, activity, recovery, and calendar pressure summaries.
+   - \`get_recovery_signals\` for sleep, heart-rate, HRV, oxygen, respiratory, temperature, activity, and workout-minutes context.
+   - \`get_weekly_summary\` for compact 7-day health, activity, and recovery summaries.
    - \`healthlink_status\`, \`list_source_devices\`, and \`revoke_source_device\` for setup and troubleshooting.
    - \`list_devices\` and \`revoke_device\` only as legacy aliases when an older agent flow expects those names.
    - \`record_feedback\` only when the user explicitly gives feedback, a correction, or a preference that should improve future HealthLink analysis.
 3. Mention data freshness before analysis when the answer depends on recency.
 4. If the latest sync is stale or missing, say that plainly and suggest syncing HealthLink.
-5. Keep calendar titles redacted. Use availability, timing, and pressure signals only.
 
 ## Response Boundaries
 
@@ -71,9 +69,8 @@ Do not use this skill for diagnosis, prescriptions, emergency advice, or unsuppo
 
 ## Verification Checklist
 
-- [ ] HealthLink MCP tool output was used for health/calendar claims.
+- [ ] HealthLink MCP tool output was used for health claims.
 - [ ] Data freshness or missing data was surfaced.
-- [ ] Calendar titles remained redacted.
 - [ ] Medical-safety boundaries were respected.
 `;
 }

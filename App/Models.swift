@@ -21,43 +21,33 @@ struct DailyHealthSummary: Codable, Identifiable {
     let avg_heart_rate_bpm: Double?
     let max_heart_rate_bpm: Double?
     let active_energy_kcal: Double?
+    let basal_energy_kcal: Double?
+    let distance_walking_running_m: Double?
+    let distance_cycling_m: Double?
+    let flights_climbed: Int?
+    let exercise_minutes: Int?
+    let stand_minutes: Int?
+    let heart_rate_variability_ms: Double?
+    let walking_heart_rate_average_bpm: Double?
+    let vo2_max_ml_kg_min: Double?
+    let oxygen_saturation_percent: Double?
+    let respiratory_rate_bpm: Double?
+    let body_temperature_c: Double?
+    let body_mass_kg: Double?
+    let body_fat_percentage: Double?
+    let lean_body_mass_kg: Double?
+    let body_mass_index: Double?
     let workout_minutes: Int?
     let workouts: [WorkoutSummary]
 }
 
-struct FreeWindow: Codable, Identifiable {
-    var id: String { "\(start)-\(end)" }
-
-    let start: String
-    let end: String
-}
-
-struct RedactedCalendarEvent: Codable {
-    let starts_at: String
-    let duration_minutes: Int
-    let title_redacted: Bool
-}
-
-struct DailyCalendarSummary: Codable, Identifiable {
-    var id: String { date }
-
-    let date: String
-    let timezone: String
-    let provider: String
-    let busy_minutes: Int
-    let free_windows: [FreeWindow]
-    let next_event: RedactedCalendarEvent?
-}
-
 struct SyncStatus: Codable {
     var lastHealthSyncAt: Date?
-    var lastCalendarSyncAt: Date?
     var lastError: String?
     var lastSuccessMessage: String?
 
     static let empty = SyncStatus(
         lastHealthSyncAt: nil,
-        lastCalendarSyncAt: nil,
         lastError: nil,
         lastSuccessMessage: nil
     )
@@ -133,14 +123,12 @@ struct HealthSyncPayload: Codable {
     let generated_at: String
     let timezone: String
     let health_daily_summaries: [DailyHealthSummary]
-    let calendar_daily_summaries: [DailyCalendarSummary]
 }
 
 struct HealthSyncResponse: Codable {
     let ok: Bool
     let accepted_sync_id: String
     let health_daily_count: Int
-    let calendar_daily_count: Int
     let idempotent: Bool
 }
 
@@ -170,7 +158,6 @@ struct DeviceRevokeResponse: Codable {
 enum GatewayError: LocalizedError {
     case healthKitUnavailable
     case healthPermissionRequired
-    case calendarPermissionRequired
     case missingServerURL
     case missingAPIToken
     case missingPairedDevice
@@ -186,8 +173,6 @@ enum GatewayError: LocalizedError {
             return "HealthKit is not available on this device."
         case .healthPermissionRequired:
             return "Health permission is missing or denied. Open iOS Settings and allow HealthLink to read selected Health data."
-        case .calendarPermissionRequired:
-            return "Calendar permission is missing or denied. Open iOS Settings and allow HealthLink to read Calendar data."
         case .missingServerURL:
             return "Server URL is not configured."
         case .missingAPIToken:

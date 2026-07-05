@@ -1,6 +1,6 @@
 # HealthLink Product Plan
 
-HealthLink is a user-owned personal data bridge for AI agents. It lets a user connect authorized phone, watch, calendar, and feedback data to local or cloud-hosted agents without making every agent implement HealthKit, Calendar, pairing, permissions, and privacy controls.
+HealthLink is a user-owned personal data bridge for AI agents. It lets a user connect authorized phone, watch, and feedback data to local or cloud-hosted agents without making every agent implement HealthKit, pairing, permissions, and privacy controls.
 
 The product is not an agent. It is an agent data gateway.
 
@@ -29,7 +29,7 @@ For the detailed Agent connection UX, see [agent-connection.md](agent-connection
 - Sync summaries first, raw samples only by explicit advanced permission.
 - Each agent gets a scoped token.
 - Every agent access is auditable and revocable.
-- Agents read context; they do not get direct HealthKit or calendar database access.
+- Agents read context; they do not get direct HealthKit database access.
 - The iOS app is the authority for Apple Health and iOS permissions.
 
 ## System Components
@@ -37,7 +37,7 @@ For the detailed Agent connection UX, see [agent-connection.md](agent-connection
 ```text
 healthlink-ios
   iOS app
-  HealthKit / Calendar collection
+  HealthKit collection
   pairing UI
   connected-agent management
 
@@ -211,7 +211,6 @@ Pairing session shape:
   "agent_name": "Desktop Assistant",
   "requested_scopes": [
     "health.daily.read",
-    "calendar.availability.read",
     "feedback.write"
   ],
   "expires_in_seconds": 600
@@ -223,7 +222,6 @@ Pairing session shape:
 The iOS app owns:
 
 - HealthKit authorization.
-- Calendar authorization.
 - Local sync endpoint configuration.
 - Pairing code scan / input.
 - Scope approval UI.
@@ -245,7 +243,6 @@ The MCP server should expose a small, stable tool surface:
 healthlink_status
 get_personal_context
 get_daily_health_summary
-get_calendar_availability
 get_sleep_trend
 get_workout_load
 get_recovery_signals
@@ -256,9 +253,8 @@ revoke_device
 Tool behavior:
 
 - `healthlink_status` returns device count, sync count, and latest sync time.
-- `get_personal_context` returns the preferred combined context for broad questions about today, energy, recovery, schedule pressure, and planning.
+- `get_personal_context` returns the preferred combined context for broad questions about today, energy, recovery, and activity.
 - `get_daily_health_summary` returns daily health summary only.
-- `get_calendar_availability` returns busy/free data, not event titles by default.
 - Trend and load tools return compact multi-day signals.
 - Device tools list and revoke paired devices.
 - Missing data should be represented as `null`, empty arrays, or structured no-data responses.
@@ -277,12 +273,11 @@ MCP remains the core protocol. A skill is an optional agent-specific usage guide
 
 HealthLink should ship a portable skill document, with Hermes as the first supported target. The skill should:
 
-- trigger on natural-language questions about personal status, recovery, exercise readiness, daily planning, and schedule pressure
+- trigger on natural-language questions about personal status, recovery, exercise readiness, and activity
 - call `get_personal_context` first
 - use lower-level MCP tools for drill-down questions
 - report data freshness
 - avoid diagnosis, prescriptions, and unsupported medical claims
-- keep calendar titles redacted
 
 This should be additive. A generic MCP-compatible agent should still work without installing a HealthLink skill.
 
@@ -292,7 +287,6 @@ Default scopes:
 
 ```text
 health.daily.read
-calendar.availability.read
 feedback.write
 ```
 
@@ -301,7 +295,6 @@ Additional scopes:
 ```text
 health.trends.read
 health.workouts.read
-calendar.next_event.read
 profile.basic.read
 sync.refresh.request
 ```
@@ -310,7 +303,6 @@ Sensitive scopes, disabled by default:
 
 ```text
 health.raw_samples.read
-calendar.events.read
 location.coarse.read
 location.history.read
 ```
@@ -327,7 +319,6 @@ agents
 agent_tokens
 pairing_sessions
 health_daily_summary
-calendar_daily_summary
 feedback_events
 refresh_requests
 audit_log
@@ -364,15 +355,8 @@ Current context:
     "resting_heart_rate_bpm": 62,
     "workout_minutes": 45
   },
-  "calendar": {
-    "busy_level": "medium",
-    "free_windows": [
-      {"start": "2026-06-22T19:00:00+08:00", "end": "2026-06-22T21:00:00+08:00"}
-    ]
-  },
   "freshness": {
     "health_synced_at": "2026-06-22T08:31:00+08:00",
-    "calendar_synced_at": "2026-06-22T10:12:00+08:00",
     "is_stale": false
   }
 }
@@ -411,7 +395,6 @@ For MVP, local HTTP can be allowed for LAN development. Production should prefer
 - Local daemon should bind admin APIs to `127.0.0.1` only.
 - Remote tunnel should expose only MCP and approved public endpoints.
 - Raw HealthKit samples are never exposed unless explicitly enabled.
-- Calendar titles, notes, locations, attendees are redacted by default.
 
 ## MVP Roadmap
 
@@ -419,7 +402,7 @@ For MVP, local HTTP can be allowed for LAN development. Production should prefer
 
 - `healthlink-local`
 - SQLite store
-- health/calendar sync endpoints
+- health sync endpoints
 - MCP query tools
 - pairing sessions
 - scoped agent tokens
@@ -497,7 +480,7 @@ First useful demo:
 User runs healthlink-local or npm run dev:local.
 Receiver shows pairing code.
 iOS app pairs with receiver.
-iOS app syncs Apple Health and Calendar summaries.
+iOS app syncs Apple Health summaries.
 Agent calls MCP tools and receives useful fresh context.
 iOS syncs again and the agent reads updated context without re-pairing or reloading MCP.
 ```
@@ -506,6 +489,6 @@ Product-quality criteria:
 
 - Setup under 5 minutes for a local user.
 - Setup under 10 minutes for a cloud-agent user using tunnel mode.
-- Default payloads contain no raw samples or calendar titles.
+- Default payloads contain no raw samples.
 - Agent tools return freshness metadata.
 - Revocation takes effect immediately.

@@ -1,6 +1,6 @@
 # HealthLink iOS
 
-HealthLink is a private iOS data gateway for agent systems. The MVP reads user-authorized Apple Health and Calendar summaries, uploads compact daily context to the user's Agent-side receiver, stores it locally, and exposes it to agents through MCP tools.
+HealthLink is a private iOS data gateway for agent systems. The MVP reads user-authorized Apple Health summaries, uploads compact daily context to the user's Agent-side receiver, stores it locally, and exposes it to agents through MCP tools.
 
 It is intentionally not an agent. It is a user-controlled data connector.
 
@@ -10,15 +10,17 @@ For the broader product plan covering local daemon, MCP, tunnel mode, self-hosti
 
 - HealthKit daily summaries:
   - steps
-  - active energy
+  - active / basal energy
+  - walking/running and cycling distance
+  - flights climbed
+  - exercise and stand minutes
   - heart-rate average / max
   - resting heart rate
+  - HRV, walking heart-rate average, VO2 max
+  - blood oxygen, respiratory rate, body temperature
+  - body mass, body fat, lean body mass, BMI
   - sleep minutes
   - workouts
-- Calendar daily summaries:
-  - busy minutes
-  - free windows
-  - next event metadata with title redacted
 - Local pairing configuration:
   - paired server URL in `UserDefaults`
   - paired device ID in `UserDefaults`
@@ -55,7 +57,7 @@ The current local development loop is:
 
 ```text
 iPhone app
-  -> HealthKit / Calendar summaries
+  -> HealthKit summaries
   -> POST /health/sync on manual or automatic sync
   -> healthlink-local
   -> SQLite
@@ -148,7 +150,7 @@ HealthKit requires a real iPhone for meaningful testing. In Xcode:
 4. Run on a physical iPhone.
 5. Run `node packages/local/dist/cli.js setup --agent hermes --service` on the Agent machine.
 6. Scan the pairing QR in the app Settings tab.
-7. Confirm the server/scopes, then grant Health and Calendar permissions.
+7. Confirm the server/scopes, then grant Health permission.
 8. Sync once, then restart Hermes or run `/reload-mcp`.
 9. Ask Hermes a natural-language question, such as `我今天状态怎么样？`.
 
@@ -167,11 +169,10 @@ MCP is the stable integration contract. Skills are optional agent-side usage gui
 
 For Hermes, the preferred skill behavior is:
 
-- use `get_personal_context` first for broad questions about today, energy, recovery, exercise readiness, schedule pressure, or planning
+- use `get_personal_context` first for broad questions about today, energy, recovery, or exercise readiness
 - call lower-level tools only for follow-up details
 - mention data freshness before analysis
 - avoid medical diagnosis or prescriptions
-- keep calendar titles redacted
 
 Product installs should keep the generic MCP path available for non-Hermes agents, while Hermes-first setup can install or update a HealthLink skill as an experience enhancement.
 
@@ -203,24 +204,24 @@ Unified payload:
       "avg_heart_rate_bpm": 82.0,
       "max_heart_rate_bpm": 146.0,
       "active_energy_kcal": 480.0,
+      "basal_energy_kcal": 1500.0,
+      "distance_walking_running_m": 3200.0,
+      "distance_cycling_m": null,
+      "flights_climbed": 8,
+      "exercise_minutes": 35,
+      "stand_minutes": 120,
+      "heart_rate_variability_ms": 42.0,
+      "walking_heart_rate_average_bpm": 98.0,
+      "vo2_max_ml_kg_min": 38.5,
+      "oxygen_saturation_percent": 97.5,
+      "respiratory_rate_bpm": 15.2,
+      "body_temperature_c": null,
+      "body_mass_kg": 72.4,
+      "body_fat_percentage": null,
+      "lean_body_mass_kg": null,
+      "body_mass_index": null,
       "workout_minutes": 45,
       "workouts": []
-    }
-  ],
-  "calendar_daily_summaries": [
-    {
-      "date": "2026-06-21",
-      "timezone": "Asia/Shanghai",
-      "provider": "apple_calendar",
-      "busy_minutes": 240,
-      "free_windows": [
-        {"start": "2026-06-21T19:00:00+08:00", "end": "2026-06-21T21:00:00+08:00"}
-      ],
-      "next_event": {
-        "starts_at": "2026-06-21T14:00:00+08:00",
-        "duration_minutes": 60,
-        "title_redacted": true
-      }
     }
   ]
 }

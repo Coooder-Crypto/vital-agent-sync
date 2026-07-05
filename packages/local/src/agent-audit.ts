@@ -161,7 +161,6 @@ function getAgentClient(database: HealthLinkDatabase, id: string): AgentClient |
 function defaultMcpScopes(): string[] {
   return [
     "health.daily_summary.read",
-    "calendar.daily_summary.read",
     "source_devices.read",
     "feedback.events.write",
     "agent_audit.write"
@@ -172,16 +171,13 @@ function inferToolScopes(toolName: string): string[] {
   if (toolName.includes("feedback")) {
     return ["feedback.events.write"];
   }
-  if (toolName.includes("calendar")) {
-    return ["calendar.daily_summary.read"];
-  }
   if (toolName.includes("device")) {
     return ["source_devices.read"];
   }
   if (toolName.includes("status")) {
-    return ["source_devices.read", "health.daily_summary.read", "calendar.daily_summary.read"];
+    return ["source_devices.read", "health.daily_summary.read"];
   }
-  return ["health.daily_summary.read", "calendar.daily_summary.read"];
+  return ["health.daily_summary.read"];
 }
 
 function parseScopes(value: string): string[] {

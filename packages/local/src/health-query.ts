@@ -18,6 +18,22 @@ type HealthDailyRow = {
   avg_heart_rate_bpm: number | null;
   max_heart_rate_bpm: number | null;
   active_energy_kcal: number | null;
+  basal_energy_kcal: number | null;
+  distance_walking_running_m: number | null;
+  distance_cycling_m: number | null;
+  flights_climbed: number | null;
+  exercise_minutes: number | null;
+  stand_minutes: number | null;
+  heart_rate_variability_ms: number | null;
+  walking_heart_rate_average_bpm: number | null;
+  vo2_max_ml_kg_min: number | null;
+  oxygen_saturation_percent: number | null;
+  respiratory_rate_bpm: number | null;
+  body_temperature_c: number | null;
+  body_mass_kg: number | null;
+  body_fat_percentage: number | null;
+  lean_body_mass_kg: number | null;
+  body_mass_index: number | null;
   workout_minutes: number | null;
   updated_at: string;
 };
@@ -29,24 +45,6 @@ type WorkoutRow = {
   duration_minutes: number;
   active_energy_kcal: number | null;
   avg_heart_rate_bpm: number | null;
-};
-
-type CalendarDailyRow = {
-  id: string;
-  device_id: string;
-  date: string;
-  timezone: string;
-  provider: string;
-  busy_minutes: number;
-  next_event_starts_at: string | null;
-  next_event_duration_minutes: number | null;
-  title_redacted: number;
-  updated_at: string;
-};
-
-type FreeWindowRow = {
-  start: string;
-  end: string;
 };
 
 type SourceCoverageRow = {
@@ -65,12 +63,11 @@ export function getPersonalContext(database: HealthLinkDatabase, options: QueryO
   const days = clampDays(options.days);
 
   return {
-    purpose: "Use this HealthLink context to answer personal status, energy, recovery, workout readiness, sleep, schedule pressure, and day-planning questions. Do not invent health or calendar facts that are not present here.",
+    purpose: "Use this HealthLink context to answer personal status, energy, recovery, workout readiness, sleep, activity, and day-planning questions. Do not invent health facts that are not present here.",
     metadata: buildQueryMetadata(database),
     status: getAgentHealthStatus(database),
     focus_date: options.date ?? "latest_synced_date",
     daily_health_summary: getDailyHealthSummary(database, { date: options.date }),
-    calendar_availability: getCalendarAvailability(database, { date: options.date }),
     sleep_trend: getSleepTrend(database, { days }),
     workout_load: getWorkoutLoad(database, { days }),
     recovery_signals: getRecoverySignals(database, { days })
@@ -116,47 +113,25 @@ export function getDailyHealthSummary(database: HealthLinkDatabase, options: Que
       avg_heart_rate_bpm: health.avg_heart_rate_bpm,
       max_heart_rate_bpm: health.max_heart_rate_bpm,
       active_energy_kcal: health.active_energy_kcal,
+      basal_energy_kcal: health.basal_energy_kcal,
+      distance_walking_running_m: health.distance_walking_running_m,
+      distance_cycling_m: health.distance_cycling_m,
+      flights_climbed: health.flights_climbed,
+      exercise_minutes: health.exercise_minutes,
+      stand_minutes: health.stand_minutes,
+      heart_rate_variability_ms: health.heart_rate_variability_ms,
+      walking_heart_rate_average_bpm: health.walking_heart_rate_average_bpm,
+      vo2_max_ml_kg_min: health.vo2_max_ml_kg_min,
+      oxygen_saturation_percent: health.oxygen_saturation_percent,
+      respiratory_rate_bpm: health.respiratory_rate_bpm,
+      body_temperature_c: health.body_temperature_c,
+      body_mass_kg: health.body_mass_kg,
+      body_fat_percentage: health.body_fat_percentage,
+      lean_body_mass_kg: health.lean_body_mass_kg,
+      body_mass_index: health.body_mass_index,
       workout_minutes: health.workout_minutes
     },
     workouts
-  };
-}
-
-export function getCalendarAvailability(database: HealthLinkDatabase, options: QueryOptions = {}): unknown {
-  const calendar = findCalendarDaily(database, options.date);
-  if (!calendar) {
-    return {
-      metadata: buildQueryMetadata(database),
-      date: options.date ?? null,
-      calendar: null,
-      free_windows: []
-    };
-  }
-
-  const freeWindows = database.sqlite.prepare(`
-    select start, end
-    from calendar_free_windows
-    where summary_id = ?
-    order by start asc
-  `).all(calendar.id) as FreeWindowRow[];
-
-  return {
-    metadata: buildQueryMetadata(database),
-    date: calendar.date,
-    timezone: calendar.timezone,
-    provider: calendar.provider,
-    updated_at: calendar.updated_at,
-    calendar: {
-      busy_minutes: calendar.busy_minutes,
-      next_event: calendar.next_event_starts_at
-        ? {
-            starts_at: calendar.next_event_starts_at,
-            duration_minutes: calendar.next_event_duration_minutes,
-            title_redacted: calendar.title_redacted !== 0
-          }
-        : null
-    },
-    free_windows: freeWindows
   };
 }
 
@@ -168,6 +143,10 @@ export function getSleepTrend(database: HealthLinkDatabase, options: QueryOption
       sleep_minutes,
       resting_heart_rate_bpm,
       active_energy_kcal,
+      basal_energy_kcal,
+      heart_rate_variability_ms,
+      oxygen_saturation_percent,
+      respiratory_rate_bpm,
       workout_minutes
     from (
       select
@@ -183,7 +162,15 @@ export function getSleepTrend(database: HealthLinkDatabase, options: QueryOption
     limit ?
   `).all(days) as Pick<
     HealthDailyRow,
-    "date" | "sleep_minutes" | "resting_heart_rate_bpm" | "active_energy_kcal" | "workout_minutes"
+    | "date"
+    | "sleep_minutes"
+    | "resting_heart_rate_bpm"
+    | "active_energy_kcal"
+    | "basal_energy_kcal"
+    | "heart_rate_variability_ms"
+    | "oxygen_saturation_percent"
+    | "respiratory_rate_bpm"
+    | "workout_minutes"
   >[];
 
   return {
@@ -199,9 +186,15 @@ export function getWorkoutLoad(database: HealthLinkDatabase, options: QueryOptio
     select
       date,
       workout_minutes,
+      exercise_minutes,
+      stand_minutes,
+      distance_walking_running_m,
+      distance_cycling_m,
+      flights_climbed,
       active_energy_kcal,
       avg_heart_rate_bpm,
-      max_heart_rate_bpm
+      max_heart_rate_bpm,
+      vo2_max_ml_kg_min
     from (
       select
         *,
@@ -216,7 +209,17 @@ export function getWorkoutLoad(database: HealthLinkDatabase, options: QueryOptio
     limit ?
   `).all(days) as Pick<
     HealthDailyRow,
-    "date" | "workout_minutes" | "active_energy_kcal" | "avg_heart_rate_bpm" | "max_heart_rate_bpm"
+    | "date"
+    | "workout_minutes"
+    | "exercise_minutes"
+    | "stand_minutes"
+    | "distance_walking_running_m"
+    | "distance_cycling_m"
+    | "flights_climbed"
+    | "active_energy_kcal"
+    | "avg_heart_rate_bpm"
+    | "max_heart_rate_bpm"
+    | "vo2_max_ml_kg_min"
   >[];
 
   const workouts = database.sqlite.prepare(`
@@ -248,7 +251,15 @@ export function getRecoverySignals(database: HealthLinkDatabase, options: QueryO
       sleep_minutes,
       resting_heart_rate_bpm,
       avg_heart_rate_bpm,
+      max_heart_rate_bpm,
+      heart_rate_variability_ms,
+      walking_heart_rate_average_bpm,
+      vo2_max_ml_kg_min,
+      oxygen_saturation_percent,
+      respiratory_rate_bpm,
+      body_temperature_c,
       active_energy_kcal,
+      basal_energy_kcal,
       workout_minutes
     from (
       select
@@ -268,7 +279,15 @@ export function getRecoverySignals(database: HealthLinkDatabase, options: QueryO
     | "sleep_minutes"
     | "resting_heart_rate_bpm"
     | "avg_heart_rate_bpm"
+    | "max_heart_rate_bpm"
+    | "heart_rate_variability_ms"
+    | "walking_heart_rate_average_bpm"
+    | "vo2_max_ml_kg_min"
+    | "oxygen_saturation_percent"
+    | "respiratory_rate_bpm"
+    | "body_temperature_c"
     | "active_energy_kcal"
+    | "basal_energy_kcal"
     | "workout_minutes"
   >[];
 
@@ -282,7 +301,6 @@ export function getRecoverySignals(database: HealthLinkDatabase, options: QueryO
 export function getWeeklySummary(database: HealthLinkDatabase, options: QueryOptions = {}): unknown {
   const days = Math.max(1, Math.min(options.days ?? 7, 14));
   const healthRows = latestHealthRows(database, days);
-  const calendarRows = latestCalendarRows(database, days);
 
   const sleepValues = healthRows
     .map((row) => row.sleep_minutes)
@@ -293,21 +311,28 @@ export function getWeeklySummary(database: HealthLinkDatabase, options: QueryOpt
   const activeEnergyValues = healthRows
     .map((row) => row.active_energy_kcal)
     .filter((value): value is number => typeof value === "number");
+  const exerciseMinutesValues = healthRows
+    .map((row) => row.exercise_minutes)
+    .filter((value): value is number => typeof value === "number");
+  const standMinutesValues = healthRows
+    .map((row) => row.stand_minutes)
+    .filter((value): value is number => typeof value === "number");
+  const walkingRunningDistanceValues = healthRows
+    .map((row) => row.distance_walking_running_m)
+    .filter((value): value is number => typeof value === "number");
   const workoutMinutesValues = healthRows
     .map((row) => row.workout_minutes)
     .filter((value): value is number => typeof value === "number");
-  const busyMinutesValues = calendarRows.map((row) => row.busy_minutes);
 
   return {
     metadata: buildQueryMetadata(database),
     days,
     date_range: {
-      start: minString([...healthRows.map((row) => row.date), ...calendarRows.map((row) => row.date)]),
-      end: maxString([...healthRows.map((row) => row.date), ...calendarRows.map((row) => row.date)])
+      start: minString(healthRows.map((row) => row.date)),
+      end: maxString(healthRows.map((row) => row.date))
     },
     coverage: {
-      health_days: healthRows.length,
-      calendar_days: calendarRows.length
+      health_days: healthRows.length
     },
     sleep: {
       average_minutes: average(sleepValues),
@@ -316,15 +341,14 @@ export function getWeeklySummary(database: HealthLinkDatabase, options: QueryOpt
     activity: {
       average_steps: average(stepsValues),
       total_steps: sum(stepsValues),
-      total_active_energy_kcal: sum(activeEnergyValues)
+      total_active_energy_kcal: sum(activeEnergyValues),
+      total_exercise_minutes: sum(exerciseMinutesValues),
+      total_stand_minutes: sum(standMinutesValues),
+      total_walking_running_distance_m: sum(walkingRunningDistanceValues)
     },
     workouts: {
       total_minutes: sum(workoutMinutesValues),
       days_with_workouts: workoutMinutesValues.filter((value) => value > 0).length
-    },
-    calendar: {
-      total_busy_minutes: sum(busyMinutesValues),
-      average_busy_minutes: average(busyMinutesValues)
     },
     daily: healthRows.map((row) => ({
       date: row.date,
@@ -340,7 +364,6 @@ export function buildQueryMetadata(database: HealthLinkDatabase): {
   freshness: {
     latest_sync_at: string | null;
     latest_health_updated_at: string | null;
-    latest_calendar_updated_at: string | null;
   };
   source_coverage: SourceCoverageRow[];
   missing_metrics: string[];
@@ -349,10 +372,6 @@ export function buildQueryMetadata(database: HealthLinkDatabase): {
   const latestHealthUpdatedAt = database.sqlite.prepare(`
     select max(updated_at) as value
     from health_daily_summaries
-  `).get() as { value: string | null };
-  const latestCalendarUpdatedAt = database.sqlite.prepare(`
-    select max(updated_at) as value
-    from calendar_daily_summaries
   `).get() as { value: string | null };
   const sourceCoverage = database.sqlite.prepare(`
     select
@@ -371,13 +390,11 @@ export function buildQueryMetadata(database: HealthLinkDatabase): {
   return {
     freshness: {
       latest_sync_at: status.last_sync_at,
-      latest_health_updated_at: latestHealthUpdatedAt.value,
-      latest_calendar_updated_at: latestCalendarUpdatedAt.value
+      latest_health_updated_at: latestHealthUpdatedAt.value
     },
     source_coverage: sourceCoverage,
     missing_metrics: missingMetrics({
       healthCount: countRows(database, "health_daily_summaries"),
-      calendarCount: countRows(database, "calendar_daily_summaries"),
       workoutCount: countRows(database, "health_workouts")
     })
   };
@@ -402,25 +419,6 @@ function findHealthDaily(database: HealthLinkDatabase, date?: string): HealthDai
   `).get() as HealthDailyRow | undefined;
 }
 
-function findCalendarDaily(database: HealthLinkDatabase, date?: string): CalendarDailyRow | undefined {
-  if (date) {
-    return database.sqlite.prepare(`
-      select *
-      from calendar_daily_summaries
-      where date = ?
-      order by updated_at desc
-      limit 1
-    `).get(date) as CalendarDailyRow | undefined;
-  }
-
-  return database.sqlite.prepare(`
-    select *
-    from calendar_daily_summaries
-    order by date desc, updated_at desc
-    limit 1
-  `).get() as CalendarDailyRow | undefined;
-}
-
 function latestHealthRows(database: HealthLinkDatabase, days: number): HealthDailyRow[] {
   const rows = database.sqlite.prepare(`
     select *
@@ -441,26 +439,6 @@ function latestHealthRows(database: HealthLinkDatabase, days: number): HealthDai
   return rows.reverse();
 }
 
-function latestCalendarRows(database: HealthLinkDatabase, days: number): CalendarDailyRow[] {
-  const rows = database.sqlite.prepare(`
-    select *
-    from (
-      select
-        *,
-        row_number() over (
-          partition by date
-          order by updated_at desc, id desc
-        ) as row_number
-      from calendar_daily_summaries
-    )
-    where row_number = 1
-    order by date desc
-    limit ?
-  `).all(days) as CalendarDailyRow[];
-
-  return rows.reverse();
-}
-
 function countRows(database: HealthLinkDatabase, table: string): number {
   const row = database.sqlite.prepare(`select count(*) as value from ${table}`).get() as { value: number };
   return row.value;
@@ -468,15 +446,11 @@ function countRows(database: HealthLinkDatabase, table: string): number {
 
 function missingMetrics(input: {
   healthCount: number;
-  calendarCount: number;
   workoutCount: number;
 }): string[] {
   const missing: string[] = [];
   if (input.healthCount === 0) {
     missing.push("health.daily_summary");
-  }
-  if (input.calendarCount === 0) {
-    missing.push("calendar.daily_summary");
   }
   if (input.workoutCount === 0) {
     missing.push("health.workouts");

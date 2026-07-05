@@ -12,7 +12,6 @@ final class GatewaySettings: ObservableObject {
     @Published var pendingPairing: PairingPreview?
     @Published var pairingMessage: String?
     @Published var uploadHealthEnabled: Bool
-    @Published var uploadCalendarEnabled: Bool
     @Published var autoSyncEnabled: Bool
     @Published var autoSyncMinimumIntervalMinutes: Int
     @Published private(set) var lastAutoSyncAt: Date?
@@ -28,7 +27,6 @@ final class GatewaySettings: ObservableObject {
     private enum Keys {
         static let serverURL = "gateway.serverURL"
         static let uploadHealthEnabled = "gateway.uploadHealthEnabled"
-        static let uploadCalendarEnabled = "gateway.uploadCalendarEnabled"
         static let apiToken = "gateway.apiToken"
         static let pairedDeviceID = "gateway.pairedDeviceID"
         static let pairedAgentName = "gateway.pairedAgentName"
@@ -43,8 +41,7 @@ final class GatewaySettings: ObservableObject {
     }
 
     static let defaultAcceptedScopes = [
-        "health.daily_summary.write",
-        "calendar.daily_summary.write"
+        "health.daily_summary.write"
     ]
 
     init() {
@@ -54,7 +51,6 @@ final class GatewaySettings: ObservableObject {
         self.pairedAgentName = defaults.string(forKey: Keys.pairedAgentName)
         self.acceptedScopes = defaults.stringArray(forKey: Keys.acceptedScopes) ?? Self.defaultAcceptedScopes
         self.uploadHealthEnabled = defaults.object(forKey: Keys.uploadHealthEnabled) as? Bool ?? true
-        self.uploadCalendarEnabled = defaults.object(forKey: Keys.uploadCalendarEnabled) as? Bool ?? true
         self.autoSyncEnabled = defaults.object(forKey: Keys.autoSyncEnabled) as? Bool ?? true
         let savedInterval = defaults.integer(forKey: Keys.autoSyncMinimumIntervalMinutes)
         self.autoSyncMinimumIntervalMinutes = savedInterval > 0 ? savedInterval : 30
@@ -169,7 +165,6 @@ final class GatewaySettings: ObservableObject {
     func save() {
         defaults.set(serverURLText.trimmingCharacters(in: .whitespacesAndNewlines), forKey: Keys.serverURL)
         defaults.set(uploadHealthEnabled, forKey: Keys.uploadHealthEnabled)
-        defaults.set(uploadCalendarEnabled, forKey: Keys.uploadCalendarEnabled)
         saveAutoSyncSettings()
 
         do {
