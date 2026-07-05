@@ -2,25 +2,58 @@ import SwiftUI
 import UIKit
 
 struct ContentView: View {
+    @EnvironmentObject private var settings: GatewaySettings
+    @EnvironmentObject private var sync: SyncCoordinator
+    @State private var isShowingScanner = false
+
     var body: some View {
         TabView {
-            DashboardView()
+            HomeView(isShowingScanner: $isShowingScanner)
                 .tabItem {
-                    Label("Sync", systemImage: "arrow.triangle.2.circlepath")
+                    Label("Home", systemImage: "house")
                 }
 
-            SettingsView()
+            SourcesView()
                 .tabItem {
-                    Label("Settings", systemImage: "gearshape")
+                    Label("Sources", systemImage: "heart.text.square")
+                }
+
+            ConnectionView(isShowingScanner: $isShowingScanner)
+                .tabItem {
+                    Label("Connection", systemImage: "link")
                 }
         }
         .tint(GatewayStyle.primary)
+        .sheet(isPresented: $isShowingScanner) {
+            PairingScannerView { value in
+                isShowingScanner = false
+                Task { await settings.preparePairing(rawValue: value) }
+            }
+        }
+        .sheet(item: $settings.pendingPairing) { preview in
+            PairingConfirmationView(
+                preview: preview,
+                isPairing: settings.isPairing,
+                onCancel: {
+                    settings.cancelPendingPairing()
+                },
+                onConfirm: {
+                    Task {
+                        let paired = await settings.confirmPairing(preview)
+                        if paired {
+                            await sync.attemptAutoSync(settings: settings, reason: "pairing")
+                        }
+                    }
+                }
+            )
+        }
     }
 }
 
-struct DashboardView: View {
+struct HomeView: View {
     @EnvironmentObject private var settings: GatewaySettings
     @EnvironmentObject private var sync: SyncCoordinator
+    @Binding var isShowingScanner: Bool
 
     var body: some View {
         NavigationStack {
@@ -29,23 +62,29 @@ struct DashboardView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        HeaderPanel(
-                            isConfigured: isConfigured,
-                            isSyncing: sync.isSyncing,
-                            lastError: sync.status.lastError
+                        HomeHeroPanel(
+                            settings: settings,
+                            sync: sync,
+                            onScan: { isShowingScanner = true },
+                            onSync: {
+                                Task { await sync.sync(settings: settings, trigger: .manual) }
+                            }
                         )
 
-                        PermissionPanel(sync: sync)
+                        if settings.isPaired {
+                            if sync.latestHealthSummary != nil || sync.latestCalendarSummary != nil {
+                                SummaryPanel(
+                                    health: sync.latestHealthSummary,
+                                    calendar: sync.latestCalendarSummary
+                                )
+                            } else {
+                                EmptySummaryPanel()
+                            }
 
-                        SyncPanel(settings: settings, sync: sync)
-
-                        if sync.latestHealthSummary != nil || sync.latestCalendarSummary != nil {
-                            SummaryPanel(
-                                health: sync.latestHealthSummary,
-                                calendar: sync.latestCalendarSummary
-                            )
+                            AgentPromptPanel(agentName: agentName)
+                            HomeSyncDetails(settings: settings, sync: sync)
                         } else {
-                            EmptySummaryPanel()
+                            PairingCommandPanel(onScan: { isShowingScanner = true })
                         }
                     }
                     .padding(.horizontal, 18)
@@ -58,31 +97,227 @@ struct DashboardView: View {
         }
     }
 
-    private var isConfigured: Bool {
-        settings.serverURL != nil && !settings.apiTokenText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    private var agentName: String {
+        settings.pairedAgentName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+            ? settings.pairedAgentName!
+            : "your agent"
     }
 }
 
-struct HeaderPanel: View {
-    let isConfigured: Bool
-    let isSyncing: Bool
-    let lastError: String?
+struct SourcesView: View {
+    @Environment(\.openURL) private var openURL
+    @EnvironmentObject private var settings: GatewaySettings
+    @EnvironmentObject private var sync: SyncCoordinator
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Gateway")
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
-                        .foregroundStyle(GatewayStyle.text)
+        NavigationStack {
+            Form {
+                Section("Data Sources") {
+                    Button {
+                        Task { await sync.requestHealthAuthorization(settings: settings) }
+                    } label: {
+                        Label("Allow Health Access", systemImage: "heart.text.square")
+                    }
+                    .disabled(sync.isSyncing)
 
-                    Text(statusText)
-                        .font(.callout)
-                        .foregroundStyle(GatewayStyle.mutedText)
-                        .lineLimit(2)
+                    Button {
+                        Task { await sync.requestCalendarAuthorization(settings: settings) }
+                    } label: {
+                        Label("Allow Calendar Access", systemImage: "calendar.badge.clock")
+                    }
+                    .disabled(sync.isSyncing)
+
+                    Button {
+                        openURL(URL(string: UIApplication.openSettingsURLString)!)
+                    } label: {
+                        Label("Open iOS Settings", systemImage: "gearshape")
+                    }
+                    .disabled(sync.isSyncing)
                 }
 
-                Spacer()
+                Section("Data Sent To Agent") {
+                    Toggle(isOn: $settings.uploadHealthEnabled) {
+                        Label("Health summaries", systemImage: "heart")
+                    }
+                    .onChange(of: settings.uploadHealthEnabled) { _, _ in
+                        settings.save()
+                    }
+
+                    Toggle(isOn: $settings.uploadCalendarEnabled) {
+                        Label("Calendar availability", systemImage: "calendar")
+                    }
+                    .onChange(of: settings.uploadCalendarEnabled) { _, _ in
+                        settings.save()
+                    }
+                }
+
+                Section("Auto Sync") {
+                    Toggle(isOn: $settings.autoSyncEnabled) {
+                        Label("Auto Sync", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                    .onChange(of: settings.autoSyncEnabled) { _, _ in
+                        settings.saveAutoSyncSettings()
+                        BackgroundSyncManager.scheduleAppRefresh(settings: settings)
+                    }
+
+                    Stepper(value: $settings.autoSyncMinimumIntervalMinutes, in: 5...240, step: 5) {
+                        Label("Minimum \(settings.autoSyncMinimumIntervalMinutes)m", systemImage: "timer")
+                    }
+                    .disabled(!settings.autoSyncEnabled)
+                    .onChange(of: settings.autoSyncMinimumIntervalMinutes) { _, _ in
+                        settings.saveAutoSyncSettings()
+                        BackgroundSyncManager.scheduleAppRefresh(settings: settings)
+                    }
+
+                    if let lastAutoSyncAt = settings.lastAutoSyncAt {
+                        LabeledContent("Last auto sync", value: lastAutoSyncAt.formatted(date: .omitted, time: .shortened))
+                    }
+
+                    if let lastSyncAttemptAt = settings.lastSyncAttemptAt {
+                        LabeledContent("Last attempt", value: lastSyncAttemptAt.formatted(date: .omitted, time: .shortened))
+                    }
+
+                    if let nextEligibleAutoSyncAt = settings.nextEligibleAutoSyncAt {
+                        LabeledContent("Next eligible", value: nextEligibleAutoSyncAt.formatted(date: .omitted, time: .shortened))
+                    }
+                }
+
+                Section("Sync History") {
+                    LabeledContent("Health", value: sync.status.lastHealthSyncAt.map(Self.formatDate) ?? "Never")
+                    LabeledContent("Calendar", value: sync.status.lastCalendarSyncAt.map(Self.formatDate) ?? "Never")
+
+                    if let lastSyncError = settings.lastSyncError ?? sync.status.lastError {
+                        Label(lastSyncError, systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(GatewayStyle.warning)
+                    }
+
+                    if let lastBackgroundScheduleError = settings.lastBackgroundScheduleError {
+                        Label(lastBackgroundScheduleError, systemImage: "calendar.badge.exclamationmark")
+                            .foregroundStyle(GatewayStyle.warning)
+                    }
+                }
+
+                Section("Privacy") {
+                    Label("Calendar titles are redacted", systemImage: "calendar.badge.exclamationmark")
+                    Label("Health samples are summarized", systemImage: "chart.bar.doc.horizontal")
+                }
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            }
+            .navigationTitle("Sources")
+        }
+    }
+
+    private static func formatDate(_ date: Date) -> String {
+        date.formatted(date: .abbreviated, time: .shortened)
+    }
+}
+
+struct ConnectionView: View {
+    @EnvironmentObject private var settings: GatewaySettings
+    @EnvironmentObject private var sync: SyncCoordinator
+    @Binding var isShowingScanner: Bool
+
+    @State private var receiverStatus: ReceiverCheckState = .idle
+    @State private var isAdvancedExpanded = false
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                GatewayStyle.background.ignoresSafeArea()
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        ConnectionStatusPanel(
+                            settings: settings,
+                            receiverStatus: receiverStatus,
+                            onCheck: {
+                                Task { await checkReceiver() }
+                            }
+                        )
+
+                        PairingPanel(
+                            settings: settings,
+                            isShowingScanner: $isShowingScanner
+                        )
+
+                        AdvancedConnectionPanel(
+                            settings: settings,
+                            isExpanded: $isAdvancedExpanded
+                        )
+
+                        if settings.isPaired {
+                            Button(role: .destructive) {
+                                Task { await settings.disconnect() }
+                            } label: {
+                                Label("Disconnect Agent", systemImage: "iphone.slash")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(settings.isPairing)
+                        }
+
+                        if let message = settings.pairingMessage {
+                            StatusMessage(
+                                message: message,
+                                systemImage: settings.isPaired ? "checkmark.circle" : "exclamationmark.triangle",
+                                color: settings.isPaired ? GatewayStyle.success : GatewayStyle.warning
+                            )
+                            .padding(.horizontal, 2)
+                        }
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.top, 14)
+                    .padding(.bottom, 28)
+                }
+            }
+            .navigationTitle("Connection")
+            .navigationBarTitleDisplayMode(.inline)
+            .task(id: settings.serverURLText) {
+                if settings.isPaired {
+                    await checkReceiver()
+                }
+            }
+        }
+    }
+
+    private func checkReceiver() async {
+        guard let serverURL = settings.serverURL else {
+            receiverStatus = .offline("No server URL")
+            return
+        }
+
+        receiverStatus = .checking
+        do {
+            let status = try await GatewayAPIClient.checkReceiver(serverURL: serverURL)
+            receiverStatus = .online(status)
+        } catch {
+            receiverStatus = .offline(error.localizedDescription)
+        }
+    }
+}
+
+struct HomeHeroPanel: View {
+    @ObservedObject var settings: GatewaySettings
+    @ObservedObject var sync: SyncCoordinator
+    let onScan: () -> Void
+    let onSync: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(title)
+                        .font(.system(size: 30, weight: .bold, design: .rounded))
+                        .foregroundStyle(GatewayStyle.text)
+
+                    Text(subtitle)
+                        .font(.callout)
+                        .foregroundStyle(GatewayStyle.mutedText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 12)
 
                 StatusBadge(
                     title: badgeTitle,
@@ -91,9 +326,36 @@ struct HeaderPanel: View {
                 )
             }
 
-            if let lastError {
+            if let lastError = sync.status.lastError ?? settings.lastSyncError {
                 ErrorBanner(message: lastError)
             }
+
+            Button(action: primaryAction) {
+                HStack {
+                    Image(systemName: primaryIcon)
+                        .font(.headline.weight(.semibold))
+
+                    Text(primaryTitle)
+                        .font(.headline.weight(.semibold))
+
+                    Spacer()
+
+                    if sync.isSyncing || settings.isPairing {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.bold))
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .padding(.horizontal, 16)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white)
+            .background(GatewayStyle.primary)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .disabled(sync.isSyncing || settings.isPairing)
         }
         .padding(18)
         .background(GatewayStyle.surface)
@@ -104,153 +366,178 @@ struct HeaderPanel: View {
         )
     }
 
-    private var statusText: String {
-        if isSyncing {
-            return "Sync in progress"
+    private var title: String {
+        if !settings.isPaired {
+            return "Connect your agent"
         }
-        if lastError != nil {
-            return "Last operation needs attention"
+        if sync.status.lastError != nil || settings.lastSyncError != nil {
+            return "Sync needs attention"
         }
-        if isConfigured {
-            return "Ready to publish daily context"
+        return "Ready for \(agentName)"
+    }
+
+    private var subtitle: String {
+        if !settings.isPaired {
+            return "Pair HealthLink with your local Agent receiver."
         }
-        return "Server settings required"
+        if sync.isSyncing {
+            return "Uploading your latest daily summaries."
+        }
+        if let latestSyncDate {
+            return "Last sync \(latestSyncDate.formatted(date: .omitted, time: .shortened))."
+        }
+        return "Connected. Run the first sync when you are ready."
+    }
+
+    private var primaryTitle: String {
+        if !settings.isPaired {
+            return "Scan QR Code"
+        }
+        if sync.isSyncing {
+            return "Syncing"
+        }
+        if sync.status.lastError != nil || settings.lastSyncError != nil {
+            return "Retry Sync"
+        }
+        return "Sync Now"
+    }
+
+    private var primaryIcon: String {
+        settings.isPaired ? "icloud.and.arrow.up" : "qrcode.viewfinder"
     }
 
     private var badgeTitle: String {
-        if isSyncing { return "Syncing" }
-        if lastError != nil { return "Check" }
-        return isConfigured ? "Ready" : "Setup"
+        if sync.isSyncing { return "Syncing" }
+        if !settings.isPaired { return "Setup" }
+        if sync.status.lastError != nil || settings.lastSyncError != nil { return "Check" }
+        return "Connected"
     }
 
     private var badgeIcon: String {
-        if isSyncing { return "arrow.triangle.2.circlepath" }
-        if lastError != nil { return "exclamationmark.triangle" }
-        return isConfigured ? "checkmark.seal" : "slider.horizontal.3"
+        if sync.isSyncing { return "arrow.triangle.2.circlepath" }
+        if !settings.isPaired { return "link.badge.plus" }
+        if sync.status.lastError != nil || settings.lastSyncError != nil { return "exclamationmark.triangle" }
+        return "checkmark.seal"
     }
 
     private var badgeTone: StatusTone {
-        if isSyncing { return .neutral }
-        if lastError != nil { return .warning }
-        return isConfigured ? .success : .neutral
+        if sync.isSyncing { return .neutral }
+        if !settings.isPaired { return .neutral }
+        if sync.status.lastError != nil || settings.lastSyncError != nil { return .warning }
+        return .success
     }
-}
 
-struct PermissionPanel: View {
-    @Environment(\.openURL) private var openURL
-    @EnvironmentObject private var settings: GatewaySettings
+    private var agentName: String {
+        settings.pairedAgentName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+            ? settings.pairedAgentName!
+            : "your agent"
+    }
 
-    @ObservedObject var sync: SyncCoordinator
+    private var latestSyncDate: Date? {
+        [sync.status.lastHealthSyncAt, sync.status.lastCalendarSyncAt, settings.lastManualSyncAt, settings.lastAutoSyncAt]
+            .compactMap { $0 }
+            .max()
+    }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SectionTitle("Permissions")
-
-            HStack(spacing: 12) {
-                PermissionButton(
-                    title: "Health",
-                    systemImage: "heart.text.square",
-                    disabled: sync.isSyncing
-                ) {
-                    Task { await sync.requestHealthAuthorization(settings: settings) }
-                }
-
-                PermissionButton(
-                    title: "Calendar",
-                    systemImage: "calendar.badge.clock",
-                    disabled: sync.isSyncing
-                ) {
-                    Task { await sync.requestCalendarAuthorization(settings: settings) }
-                }
-            }
-
-            Button {
-                openURL(URL(string: UIApplication.openSettingsURLString)!)
-            } label: {
-                Label("Open iOS Settings", systemImage: "gearshape")
-                    .font(.footnote.weight(.semibold))
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-            .tint(GatewayStyle.primary)
-            .disabled(sync.isSyncing)
+    private func primaryAction() {
+        if settings.isPaired {
+            onSync()
+        } else {
+            onScan()
         }
     }
 }
 
-struct SyncPanel: View {
+struct PairingCommandPanel: View {
+    let onScan: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionTitle("Agent Setup")
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Run this on your Mac")
+                    .font(.headline)
+                    .foregroundStyle(GatewayStyle.text)
+
+                Text("npx -y healthlink-local setup --agent hermes --service")
+                    .font(.footnote.monospaced())
+                    .foregroundStyle(GatewayStyle.text)
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(.secondarySystemGroupedBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                Button(action: onScan) {
+                    Label("Scan QR Code", systemImage: "qrcode.viewfinder")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(GatewayStyle.primary)
+            }
+            .padding(16)
+            .background(GatewayStyle.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(GatewayStyle.border, lineWidth: 1)
+            )
+        }
+    }
+}
+
+struct AgentPromptPanel: View {
+    let agentName: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionTitle("Ask \(agentName)")
+
+            VStack(alignment: .leading, spacing: 10) {
+                PromptRow(text: "How is my day looking?")
+                PromptRow(text: "Review my sleep and recovery.")
+                PromptRow(text: "Plan today around my calendar and energy.")
+            }
+            .padding(14)
+            .background(GatewayStyle.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(GatewayStyle.border, lineWidth: 1)
+            )
+        }
+    }
+}
+
+struct PromptRow: View {
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "quote.opening")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(GatewayStyle.primary)
+                .frame(width: 18)
+
+            Text(text)
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(GatewayStyle.text)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+struct HomeSyncDetails: View {
     @ObservedObject var settings: GatewaySettings
     @ObservedObject var sync: SyncCoordinator
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionTitle("Sync")
+            SectionTitle("Sync Status")
 
-            VStack(spacing: 14) {
-                if settings.isPaired {
-                    HStack(spacing: 10) {
-                        Image(systemName: "link.badge.plus")
-                            .foregroundStyle(GatewayStyle.primary)
-                            .frame(width: 22)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(settings.serverURLText.isEmpty ? "No server" : settings.serverURLText)
-                                .font(.footnote.weight(.semibold))
-                                .foregroundStyle(GatewayStyle.text)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-
-                            Text(settings.pairedDeviceID.map(shortDeviceID) ?? "No device")
-                                .font(.caption)
-                                .foregroundStyle(GatewayStyle.mutedText)
-                        }
-
-                        Spacer(minLength: 0)
-                    }
-                }
-
-                Button {
-                    Task { await sync.sync(settings: settings, trigger: .manual) }
-                } label: {
-                    HStack(spacing: 12) {
-                        ZStack {
-                            Circle()
-                                .fill(GatewayStyle.primary.opacity(0.12))
-                                .frame(width: 38, height: 38)
-
-                            if sync.isSyncing {
-                                ProgressView()
-                                    .controlSize(.small)
-                            } else {
-                                Image(systemName: "icloud.and.arrow.up")
-                                    .font(.system(size: 17, weight: .bold))
-                                    .foregroundStyle(GatewayStyle.primary)
-                            }
-                        }
-
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("Sync Yesterday and Today")
-                                .font(.headline)
-                                .foregroundStyle(GatewayStyle.text)
-
-                            Text(sync.isSyncing ? "Uploading summaries" : "Health and calendar summaries")
-                                .font(.caption)
-                                .foregroundStyle(GatewayStyle.mutedText)
-                        }
-
-                        Spacer()
-
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(GatewayStyle.mutedText)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .disabled(sync.isSyncing)
-
-                Divider()
-
+            VStack(spacing: 12) {
                 HStack(spacing: 12) {
                     LastSyncTile(
                         title: "Health",
@@ -265,9 +552,7 @@ struct SyncPanel: View {
                     )
                 }
 
-                if settings.autoSyncEnabled {
-                    AutoSyncStatusRow(settings: settings)
-                }
+                AutoSyncStatusRow(settings: settings)
 
                 if let message = sync.status.lastSuccessMessage {
                     StatusMessage(
@@ -276,13 +561,151 @@ struct SyncPanel: View {
                         color: GatewayStyle.success
                     )
                 }
+            }
+            .padding(14)
+            .background(GatewayStyle.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(GatewayStyle.border, lineWidth: 1)
+            )
+        }
+    }
+}
 
-                if let message = sync.status.lastError {
-                    StatusMessage(
-                        message: message,
-                        systemImage: "exclamationmark.triangle",
-                        color: GatewayStyle.warning
-                    )
+struct ConnectionStatusPanel: View {
+    @ObservedObject var settings: GatewaySettings
+    let receiverStatus: ReceiverCheckState
+    let onCheck: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(settings.isPaired ? agentName : "No agent connected")
+                        .font(.title2.weight(.bold))
+                        .foregroundStyle(GatewayStyle.text)
+
+                    Text(detail)
+                        .font(.callout)
+                        .foregroundStyle(GatewayStyle.mutedText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 12)
+
+                StatusBadge(
+                    title: badgeTitle,
+                    systemImage: badgeIcon,
+                    tone: badgeTone
+                )
+            }
+
+            if settings.isPaired {
+                Divider()
+
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: receiverStatus.systemImage)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(receiverStatus.tone.foreground)
+                        .frame(width: 18)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(receiverStatus.title)
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(GatewayStyle.text)
+
+                        Text(receiverStatus.detail)
+                            .font(.caption)
+                            .foregroundStyle(GatewayStyle.mutedText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer(minLength: 0)
+                }
+
+                Button(action: onCheck) {
+                    Label("Check Receiver", systemImage: "network")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(receiverStatus.isChecking)
+            }
+        }
+        .padding(18)
+        .background(GatewayStyle.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(GatewayStyle.border, lineWidth: 1)
+        )
+    }
+
+    private var agentName: String {
+        settings.pairedAgentName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+            ? settings.pairedAgentName!
+            : "Local Agent"
+    }
+
+    private var detail: String {
+        if settings.isPaired {
+            return settings.serverURLText.isEmpty ? "Connected" : settings.serverURLText
+        }
+        return "Scan a HealthLink pairing QR to connect this iPhone."
+    }
+
+    private var badgeTitle: String {
+        settings.isPaired ? "Paired" : "Setup"
+    }
+
+    private var badgeIcon: String {
+        settings.isPaired ? "link" : "link.badge.plus"
+    }
+
+    private var badgeTone: StatusTone {
+        settings.isPaired ? .success : .neutral
+    }
+}
+
+struct PairingPanel: View {
+    @ObservedObject var settings: GatewaySettings
+    @Binding var isShowingScanner: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionTitle("Pairing")
+
+            VStack(alignment: .leading, spacing: 12) {
+                Button {
+                    isShowingScanner = true
+                } label: {
+                    Label(settings.isPaired ? "Scan New QR Code" : "Scan QR Code", systemImage: "qrcode.viewfinder")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(GatewayStyle.primary)
+                .disabled(settings.isPairing)
+
+                TextField("healthlink://pair?server=...&code=...", text: $settings.pairingURLText)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.URL)
+                    .textFieldStyle(.roundedBorder)
+
+                Button {
+                    Task { await settings.preparePairingFromText() }
+                } label: {
+                    if settings.isPairing {
+                        Label("Checking Pairing", systemImage: "arrow.triangle.2.circlepath")
+                    } else {
+                        Label("Use Pairing Link", systemImage: "link")
+                    }
+                }
+                .disabled(settings.isPairing || settings.pairingURLText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                if settings.isPaired {
+                    LabeledContent("Device", value: settings.pairedDeviceID.map(shortDeviceID) ?? "-")
+                        .font(.footnote)
                 }
             }
             .padding(14)
@@ -300,6 +723,109 @@ struct SyncPanel: View {
             return deviceID
         }
         return "\(deviceID.prefix(8))...\(deviceID.suffix(6))"
+    }
+}
+
+struct AdvancedConnectionPanel: View {
+    @ObservedObject var settings: GatewaySettings
+    @Binding var isExpanded: Bool
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $isExpanded) {
+            VStack(alignment: .leading, spacing: 12) {
+                TextField("Server URL", text: $settings.serverURLText)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.URL)
+                    .textFieldStyle(.roundedBorder)
+
+                SecureField("API token", text: $settings.apiTokenText)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .textFieldStyle(.roundedBorder)
+
+                if settings.isPaired {
+                    Divider()
+
+                    LabeledContent("Agent", value: settings.pairedAgentName ?? "Local Agent")
+                    LabeledContent("Device", value: settings.pairedDeviceID ?? "-")
+                    LabeledContent("Scopes", value: settings.acceptedScopes.joined(separator: ", "))
+                }
+
+                Button {
+                    settings.save()
+                } label: {
+                    Label("Save Advanced Settings", systemImage: "checkmark.circle")
+                }
+
+                if let message = settings.lastSavedMessage {
+                    Text(message)
+                        .font(.footnote)
+                        .foregroundStyle(GatewayStyle.mutedText)
+                }
+            }
+            .padding(.top, 10)
+        } label: {
+            Label("Advanced", systemImage: "slider.horizontal.3")
+                .font(.headline)
+                .foregroundStyle(GatewayStyle.text)
+        }
+        .padding(14)
+        .background(GatewayStyle.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(GatewayStyle.border, lineWidth: 1)
+        )
+    }
+}
+
+struct PairingConfirmationView: View {
+    let preview: PairingPreview
+    let isPairing: Bool
+    let onCancel: () -> Void
+    let onConfirm: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Agent") {
+                    LabeledContent("Name", value: preview.status.agent_name)
+                    LabeledContent("Server", value: preview.status.server_url)
+                    if let transport = preview.status.transport {
+                        LabeledContent("Transport", value: transport)
+                    }
+                    LabeledContent("Code", value: preview.status.pairing_code)
+                    LabeledContent("Expires", value: preview.status.expires_at)
+                }
+
+                Section("Data Access") {
+                    ForEach(preview.status.requested_scopes, id: \.self) { scope in
+                        Label(scope, systemImage: "checkmark.circle")
+                    }
+                }
+            }
+            .navigationTitle("Confirm Pairing")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", action: onCancel)
+                        .disabled(isPairing)
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        onConfirm()
+                    } label: {
+                        if isPairing {
+                            Text("Pairing")
+                        } else {
+                            Text("Pair")
+                        }
+                    }
+                    .disabled(isPairing)
+                }
+            }
+        }
     }
 }
 
@@ -351,6 +877,9 @@ struct AutoSyncStatusRow: View {
     }
 
     private var detail: String {
+        if !settings.autoSyncEnabled {
+            return "Off"
+        }
         if let lastBackgroundScheduleError = settings.lastBackgroundScheduleError {
             return "Background scheduling issue: \(lastBackgroundScheduleError)"
         }
@@ -370,7 +899,7 @@ struct SummaryPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionTitle("Latest Summary")
+            SectionTitle("Today")
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                 MetricTile(
@@ -404,7 +933,7 @@ struct SummaryPanel: View {
                 )
 
                 MetricTile(
-                    title: "Free",
+                    title: "Free Windows",
                     value: calendar.map { "\($0.free_windows.count)" } ?? "-",
                     systemImage: "clock.badge.checkmark"
                 )
@@ -431,7 +960,7 @@ struct SummaryPanel: View {
 struct EmptySummaryPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionTitle("Latest Summary")
+            SectionTitle("Today")
 
             VStack(alignment: .leading, spacing: 10) {
                 Image(systemName: "tray")
@@ -442,7 +971,7 @@ struct EmptySummaryPanel: View {
                     .font(.headline)
                     .foregroundStyle(GatewayStyle.text)
 
-                Text("Awaiting first daily context")
+                Text("Run your first sync to send daily context to your agent.")
                     .font(.footnote)
                     .foregroundStyle(GatewayStyle.mutedText)
                     .fixedSize(horizontal: false, vertical: true)
@@ -456,309 +985,6 @@ struct EmptySummaryPanel: View {
                     .stroke(GatewayStyle.border, lineWidth: 1)
             )
         }
-    }
-}
-
-struct SettingsView: View {
-    @EnvironmentObject private var settings: GatewaySettings
-    @EnvironmentObject private var sync: SyncCoordinator
-    @State private var isShowingScanner = false
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Pairing") {
-                    Button {
-                        isShowingScanner = true
-                    } label: {
-                        Label("Scan Pairing QR", systemImage: "qrcode.viewfinder")
-                    }
-                    .disabled(settings.isPairing)
-
-                    TextField("healthlink://pair?server=...&code=...", text: $settings.pairingURLText)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .keyboardType(.URL)
-
-                    Button {
-                        Task { await settings.preparePairingFromText() }
-                    } label: {
-                        if settings.isPairing {
-                            Label("Checking Pairing", systemImage: "arrow.triangle.2.circlepath")
-                        } else {
-                            Label("Use Pairing URL", systemImage: "link")
-                        }
-                    }
-                    .disabled(settings.isPairing || settings.pairingURLText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-                    HStack {
-                        Label(pairingStatus, systemImage: pairingIcon)
-                            .foregroundStyle(pairingColor)
-                        Spacer()
-                    }
-                    .font(.footnote)
-
-                    if let deviceID = settings.pairedDeviceID {
-                        Text(deviceID)
-                            .font(.footnote.monospaced())
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-
-                    if settings.isPaired {
-                        VStack(alignment: .leading, spacing: 6) {
-                            LabeledContent("Server", value: settings.serverURLText.isEmpty ? "-" : settings.serverURLText)
-                            LabeledContent("Scopes", value: settings.acceptedScopes.joined(separator: ", "))
-                        }
-                        .font(.footnote)
-
-                        Button(role: .destructive) {
-                            Task { await settings.disconnect() }
-                        } label: {
-                            Label("Disconnect Device", systemImage: "iphone.slash")
-                        }
-                        .disabled(settings.isPairing)
-                    }
-
-                    if let message = settings.pairingMessage {
-                        Text(message)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Section("Server") {
-                    TextField("Server URL", text: $settings.serverURLText)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .keyboardType(.URL)
-
-                    SecureField("API token", text: $settings.apiTokenText)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-
-                    HStack {
-                        Label(tokenStatus, systemImage: tokenIcon)
-                            .foregroundStyle(tokenColor)
-                        Spacer()
-                    }
-                    .font(.footnote)
-                }
-
-                Section("Data") {
-                    Toggle(isOn: $settings.uploadHealthEnabled) {
-                        Label("Health summaries", systemImage: "heart.text.square")
-                    }
-
-                    Toggle(isOn: $settings.uploadCalendarEnabled) {
-                        Label("Calendar summaries", systemImage: "calendar.badge.clock")
-                    }
-                }
-
-                Section("Auto Sync") {
-                    Toggle(isOn: $settings.autoSyncEnabled) {
-                        Label("Auto Sync", systemImage: "arrow.triangle.2.circlepath")
-                    }
-                    .onChange(of: settings.autoSyncEnabled) { _, _ in
-                        settings.saveAutoSyncSettings()
-                        BackgroundSyncManager.scheduleAppRefresh(settings: settings)
-                    }
-
-                    Stepper(value: $settings.autoSyncMinimumIntervalMinutes, in: 5...240, step: 5) {
-                        Label("Minimum \(settings.autoSyncMinimumIntervalMinutes)m", systemImage: "timer")
-                    }
-                    .disabled(!settings.autoSyncEnabled)
-                    .onChange(of: settings.autoSyncMinimumIntervalMinutes) { _, _ in
-                        settings.saveAutoSyncSettings()
-                        BackgroundSyncManager.scheduleAppRefresh(settings: settings)
-                    }
-
-                    if let lastAutoSyncAt = settings.lastAutoSyncAt {
-                        LabeledContent("Last auto sync", value: lastAutoSyncAt.formatted(date: .omitted, time: .shortened))
-                    }
-
-                    if let lastSyncAttemptAt = settings.lastSyncAttemptAt {
-                        LabeledContent("Last attempt", value: lastSyncAttemptAt.formatted(date: .omitted, time: .shortened))
-                    }
-
-                    if let nextEligibleAutoSyncAt = settings.nextEligibleAutoSyncAt {
-                        LabeledContent("Next eligible", value: nextEligibleAutoSyncAt.formatted(date: .omitted, time: .shortened))
-                    }
-
-                    if let lastSyncError = settings.lastSyncError {
-                        Label(lastSyncError, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(GatewayStyle.warning)
-                    }
-
-                    if let lastBackgroundScheduleError = settings.lastBackgroundScheduleError {
-                        Label(lastBackgroundScheduleError, systemImage: "calendar.badge.exclamationmark")
-                            .foregroundStyle(GatewayStyle.warning)
-                    }
-
-                    Text("Auto Sync runs when the app opens, when it enters background, and during iOS background refresh opportunities. It is not strict real-time syncing.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-
-                Section {
-                    Button {
-                        settings.save()
-                    } label: {
-                        Label("Save Settings", systemImage: "checkmark.circle")
-                    }
-
-                    if let message = settings.lastSavedMessage {
-                        Text(message)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Section("Privacy") {
-                    Label("Calendar titles are redacted", systemImage: "calendar.badge.exclamationmark")
-                    Label("Health samples are summarized", systemImage: "chart.bar.doc.horizontal")
-                }
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            }
-            .navigationTitle("Settings")
-            .sheet(isPresented: $isShowingScanner) {
-                PairingScannerView { value in
-                    isShowingScanner = false
-                    Task { await settings.preparePairing(rawValue: value) }
-                }
-            }
-            .sheet(item: $settings.pendingPairing) { preview in
-                PairingConfirmationView(
-                    preview: preview,
-                    isPairing: settings.isPairing,
-                    onCancel: {
-                        settings.cancelPendingPairing()
-                    },
-                    onConfirm: {
-                        Task {
-                            let paired = await settings.confirmPairing(preview)
-                            if paired {
-                                await sync.attemptAutoSync(settings: settings, reason: "pairing")
-                            }
-                        }
-                    }
-                )
-            }
-        }
-    }
-
-    private var tokenStatus: String {
-        settings.apiTokenText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Token not set" : "Token set"
-    }
-
-    private var tokenIcon: String {
-        settings.apiTokenText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "key.slash" : "key"
-    }
-
-    private var tokenColor: Color {
-        settings.apiTokenText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? GatewayStyle.warning : GatewayStyle.success
-    }
-
-    private var pairingStatus: String {
-        settings.isPaired ? "Device paired" : "No paired device"
-    }
-
-    private var pairingIcon: String {
-        settings.isPaired ? "iphone.gen3" : "iphone.slash"
-    }
-
-    private var pairingColor: Color {
-        settings.isPaired ? GatewayStyle.success : GatewayStyle.warning
-    }
-}
-
-struct PairingConfirmationView: View {
-    let preview: PairingPreview
-    let isPairing: Bool
-    let onCancel: () -> Void
-    let onConfirm: () -> Void
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Agent") {
-                    LabeledContent("Name", value: preview.status.agent_name)
-                    LabeledContent("Server", value: preview.status.server_url)
-                    if let transport = preview.status.transport {
-                        LabeledContent("Transport", value: transport)
-                    }
-                    LabeledContent("Code", value: preview.status.pairing_code)
-                    LabeledContent("Expires", value: preview.status.expires_at)
-                }
-
-                Section("Scopes") {
-                    ForEach(preview.status.requested_scopes, id: \.self) { scope in
-                        Label(scope, systemImage: "checkmark.circle")
-                    }
-                }
-            }
-            .navigationTitle("Confirm Pairing")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onCancel)
-                        .disabled(isPairing)
-                }
-
-                ToolbarItem(placement: .confirmationAction) {
-                    Button {
-                        onConfirm()
-                    } label: {
-                        if isPairing {
-                            Text("Pairing")
-                        } else {
-                            Text("Pair")
-                        }
-                    }
-                    .disabled(isPairing)
-                }
-            }
-        }
-    }
-}
-
-struct PermissionButton: View {
-    let title: String
-    let systemImage: String
-    let disabled: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 12) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(GatewayStyle.primary)
-
-                HStack {
-                    Text(title)
-                        .font(.headline)
-                        .foregroundStyle(GatewayStyle.text)
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(GatewayStyle.mutedText)
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: 94, alignment: .leading)
-            .padding(14)
-            .background(GatewayStyle.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(GatewayStyle.border, lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .disabled(disabled)
     }
 }
 
@@ -888,6 +1114,70 @@ struct SectionTitle: View {
             .foregroundStyle(GatewayStyle.mutedText)
             .tracking(0.8)
             .padding(.horizontal, 2)
+    }
+}
+
+enum ReceiverCheckState {
+    case idle
+    case checking
+    case online(ReceiverHealthStatus)
+    case offline(String)
+
+    var title: String {
+        switch self {
+        case .idle:
+            return "Receiver not checked"
+        case .checking:
+            return "Checking receiver"
+        case .online:
+            return "Receiver online"
+        case .offline:
+            return "Receiver offline"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .idle:
+            return "Check whether this iPhone can reach the Agent receiver."
+        case .checking:
+            return "Contacting the saved server URL."
+        case .online(let status):
+            return "\(status.device_count) devices, \(status.sync_count) syncs, last sync \(status.last_sync_at ?? "never")."
+        case .offline(let message):
+            return message
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .idle:
+            return "network"
+        case .checking:
+            return "arrow.triangle.2.circlepath"
+        case .online:
+            return "checkmark.circle"
+        case .offline:
+            return "exclamationmark.triangle"
+        }
+    }
+
+    var tone: StatusTone {
+        switch self {
+        case .online:
+            return .success
+        case .offline:
+            return .warning
+        case .idle, .checking:
+            return .neutral
+        }
+    }
+
+    var isChecking: Bool {
+        if case .checking = self {
+            return true
+        }
+        return false
     }
 }
 
