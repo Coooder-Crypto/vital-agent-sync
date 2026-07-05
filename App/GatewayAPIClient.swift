@@ -16,10 +16,6 @@ final class GatewayAPIClient {
         try await post(summary, path: "/api/health/daily-summary")
     }
 
-    func uploadCalendarSummary(_ summary: DailyCalendarSummary) async throws {
-        try await post(summary, path: "/api/calendar/daily-summary")
-    }
-
     func uploadHealthSync(_ payload: HealthSyncPayload) async throws -> HealthSyncResponse {
         try await post(payload, path: "/health/sync")
     }
@@ -87,11 +83,12 @@ final class GatewayAPIClient {
 
     static func checkReceiver(serverURL: URL) async throws -> ReceiverHealthStatus {
         let url = endpoint(baseURL: serverURL, path: "/health/status")
+        let request = URLRequest(url: url, timeoutInterval: 2)
 
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await URLSession.shared.data(from: url)
+            (data, response) = try await URLSession.shared.data(for: request)
         } catch let error as URLError {
             throw GatewayError.fromURL(error)
         }

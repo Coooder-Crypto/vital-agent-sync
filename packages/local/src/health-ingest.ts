@@ -12,7 +12,6 @@ export type HealthSyncResult = {
   ok: true;
   accepted_sync_id: string;
   health_daily_count: number;
-  calendar_daily_count: number;
   idempotent: boolean;
 };
 
@@ -49,27 +48,24 @@ const dailyHealthSummarySchema = z.object({
   avg_heart_rate_bpm: z.number().nullable().optional(),
   max_heart_rate_bpm: z.number().nullable().optional(),
   active_energy_kcal: z.number().nullable().optional(),
+  basal_energy_kcal: z.number().nullable().optional(),
+  distance_walking_running_m: z.number().nullable().optional(),
+  distance_cycling_m: z.number().nullable().optional(),
+  flights_climbed: z.number().int().nonnegative().nullable().optional(),
+  exercise_minutes: z.number().int().nonnegative().nullable().optional(),
+  stand_minutes: z.number().int().nonnegative().nullable().optional(),
+  heart_rate_variability_ms: z.number().nullable().optional(),
+  walking_heart_rate_average_bpm: z.number().nullable().optional(),
+  vo2_max_ml_kg_min: z.number().nullable().optional(),
+  oxygen_saturation_percent: z.number().nullable().optional(),
+  respiratory_rate_bpm: z.number().nullable().optional(),
+  body_temperature_c: z.number().nullable().optional(),
+  body_mass_kg: z.number().nullable().optional(),
+  body_fat_percentage: z.number().nullable().optional(),
+  lean_body_mass_kg: z.number().nullable().optional(),
+  body_mass_index: z.number().nullable().optional(),
   workout_minutes: z.number().int().nonnegative().nullable().optional(),
   workouts: z.array(workoutSummarySchema).default([])
-});
-
-const freeWindowSchema = z.object({
-  start: z.string().min(1),
-  end: z.string().min(1)
-});
-
-const redactedCalendarEventSchema = z.object({
-  starts_at: z.string().min(1),
-  duration_minutes: z.number().int().nonnegative(),
-  title_redacted: z.boolean()
-});
-
-const dailyCalendarSummarySchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  provider: z.string().min(1),
-  busy_minutes: z.number().int().nonnegative(),
-  free_windows: z.array(freeWindowSchema).default([]),
-  next_event: redactedCalendarEventSchema.nullable().optional()
 });
 
 export const healthSyncPayloadSchema = z.object({
@@ -77,8 +73,7 @@ export const healthSyncPayloadSchema = z.object({
   sync_id: z.string().min(1),
   generated_at: z.string().min(1),
   timezone: z.string().min(1),
-  health_daily_summaries: z.array(dailyHealthSummarySchema).default([]),
-  calendar_daily_summaries: z.array(dailyCalendarSummarySchema).default([])
+  health_daily_summaries: z.array(dailyHealthSummarySchema).default([])
 });
 
 export type HealthSyncPayload = z.infer<typeof healthSyncPayloadSchema>;
@@ -155,9 +150,6 @@ export function ingestHealthSync(
   if (payload.health_daily_summaries.length > 0 && !device.scopes.includes("health.daily_summary.write")) {
     throw new HealthIngestError("missing_scope", "Device is missing health.daily_summary.write scope.");
   }
-  if (payload.calendar_daily_summaries.length > 0 && !device.scopes.includes("calendar.daily_summary.write")) {
-    throw new HealthIngestError("missing_scope", "Device is missing calendar.daily_summary.write scope.");
-  }
 
   const existingSync = database.sqlite.prepare(`
     select sync_id as syncId
@@ -170,7 +162,6 @@ export function ingestHealthSync(
       ok: true,
       accepted_sync_id: payload.sync_id,
       health_daily_count: payload.health_daily_summaries.length,
-      calendar_daily_count: payload.calendar_daily_summaries.length,
       idempotent: true
     };
   }
@@ -207,10 +198,6 @@ export function ingestHealthSync(
     for (const summary of payload.health_daily_summaries) {
       upsertHealthDailySummary(database, payload, summary, now);
     }
-
-    for (const summary of payload.calendar_daily_summaries) {
-      upsertCalendarDailySummary(database, payload, summary, now);
-    }
   });
 
   persist();
@@ -219,7 +206,6 @@ export function ingestHealthSync(
     ok: true,
     accepted_sync_id: payload.sync_id,
     health_daily_count: payload.health_daily_summaries.length,
-    calendar_daily_count: payload.calendar_daily_summaries.length,
     idempotent: false
   };
 }
@@ -269,6 +255,22 @@ function upsertHealthDailySummary(
       avg_heart_rate_bpm,
       max_heart_rate_bpm,
       active_energy_kcal,
+      basal_energy_kcal,
+      distance_walking_running_m,
+      distance_cycling_m,
+      flights_climbed,
+      exercise_minutes,
+      stand_minutes,
+      heart_rate_variability_ms,
+      walking_heart_rate_average_bpm,
+      vo2_max_ml_kg_min,
+      oxygen_saturation_percent,
+      respiratory_rate_bpm,
+      body_temperature_c,
+      body_mass_kg,
+      body_fat_percentage,
+      lean_body_mass_kg,
+      body_mass_index,
       workout_minutes,
       updated_at
     ) values (
@@ -283,6 +285,22 @@ function upsertHealthDailySummary(
       @avgHeartRateBpm,
       @maxHeartRateBpm,
       @activeEnergyKcal,
+      @basalEnergyKcal,
+      @distanceWalkingRunningM,
+      @distanceCyclingM,
+      @flightsClimbed,
+      @exerciseMinutes,
+      @standMinutes,
+      @heartRateVariabilityMs,
+      @walkingHeartRateAverageBpm,
+      @vo2MaxMlKgMin,
+      @oxygenSaturationPercent,
+      @respiratoryRateBpm,
+      @bodyTemperatureC,
+      @bodyMassKg,
+      @bodyFatPercentage,
+      @leanBodyMassKg,
+      @bodyMassIndex,
       @workoutMinutes,
       @updatedAt
     )
@@ -293,6 +311,22 @@ function upsertHealthDailySummary(
       avg_heart_rate_bpm = excluded.avg_heart_rate_bpm,
       max_heart_rate_bpm = excluded.max_heart_rate_bpm,
       active_energy_kcal = excluded.active_energy_kcal,
+      basal_energy_kcal = excluded.basal_energy_kcal,
+      distance_walking_running_m = excluded.distance_walking_running_m,
+      distance_cycling_m = excluded.distance_cycling_m,
+      flights_climbed = excluded.flights_climbed,
+      exercise_minutes = excluded.exercise_minutes,
+      stand_minutes = excluded.stand_minutes,
+      heart_rate_variability_ms = excluded.heart_rate_variability_ms,
+      walking_heart_rate_average_bpm = excluded.walking_heart_rate_average_bpm,
+      vo2_max_ml_kg_min = excluded.vo2_max_ml_kg_min,
+      oxygen_saturation_percent = excluded.oxygen_saturation_percent,
+      respiratory_rate_bpm = excluded.respiratory_rate_bpm,
+      body_temperature_c = excluded.body_temperature_c,
+      body_mass_kg = excluded.body_mass_kg,
+      body_fat_percentage = excluded.body_fat_percentage,
+      lean_body_mass_kg = excluded.lean_body_mass_kg,
+      body_mass_index = excluded.body_mass_index,
       workout_minutes = excluded.workout_minutes,
       updated_at = excluded.updated_at
   `).run({
@@ -307,6 +341,22 @@ function upsertHealthDailySummary(
     avgHeartRateBpm: summary.avg_heart_rate_bpm ?? null,
     maxHeartRateBpm: summary.max_heart_rate_bpm ?? null,
     activeEnergyKcal: summary.active_energy_kcal ?? null,
+    basalEnergyKcal: summary.basal_energy_kcal ?? null,
+    distanceWalkingRunningM: summary.distance_walking_running_m ?? null,
+    distanceCyclingM: summary.distance_cycling_m ?? null,
+    flightsClimbed: summary.flights_climbed ?? null,
+    exerciseMinutes: summary.exercise_minutes ?? null,
+    standMinutes: summary.stand_minutes ?? null,
+    heartRateVariabilityMs: summary.heart_rate_variability_ms ?? null,
+    walkingHeartRateAverageBpm: summary.walking_heart_rate_average_bpm ?? null,
+    vo2MaxMlKgMin: summary.vo2_max_ml_kg_min ?? null,
+    oxygenSaturationPercent: summary.oxygen_saturation_percent ?? null,
+    respiratoryRateBpm: summary.respiratory_rate_bpm ?? null,
+    bodyTemperatureC: summary.body_temperature_c ?? null,
+    bodyMassKg: summary.body_mass_kg ?? null,
+    bodyFatPercentage: summary.body_fat_percentage ?? null,
+    leanBodyMassKg: summary.lean_body_mass_kg ?? null,
+    bodyMassIndex: summary.body_mass_index ?? null,
     workoutMinutes: summary.workout_minutes ?? null,
     updatedAt
   });
@@ -354,85 +404,6 @@ function upsertHealthDailySummary(
       activeEnergyKcal: workout.active_energy_kcal ?? null,
       avgHeartRateBpm: workout.avg_heart_rate_bpm ?? null,
       updatedAt
-    });
-  }
-}
-
-function upsertCalendarDailySummary(
-  database: HealthLinkDatabase,
-  payload: HealthSyncPayload,
-  summary: HealthSyncPayload["calendar_daily_summaries"][number],
-  updatedAt: string
-): void {
-  const id = stableId("calendar_daily", payload.device_id, summary.provider, summary.date, payload.timezone);
-  database.sqlite.prepare(`
-    insert into calendar_daily_summaries (
-      id,
-      device_id,
-      date,
-      timezone,
-      provider,
-      busy_minutes,
-      next_event_starts_at,
-      next_event_duration_minutes,
-      title_redacted,
-      updated_at
-    ) values (
-      @id,
-      @deviceId,
-      @date,
-      @timezone,
-      @provider,
-      @busyMinutes,
-      @nextEventStartsAt,
-      @nextEventDurationMinutes,
-      @titleRedacted,
-      @updatedAt
-    )
-    on conflict(device_id, provider, date, timezone) do update set
-      busy_minutes = excluded.busy_minutes,
-      next_event_starts_at = excluded.next_event_starts_at,
-      next_event_duration_minutes = excluded.next_event_duration_minutes,
-      title_redacted = excluded.title_redacted,
-      updated_at = excluded.updated_at
-  `).run({
-    id,
-    deviceId: payload.device_id,
-    date: summary.date,
-    timezone: payload.timezone,
-    provider: summary.provider,
-    busyMinutes: summary.busy_minutes,
-    nextEventStartsAt: summary.next_event?.starts_at ?? null,
-    nextEventDurationMinutes: summary.next_event?.duration_minutes ?? null,
-    titleRedacted: summary.next_event?.title_redacted === false ? 0 : 1,
-    updatedAt
-  });
-
-  database.sqlite.prepare(`
-    delete from calendar_free_windows
-    where summary_id = ?
-  `).run(id);
-
-  const insertFreeWindow = database.sqlite.prepare(`
-    insert into calendar_free_windows (
-      id,
-      summary_id,
-      start,
-      end
-    ) values (
-      @id,
-      @summaryId,
-      @start,
-      @end
-    )
-  `);
-
-  for (const window of summary.free_windows) {
-    insertFreeWindow.run({
-      id: stableId("free_window", id, window.start, window.end),
-      summaryId: id,
-      start: window.start,
-      end: window.end
     });
   }
 }

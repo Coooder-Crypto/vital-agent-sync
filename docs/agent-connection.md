@@ -12,7 +12,7 @@ For adapter implementation guidance, see [architecture-adapter-design.md](archit
 2. HealthLink starts an Agent-side receiver and shows a QR code.
 3. User scans the QR code with the iOS app.
 4. User selects which data types to expose.
-5. User authorizes Apple Health / Calendar once.
+5. User authorizes Apple Health once.
 6. The Agent-side receiver stores the data locally.
 7. The iOS app syncs compact summaries manually or automatically.
 8. The agent reads the latest stored data through MCP tools.
@@ -27,7 +27,7 @@ HealthLink has three roles:
 ```text
 HealthLink iOS
   Apple permissions
-  HealthKit / Calendar collection
+  HealthKit collection
   scope selection
   manual and automatic sync
 
@@ -266,8 +266,7 @@ Future payload fields:
   "agent_name": "Hermes Agent",
   "agent_public_key": "...",
   "requested_scopes": [
-    "health.daily_summary.write",
-    "calendar.daily_summary.write"
+    "health.daily_summary.write"
   ],
   "expires_at": "2026-07-04T06:00:00Z"
 }
@@ -332,13 +331,12 @@ HealthLink should provide a small, portable skill document for agents that suppo
 
 Skill responsibilities:
 
-- recognize questions such as "How am I today?", "Should I exercise?", "How should I plan today?", "Am I recovered?", and "Is my schedule overloaded?"
+- recognize questions such as "How am I today?", "Should I exercise?", and "Am I recovered?"
 - call `get_personal_context` first for broad personal-context questions
 - use lower-level tools only for drill-down questions
 - report data freshness before analysis
-- combine health, sleep, activity, recovery, and calendar pressure
+- combine health, sleep, activity, and recovery
 - avoid diagnosis, prescriptions, or unsupported medical claims
-- keep calendar titles redacted
 
 Potential helper commands:
 
@@ -358,7 +356,6 @@ Current implemented tools:
 healthlink_status
 get_personal_context
 get_daily_health_summary
-get_calendar_availability
 get_sleep_trend
 get_workout_load
 get_recovery_signals
@@ -372,12 +369,11 @@ revoke_device
 
 Tool rules:
 
-- Use `get_personal_context` first for broad natural-language questions about today, energy, recovery, exercise readiness, schedule pressure, and day planning.
+- Use `get_personal_context` first for broad natural-language questions about today, energy, recovery, and exercise readiness.
 - Use `list_source_devices` and `revoke_source_device` for setup and troubleshooting. `list_devices` and `revoke_device` remain legacy aliases.
 - Use `record_feedback` only when the user explicitly gives a correction, preference, or usefulness rating.
 - Return compact summaries, not raw samples.
 - Include enough timestamps for freshness checks.
-- Redact calendar event titles by default.
 - Return empty structured data when a date has no samples.
 
 ## Development Priorities

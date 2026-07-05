@@ -4,8 +4,7 @@ import type { SourcePlatform } from "./source-devices.js";
 import type { TransportProviderId } from "./transports.js";
 
 export const defaultScopes = [
-  "health.daily_summary.write",
-  "calendar.daily_summary.write"
+  "health.daily_summary.write"
 ] as const;
 
 export type HealthLinkScope = typeof defaultScopes[number];

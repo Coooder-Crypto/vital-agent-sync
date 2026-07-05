@@ -14,7 +14,6 @@ Content-Type: application/json
 Tokens should be scoped. For the MVP, one token can allow:
 
 - `health.daily_summary.write`
-- `calendar.daily_summary.write`
 
 ## Health Daily Summary
 
@@ -35,6 +34,22 @@ Body:
   "avg_heart_rate_bpm": 82.0,
   "max_heart_rate_bpm": 146.0,
   "active_energy_kcal": 480.0,
+  "basal_energy_kcal": 1500.0,
+  "distance_walking_running_m": 3200.0,
+  "distance_cycling_m": null,
+  "flights_climbed": 8,
+  "exercise_minutes": 35,
+  "stand_minutes": 120,
+  "heart_rate_variability_ms": 42.0,
+  "walking_heart_rate_average_bpm": 98.0,
+  "vo2_max_ml_kg_min": 38.5,
+  "oxygen_saturation_percent": 97.5,
+  "respiratory_rate_bpm": 15.2,
+  "body_temperature_c": null,
+  "body_mass_kg": 72.4,
+  "body_fat_percentage": null,
+  "lean_body_mass_kg": null,
+  "body_mass_index": null,
   "workout_minutes": 45,
   "workouts": [
     {
@@ -55,40 +70,6 @@ Recommended server behavior:
 - Store workouts idempotently by provider + workout `id`.
 - Keep raw payloads in a restricted raw-events table if needed.
 - Expose summaries to agents, not high-frequency raw samples.
-
-## Calendar Daily Summary
-
-```http
-POST /api/calendar/daily-summary
-```
-
-Body:
-
-```json
-{
-  "date": "2026-06-21",
-  "timezone": "Asia/Shanghai",
-  "provider": "apple_calendar",
-  "busy_minutes": 240,
-  "free_windows": [
-    {
-      "start": "2026-06-21T19:00:00+08:00",
-      "end": "2026-06-21T21:00:00+08:00"
-    }
-  ],
-  "next_event": {
-    "starts_at": "2026-06-21T14:00:00+08:00",
-    "duration_minutes": 60,
-    "title_redacted": true
-  }
-}
-```
-
-Recommended server behavior:
-
-- Store only redacted availability by default.
-- Do not require event titles, notes, attendees, or locations in the MVP.
-- Convert this into an agent-facing `schedule_availability` context.
 
 ## Responses
 

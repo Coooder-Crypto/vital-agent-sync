@@ -110,6 +110,22 @@ function migrate(sqlite: BetterSqliteDatabase): void {
       avg_heart_rate_bpm real,
       max_heart_rate_bpm real,
       active_energy_kcal real,
+      basal_energy_kcal real,
+      distance_walking_running_m real,
+      distance_cycling_m real,
+      flights_climbed integer,
+      exercise_minutes integer,
+      stand_minutes integer,
+      heart_rate_variability_ms real,
+      walking_heart_rate_average_bpm real,
+      vo2_max_ml_kg_min real,
+      oxygen_saturation_percent real,
+      respiratory_rate_bpm real,
+      body_temperature_c real,
+      body_mass_kg real,
+      body_fat_percentage real,
+      lean_body_mass_kg real,
+      body_mass_index real,
       workout_minutes integer,
       updated_at text not null,
       unique(device_id, provider, date, timezone)
@@ -129,27 +145,6 @@ function migrate(sqlite: BetterSqliteDatabase): void {
       unique(device_id, provider, workout_id)
     );
 
-    create table if not exists calendar_daily_summaries (
-      id text primary key,
-      device_id text not null references devices(id),
-      date text not null,
-      timezone text not null,
-      provider text not null,
-      busy_minutes integer not null,
-      next_event_starts_at text,
-      next_event_duration_minutes integer,
-      title_redacted integer not null default 1,
-      updated_at text not null,
-      unique(device_id, provider, date, timezone)
-    );
-
-    create table if not exists calendar_free_windows (
-      id text primary key,
-      summary_id text not null references calendar_daily_summaries(id) on delete cascade,
-      start text not null,
-      end text not null
-    );
-
     create table if not exists feedback_events (
       id text primary key,
       source text not null,
@@ -165,6 +160,22 @@ function migrate(sqlite: BetterSqliteDatabase): void {
   `);
 
   ensureColumn(sqlite, "pairing_sessions", "transport", "text not null default 'lan'");
+  ensureColumn(sqlite, "health_daily_summaries", "basal_energy_kcal", "real");
+  ensureColumn(sqlite, "health_daily_summaries", "distance_walking_running_m", "real");
+  ensureColumn(sqlite, "health_daily_summaries", "distance_cycling_m", "real");
+  ensureColumn(sqlite, "health_daily_summaries", "flights_climbed", "integer");
+  ensureColumn(sqlite, "health_daily_summaries", "exercise_minutes", "integer");
+  ensureColumn(sqlite, "health_daily_summaries", "stand_minutes", "integer");
+  ensureColumn(sqlite, "health_daily_summaries", "heart_rate_variability_ms", "real");
+  ensureColumn(sqlite, "health_daily_summaries", "walking_heart_rate_average_bpm", "real");
+  ensureColumn(sqlite, "health_daily_summaries", "vo2_max_ml_kg_min", "real");
+  ensureColumn(sqlite, "health_daily_summaries", "oxygen_saturation_percent", "real");
+  ensureColumn(sqlite, "health_daily_summaries", "respiratory_rate_bpm", "real");
+  ensureColumn(sqlite, "health_daily_summaries", "body_temperature_c", "real");
+  ensureColumn(sqlite, "health_daily_summaries", "body_mass_kg", "real");
+  ensureColumn(sqlite, "health_daily_summaries", "body_fat_percentage", "real");
+  ensureColumn(sqlite, "health_daily_summaries", "lean_body_mass_kg", "real");
+  ensureColumn(sqlite, "health_daily_summaries", "body_mass_index", "real");
 }
 
 function ensureColumn(sqlite: BetterSqliteDatabase, table: string, column: string, definition: string): void {
