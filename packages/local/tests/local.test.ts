@@ -11,6 +11,7 @@ import {
 import { getAgentAdapter } from "../src/agents.js";
 import { openHealthLinkDatabase } from "../src/database.js";
 import { listDevices, revokeDevice } from "../src/devices.js";
+import { listFeedbackEvents, recordFeedback } from "../src/feedback.js";
 import { authenticateDevice, ingestHealthSync } from "../src/health-ingest.js";
 import {
   getCalendarAvailability,
@@ -136,6 +137,38 @@ test("agent audit log records MCP-style reads", () => {
       assert.equal(entries.length, 1);
       assert.equal(entries[0]?.tool_name, "get_personal_context");
       assert.deepEqual(entries[0]?.scopes_used, ["health.daily_summary.read", "calendar.daily_summary.read"]);
+    } finally {
+      database.close();
+    }
+  });
+});
+
+test("feedback events persist user corrections for agent loops", () => {
+  withTempDatabase((databasePath) => {
+    const database = openHealthLinkDatabase({ path: databasePath });
+    try {
+      const first = recordFeedback(database, {
+        source: "agent",
+        category: "analysis_quality",
+        rating: 7,
+        note: "Consider sleep debt before recommending late work.",
+        occurred_at: "2026-07-04T10:00:00.000Z"
+      });
+      const second = recordFeedback(database, {
+        category: "preference",
+        rating: 0,
+        note: "Prefer concise plans.",
+        occurred_at: "2026-07-04T11:00:00.000Z"
+      });
+      const events = listFeedbackEvents(database);
+
+      assert.equal(first.rating, 5);
+      assert.equal(second.source, "agent");
+      assert.equal(second.rating, 1);
+      assert.equal(events.length, 2);
+      assert.equal(events[0]?.category, "preference");
+      assert.equal(events[1]?.note, "Consider sleep debt before recommending late work.");
+      assert.throws(() => recordFeedback(database, { category: "   " }), /category is required/);
     } finally {
       database.close();
     }

@@ -149,6 +149,19 @@ function migrate(sqlite: BetterSqliteDatabase): void {
       start text not null,
       end text not null
     );
+
+    create table if not exists feedback_events (
+      id text primary key,
+      source text not null,
+      category text not null,
+      rating integer,
+      note text,
+      occurred_at text not null,
+      created_at text not null
+    );
+
+    create index if not exists idx_feedback_events_occurred_at
+      on feedback_events(occurred_at);
   `);
 
   ensureColumn(sqlite, "pairing_sessions", "transport", "text not null default 'lan'");

@@ -15,6 +15,7 @@ import {
   getWeeklySummary,
   getWorkoutLoad
 } from "./health-query.js";
+import { recordFeedback } from "./feedback.js";
 
 export type McpServerOptions = {
   databasePath?: string;
@@ -150,6 +151,33 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
       return auditedJsonResult(database, agentClient.id, "revoke_device", {
         ok: Boolean(device),
         device: device ?? null
+      });
+    }
+  );
+
+  server.registerTool(
+    "record_feedback",
+    {
+      title: "Record HealthLink Feedback",
+      description: "Record user feedback about a HealthLink analysis, recommendation, sync issue, missing metric, or correction. Use after the user explicitly gives feedback such as 'that was wrong', 'remember this was helpful', or 'next time account for my sleep debt'.",
+      inputSchema: z.object({
+        category: z.string().min(1).max(80).describe("Short feedback category, such as analysis_quality, missing_data, preference, or correction."),
+        rating: z.number().int().min(1).max(5).optional().describe("Optional 1-5 usefulness or satisfaction rating."),
+        note: z.string().max(1000).optional().describe("Optional concise user feedback note."),
+        occurred_at: z.string().optional().describe("Optional ISO timestamp for when the feedback occurred. Defaults to now.")
+      })
+    },
+    async ({ category, rating, note, occurred_at }) => {
+      const feedback = recordFeedback(database, {
+        source: "agent",
+        category,
+        rating,
+        note,
+        occurred_at
+      });
+      return auditedJsonResult(database, agentClient.id, "record_feedback", {
+        ok: true,
+        feedback
       });
     }
   );

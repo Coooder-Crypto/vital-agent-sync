@@ -131,10 +131,13 @@ Available MCP tools:
 - `get_weekly_summary`
 - `list_devices`
 - `revoke_device`
+- `record_feedback`
 
 Use `get_personal_context` as the default high-level entry for natural language questions like "How am I today?", "How should I plan today?", "Should I exercise?", "Am I recovered?", or "Is my schedule overloaded?". It returns sync status, latest health, calendar availability, sleep trend, workout load, recovery signals, freshness metadata, and source coverage together.
 
 MCP reads are recorded in `agent_audit_log` with the local Agent client, tool name, scopes used, and read timestamp. This keeps Agent access auditable without changing the current stdio MCP setup.
+
+Agents can call `record_feedback` when the user explicitly gives a correction, preference, or usefulness rating. Feedback is stored locally in `feedback_events` and can be used by future product loops without exposing raw health samples.
 
 Agents only need `/reload-mcp` or a restart when the MCP config, database path, or tool implementation changes. New iOS syncs do not require reload.
 

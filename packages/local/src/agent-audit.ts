@@ -163,11 +163,15 @@ function defaultMcpScopes(): string[] {
     "health.daily_summary.read",
     "calendar.daily_summary.read",
     "source_devices.read",
+    "feedback.events.write",
     "agent_audit.write"
   ];
 }
 
 function inferToolScopes(toolName: string): string[] {
+  if (toolName.includes("feedback")) {
+    return ["feedback.events.write"];
+  }
   if (toolName.includes("calendar")) {
     return ["calendar.daily_summary.read"];
   }

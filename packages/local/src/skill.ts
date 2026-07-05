@@ -55,6 +55,7 @@ Do not use this skill for diagnosis, prescriptions, emergency advice, or unsuppo
    - \`get_recovery_signals\` for sleep, heart-rate, activity, and workout-minutes context.
    - \`get_weekly_summary\` for compact 7-day health, activity, recovery, and calendar pressure summaries.
    - \`healthlink_status\`, \`list_devices\`, and \`revoke_device\` for setup and troubleshooting.
+   - \`record_feedback\` only when the user explicitly gives feedback, a correction, or a preference that should improve future HealthLink analysis.
 3. Mention data freshness before analysis when the answer depends on recency.
 4. If the latest sync is stale or missing, say that plainly and suggest syncing HealthLink.
 5. Keep calendar titles redacted. Use availability, timing, and pressure signals only.

@@ -318,7 +318,7 @@ Current direction is good: keep Agent tools provider-neutral.
   - last sync per source
 - [x] Add agent audit logging for MCP reads.
 - [x] Add weekly summary tool after daily flow stabilizes.
-- [ ] Add feedback write tool when user feedback loops are ready.
+- [x] Add feedback write tool when user feedback loops are ready.
 
 ## Migration Plan
 
