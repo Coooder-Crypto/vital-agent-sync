@@ -5,10 +5,8 @@ final class SyncCoordinator: ObservableObject {
     @Published private(set) var isSyncing = false
     @Published private(set) var status: SyncStatus = .empty
     @Published private(set) var latestHealthSummary: DailyHealthSummary?
-    @Published private(set) var latestCalendarSummary: DailyCalendarSummary?
 
     private let healthService = HealthKitService()
-    private let calendarService = CalendarService()
 
     enum SyncTrigger {
         case manual
@@ -28,20 +26,6 @@ final class SyncCoordinator: ObservableObject {
         }
         if succeeded, let settings {
             await attemptAutoSync(settings: settings, reason: "health_permission")
-        }
-    }
-
-    func requestCalendarAuthorization(settings: GatewaySettings? = nil) async {
-        let succeeded = await run {
-            do {
-                try await self.calendarService.requestAuthorization()
-            } catch {
-                throw GatewayError.calendarPermissionRequired
-            }
-            self.status.lastSuccessMessage = "Calendar permission granted"
-        }
-        if succeeded, let settings {
-            await attemptAutoSync(settings: settings, reason: "calendar_permission")
         }
     }
 
@@ -65,7 +49,6 @@ final class SyncCoordinator: ObservableObject {
             let client = GatewayAPIClient(serverURL: serverURL, apiToken: token)
             let dates = self.datesToSync(daysBack: daysBack)
             var healthSummaries: [DailyHealthSummary] = []
-            var calendarSummaries: [DailyCalendarSummary] = []
 
             for date in dates {
                 if settings.uploadHealthEnabled {
@@ -80,17 +63,6 @@ final class SyncCoordinator: ObservableObject {
                     self.latestHealthSummary = healthSummary
                     healthSummaries.append(healthSummary)
                 }
-
-                if settings.uploadCalendarEnabled {
-                    let calendarSummary: DailyCalendarSummary
-                    do {
-                        calendarSummary = try self.calendarService.buildDailySummary(for: date)
-                    } catch {
-                        throw GatewayError.calendarPermissionRequired
-                    }
-                    self.latestCalendarSummary = calendarSummary
-                    calendarSummaries.append(calendarSummary)
-                }
             }
 
             let payload = HealthSyncPayload(
@@ -98,17 +70,13 @@ final class SyncCoordinator: ObservableObject {
                 sync_id: self.makeSyncID(),
                 generated_at: ISO8601DateFormatter.gatewayDateTime.string(from: Date()),
                 timezone: TimeZone.current.identifier,
-                health_daily_summaries: healthSummaries,
-                calendar_daily_summaries: calendarSummaries
+                health_daily_summaries: healthSummaries
             )
 
             let response = try await client.uploadHealthSync(payload)
             let syncedAt = Date()
             if !healthSummaries.isEmpty {
                 self.status.lastHealthSyncAt = syncedAt
-            }
-            if !calendarSummaries.isEmpty {
-                self.status.lastCalendarSyncAt = syncedAt
             }
             self.status.lastSuccessMessage = self.successMessage(
                 response: response,
@@ -155,7 +123,7 @@ final class SyncCoordinator: ObservableObject {
         case .automatic(let reason):
             prefix = "Auto sync (\(reason)) uploaded"
         }
-        return "\(prefix) \(response.health_daily_count) health / \(response.calendar_daily_count) calendar"
+        return "\(prefix) \(response.health_daily_count) health"
     }
 
     @discardableResult

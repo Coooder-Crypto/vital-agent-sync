@@ -9,10 +9,10 @@ Implementation guidance for the remaining adapter work lives in [architecture-ad
 HealthLink should support:
 
 - multiple data-source apps:
-  - iOS app with Apple Health and Calendar
+  - iOS app with Apple Health
   - Android app with Health Connect
   - Xiaomi / Mi Fitness / wearable connectors
-  - future calendar, location, reminders, feedback, and app-context sources
+  - future location, reminders, feedback, and app-context sources
 - multiple Agent runtimes:
   - Hermes
   - OpenClaw
@@ -166,8 +166,6 @@ health_daily_summaries
 sleep_daily_summaries
 activity_daily_summaries
 workout_records
-calendar_daily_summaries
-calendar_free_windows
 recovery_signals
 feedback_events
 ```
@@ -182,7 +180,6 @@ Source adapters should only know how to collect data and sync normalized payload
   - `ios`
   - `android`
   - `xiaomi`
-  - `calendar_connector`
   - `manual_import`
 - [x] Define a provider-neutral health summary schema.
 - [x] Add Health Connect mapping design for Android.
@@ -293,7 +290,7 @@ Foreground auto-sync:
   - `lastSyncAttemptAt`
   - `lastSyncError`
 - [x] Trigger auto-sync after successful pairing.
-- [x] Trigger auto-sync after HealthKit / Calendar permission grant.
+- [x] Trigger auto-sync after HealthKit permission grant.
 - [x] Trigger auto-sync on app launch.
 - [x] Trigger auto-sync when app returns to foreground.
 - [x] Skip when already syncing, unpaired, missing token, missing permissions, or throttled.

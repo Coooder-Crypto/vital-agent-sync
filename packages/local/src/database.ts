@@ -129,27 +129,6 @@ function migrate(sqlite: BetterSqliteDatabase): void {
       unique(device_id, provider, workout_id)
     );
 
-    create table if not exists calendar_daily_summaries (
-      id text primary key,
-      device_id text not null references devices(id),
-      date text not null,
-      timezone text not null,
-      provider text not null,
-      busy_minutes integer not null,
-      next_event_starts_at text,
-      next_event_duration_minutes integer,
-      title_redacted integer not null default 1,
-      updated_at text not null,
-      unique(device_id, provider, date, timezone)
-    );
-
-    create table if not exists calendar_free_windows (
-      id text primary key,
-      summary_id text not null references calendar_daily_summaries(id) on delete cascade,
-      start text not null,
-      end text not null
-    );
-
     create table if not exists feedback_events (
       id text primary key,
       source text not null,

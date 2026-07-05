@@ -14,7 +14,6 @@ Content-Type: application/json
 Tokens should be scoped. For the MVP, one token can allow:
 
 - `health.daily_summary.write`
-- `calendar.daily_summary.write`
 
 ## Health Daily Summary
 
@@ -55,40 +54,6 @@ Recommended server behavior:
 - Store workouts idempotently by provider + workout `id`.
 - Keep raw payloads in a restricted raw-events table if needed.
 - Expose summaries to agents, not high-frequency raw samples.
-
-## Calendar Daily Summary
-
-```http
-POST /api/calendar/daily-summary
-```
-
-Body:
-
-```json
-{
-  "date": "2026-06-21",
-  "timezone": "Asia/Shanghai",
-  "provider": "apple_calendar",
-  "busy_minutes": 240,
-  "free_windows": [
-    {
-      "start": "2026-06-21T19:00:00+08:00",
-      "end": "2026-06-21T21:00:00+08:00"
-    }
-  ],
-  "next_event": {
-    "starts_at": "2026-06-21T14:00:00+08:00",
-    "duration_minutes": 60,
-    "title_redacted": true
-  }
-}
-```
-
-Recommended server behavior:
-
-- Store only redacted availability by default.
-- Do not require event titles, notes, attendees, or locations in the MVP.
-- Convert this into an agent-facing `schedule_availability` context.
 
 ## Responses
 

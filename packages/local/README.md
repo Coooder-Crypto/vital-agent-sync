@@ -6,7 +6,7 @@ This package provides:
 
 - LAN pairing page with QR code.
 - Device pairing endpoints.
-- Health and calendar sync ingest.
+- Health sync ingest.
 - SQLite local storage.
 - MCP tools for agents.
 
@@ -213,7 +213,6 @@ Available MCP tools:
 - `healthlink_status`
 - `get_personal_context`
 - `get_daily_health_summary`
-- `get_calendar_availability`
 - `get_sleep_trend`
 - `get_workout_load`
 - `get_recovery_signals`
@@ -224,7 +223,7 @@ Available MCP tools:
 - `revoke_device`
 - `record_feedback`
 
-Use `get_personal_context` as the default high-level entry for natural language questions like "How am I today?", "How should I plan today?", "Should I exercise?", "Am I recovered?", or "Is my schedule overloaded?". It returns sync status, latest health, calendar availability, sleep trend, workout load, recovery signals, freshness metadata, and source coverage together.
+Use `get_personal_context` as the default high-level entry for natural language questions like "How am I today?", "Should I exercise?", or "Am I recovered?". It returns sync status, latest health, sleep trend, workout load, recovery signals, freshness metadata, and source coverage together.
 
 MCP reads are recorded in `agent_audit_log` with the local Agent client, tool name, scopes used, and read timestamp. This keeps Agent access auditable without changing the current stdio MCP setup.
 
@@ -238,11 +237,10 @@ MCP is the stable integration surface. Skills are optional instructions for agen
 
 A HealthLink skill should tell the agent to:
 
-- use `get_personal_context` first for broad health, recovery, schedule, exercise, or day-planning questions
+- use `get_personal_context` first for broad health, recovery, exercise, or activity questions
 - use lower-level tools for specific follow-up questions
 - mention data freshness before giving advice
 - avoid medical diagnosis or prescriptions
-- keep calendar titles redacted
 
 Hermes can install such a skill as an experience enhancement, but generic MCP-compatible agents should still work with the MCP config alone.
 

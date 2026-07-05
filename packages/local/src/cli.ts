@@ -408,7 +408,7 @@ async function printPairingSession(options: CliOptions): Promise<void> {
   console.log("");
   console.log("Next:");
   console.log("  1. Scan with HealthLink iOS Settings -> Pairing -> Scan QR.");
-  console.log("  2. Confirm pairing in the app, grant Health/Calendar access, then Sync.");
+  console.log("  2. Confirm pairing in the app, grant Health access, then Sync.");
   console.log("  3. If this code expires, run healthlink-local pair to print a fresh QR.");
   console.log("");
 }
@@ -515,7 +515,7 @@ function printSetupNextSteps(agent: ReturnType<typeof getAgentAdapter>): void {
   console.log("");
   console.log("Next:");
   console.log("  1. Scan the QR with HealthLink iOS.");
-  console.log("  2. Confirm pairing, grant Health/Calendar access, then run Sync in the app.");
+  console.log("  2. Confirm pairing, grant Health access, then run Sync in the app.");
   console.log(`  3. ${agent.reloadHint()}`);
   console.log("");
   console.log("After the first sync, this terminal can close. The macOS background receiver keeps accepting iOS syncs.");
