@@ -3,6 +3,11 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import {
+  ensureDefaultMcpAgentClient,
+  listAgentAuditLog,
+  recordAgentRead
+} from "../src/agent-audit.js";
 import { getAgentAdapter } from "../src/agents.js";
 import { openHealthLinkDatabase } from "../src/database.js";
 import { listDevices, revokeDevice } from "../src/devices.js";
@@ -13,6 +18,7 @@ import {
   getPersonalContext,
   getRecoverySignals,
   getSleepTrend,
+  getWeeklySummary,
   getWorkoutLoad
 } from "../src/health-query.js";
 import { getHermesMcpInstallStatus, installHermesMcpConfig } from "../src/mcp-config.js";
@@ -88,6 +94,7 @@ test("pairing creates a scoped device that can sync and be queried", () => {
         calendar: { busy_minutes: number };
       };
       const context = getPersonalContext(database, { date: "2026-07-04", days: 7 }) as {
+        metadata: { freshness: { latest_sync_at: string | null }; missing_metrics: string[] };
         daily_health_summary: { health: { steps: number } };
         calendar_availability: { calendar: { busy_minutes: number } };
         recovery_signals: { signals: unknown[] };
@@ -97,6 +104,38 @@ test("pairing creates a scoped device that can sync and be queried", () => {
       assert.equal(context.daily_health_summary.health.steps, 3456);
       assert.equal(context.calendar_availability.calendar.busy_minutes, 90);
       assert.equal(context.recovery_signals.signals.length, 1);
+      assert.equal(context.metadata.freshness.latest_sync_at !== null, true);
+
+      const weekly = getWeeklySummary(database, { days: 7 }) as {
+        coverage: { health_days: number; calendar_days: number };
+        activity: { total_steps: number };
+        calendar: { total_busy_minutes: number };
+      };
+      assert.equal(weekly.coverage.health_days, 1);
+      assert.equal(weekly.coverage.calendar_days, 1);
+      assert.equal(weekly.activity.total_steps, 3456);
+      assert.equal(weekly.calendar.total_busy_minutes, 90);
+    } finally {
+      database.close();
+    }
+  });
+});
+
+test("agent audit log records MCP-style reads", () => {
+  withTempDatabase((databasePath) => {
+    const database = openHealthLinkDatabase({ path: databasePath });
+    try {
+      const agent = ensureDefaultMcpAgentClient(database);
+      const entry = recordAgentRead(database, {
+        agentClientId: agent.id,
+        toolName: "get_personal_context"
+      });
+      const entries = listAgentAuditLog(database);
+
+      assert.equal(entry.agent_client_id, agent.id);
+      assert.equal(entries.length, 1);
+      assert.equal(entries[0]?.tool_name, "get_personal_context");
+      assert.deepEqual(entries[0]?.scopes_used, ["health.daily_summary.read", "calendar.daily_summary.read"]);
     } finally {
       database.close();
     }

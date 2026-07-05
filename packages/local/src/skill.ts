@@ -53,6 +53,7 @@ Do not use this skill for diagnosis, prescriptions, emergency advice, or unsuppo
    - \`get_sleep_trend\` for sleep continuity.
    - \`get_workout_load\` for workout and activity load.
    - \`get_recovery_signals\` for sleep, heart-rate, activity, and workout-minutes context.
+   - \`get_weekly_summary\` for compact 7-day health, activity, recovery, and calendar pressure summaries.
    - \`healthlink_status\`, \`list_devices\`, and \`revoke_device\` for setup and troubleshooting.
 3. Mention data freshness before analysis when the answer depends on recency.
 4. If the latest sync is stale or missing, say that plainly and suggest syncing HealthLink.

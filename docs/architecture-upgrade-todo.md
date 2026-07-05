@@ -310,14 +310,14 @@ Background best-effort:
 
 Current direction is good: keep Agent tools provider-neutral.
 
-- [ ] Keep `get_personal_context` as the first tool for broad personal-context questions.
-- [ ] Include freshness metadata in all high-level responses.
-- [ ] Add source coverage metadata:
+- [x] Keep `get_personal_context` as the first tool for broad personal-context questions.
+- [x] Include freshness metadata in all high-level responses.
+- [x] Add source coverage metadata:
   - which source devices contributed
   - which metrics are missing
   - last sync per source
-- [ ] Add agent audit logging for MCP reads.
-- [ ] Add weekly summary tool after daily flow stabilizes.
+- [x] Add agent audit logging for MCP reads.
+- [x] Add weekly summary tool after daily flow stabilizes.
 - [ ] Add feedback write tool when user feedback loops are ready.
 
 ## Migration Plan
@@ -340,7 +340,7 @@ Phase 3:
 
 - [x] Add foreground auto-sync.
 - [x] Add bundled skill installer.
-- [ ] Add agent audit logging.
+- [x] Add agent audit logging.
 
 Phase 4:
 

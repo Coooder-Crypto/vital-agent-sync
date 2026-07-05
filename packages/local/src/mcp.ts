@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
+import { ensureDefaultMcpAgentClient, recordAgentRead } from "./agent-audit.js";
 import { openHealthLinkDatabase } from "./database.js";
 import { listDevices, revokeDevice } from "./devices.js";
 import {
@@ -11,6 +12,7 @@ import {
   getPersonalContext,
   getRecoverySignals,
   getSleepTrend,
+  getWeeklySummary,
   getWorkoutLoad
 } from "./health-query.js";
 
@@ -23,6 +25,7 @@ const daysSchema = z.number().int().min(1).max(90).optional();
 
 export async function startMcpServer(options: McpServerOptions = {}): Promise<void> {
   const database = openHealthLinkDatabase({ path: options.databasePath });
+  const agentClient = ensureDefaultMcpAgentClient(database);
   const server = new McpServer({
     name: "healthlink-local",
     version: "0.1.0"
@@ -34,7 +37,7 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
       title: "HealthLink Status",
       description: "Check whether HealthLink is connected and fresh. Use when the user asks if HealthLink is working, whether iPhone data has synced, how many devices are paired, or when the last sync happened."
     },
-    async () => jsonResult(getAgentHealthStatus(database))
+    async () => auditedJsonResult(database, agentClient.id, "healthlink_status", getAgentHealthStatus(database))
   );
 
   server.registerTool(
@@ -47,7 +50,7 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
         days: daysSchema.describe("Number of latest synced days for trend context. Defaults to 7, max 90.")
       })
     },
-    async ({ date, days }) => jsonResult(getPersonalContext(database, { date, days }))
+    async ({ date, days }) => auditedJsonResult(database, agentClient.id, "get_personal_context", getPersonalContext(database, { date, days }))
   );
 
   server.registerTool(
@@ -59,7 +62,7 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
         date: dateSchema.describe("Optional date in YYYY-MM-DD format.")
       })
     },
-    async ({ date }) => jsonResult(getDailyHealthSummary(database, { date }))
+    async ({ date }) => auditedJsonResult(database, agentClient.id, "get_daily_health_summary", getDailyHealthSummary(database, { date }))
   );
 
   server.registerTool(
@@ -71,7 +74,7 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
         date: dateSchema.describe("Optional date in YYYY-MM-DD format.")
       })
     },
-    async ({ date }) => jsonResult(getCalendarAvailability(database, { date }))
+    async ({ date }) => auditedJsonResult(database, agentClient.id, "get_calendar_availability", getCalendarAvailability(database, { date }))
   );
 
   server.registerTool(
@@ -83,7 +86,7 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
         days: daysSchema.describe("Number of latest synced days to return. Defaults to 7, max 90.")
       })
     },
-    async ({ days }) => jsonResult(getSleepTrend(database, { days }))
+    async ({ days }) => auditedJsonResult(database, agentClient.id, "get_sleep_trend", getSleepTrend(database, { days }))
   );
 
   server.registerTool(
@@ -95,7 +98,7 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
         days: daysSchema.describe("Number of latest synced days to return. Defaults to 7, max 90.")
       })
     },
-    async ({ days }) => jsonResult(getWorkoutLoad(database, { days }))
+    async ({ days }) => auditedJsonResult(database, agentClient.id, "get_workout_load", getWorkoutLoad(database, { days }))
   );
 
   server.registerTool(
@@ -107,7 +110,19 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
         days: daysSchema.describe("Number of latest synced days to return. Defaults to 7, max 90.")
       })
     },
-    async ({ days }) => jsonResult(getRecoverySignals(database, { days }))
+    async ({ days }) => auditedJsonResult(database, agentClient.id, "get_recovery_signals", getRecoverySignals(database, { days }))
+  );
+
+  server.registerTool(
+    "get_weekly_summary",
+    {
+      title: "Get Weekly HealthLink Summary",
+      description: "Get a compact 7-day provider-neutral summary with freshness, source coverage, sleep, activity, workout, recovery, and calendar pressure signals.",
+      inputSchema: z.object({
+        days: z.number().int().min(1).max(14).optional().describe("Number of latest synced days to summarize. Defaults to 7, max 14.")
+      })
+    },
+    async ({ days }) => auditedJsonResult(database, agentClient.id, "get_weekly_summary", getWeeklySummary(database, { days }))
   );
 
   server.registerTool(
@@ -116,7 +131,7 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
       title: "List HealthLink Devices",
       description: "List paired HealthLink devices, revocation state, sync count, and latest sync time."
     },
-    async () => jsonResult({
+    async () => auditedJsonResult(database, agentClient.id, "list_devices", {
       devices: listDevices(database)
     })
   );
@@ -132,7 +147,7 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
     },
     async ({ device_id }) => {
       const device = revokeDevice(database, device_id);
-      return jsonResult({
+      return auditedJsonResult(database, agentClient.id, "revoke_device", {
         ok: Boolean(device),
         device: device ?? null
       });
@@ -162,4 +177,12 @@ function jsonResult(value: unknown) {
       }
     ]
   };
+}
+
+function auditedJsonResult(database: ReturnType<typeof openHealthLinkDatabase>, agentClientId: string, toolName: string, value: unknown) {
+  recordAgentRead(database, {
+    agentClientId,
+    toolName
+  });
+  return jsonResult(value);
 }

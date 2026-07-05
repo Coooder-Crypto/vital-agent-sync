@@ -49,6 +49,14 @@ type FreeWindowRow = {
   end: string;
 };
 
+type SourceCoverageRow = {
+  device_id: string;
+  device_name: string;
+  device_platform: string;
+  last_sync_at: string | null;
+  sync_count: number;
+};
+
 export function getAgentHealthStatus(database: HealthLinkDatabase): unknown {
   return getHealthStatus(database);
 }
@@ -58,6 +66,7 @@ export function getPersonalContext(database: HealthLinkDatabase, options: QueryO
 
   return {
     purpose: "Use this HealthLink context to answer personal status, energy, recovery, workout readiness, sleep, schedule pressure, and day-planning questions. Do not invent health or calendar facts that are not present here.",
+    metadata: buildQueryMetadata(database),
     status: getAgentHealthStatus(database),
     focus_date: options.date ?? "latest_synced_date",
     daily_health_summary: getDailyHealthSummary(database, { date: options.date }),
@@ -72,6 +81,7 @@ export function getDailyHealthSummary(database: HealthLinkDatabase, options: Que
   const health = findHealthDaily(database, options.date);
   if (!health) {
     return {
+      metadata: buildQueryMetadata(database),
       date: options.date ?? null,
       health: null,
       workouts: []
@@ -94,6 +104,7 @@ export function getDailyHealthSummary(database: HealthLinkDatabase, options: Que
   `).all(health.device_id, health.provider, health.date) as WorkoutRow[];
 
   return {
+    metadata: buildQueryMetadata(database),
     date: health.date,
     timezone: health.timezone,
     provider: health.provider,
@@ -115,6 +126,7 @@ export function getCalendarAvailability(database: HealthLinkDatabase, options: Q
   const calendar = findCalendarDaily(database, options.date);
   if (!calendar) {
     return {
+      metadata: buildQueryMetadata(database),
       date: options.date ?? null,
       calendar: null,
       free_windows: []
@@ -129,6 +141,7 @@ export function getCalendarAvailability(database: HealthLinkDatabase, options: Q
   `).all(calendar.id) as FreeWindowRow[];
 
   return {
+    metadata: buildQueryMetadata(database),
     date: calendar.date,
     timezone: calendar.timezone,
     provider: calendar.provider,
@@ -174,6 +187,7 @@ export function getSleepTrend(database: HealthLinkDatabase, options: QueryOption
   >[];
 
   return {
+    metadata: buildQueryMetadata(database),
     days,
     trend: rows.reverse()
   };
@@ -219,6 +233,7 @@ export function getWorkoutLoad(database: HealthLinkDatabase, options: QueryOptio
   `).all() as WorkoutRow[];
 
   return {
+    metadata: buildQueryMetadata(database),
     days,
     daily: daily.reverse(),
     workouts: workouts.reverse()
@@ -258,8 +273,113 @@ export function getRecoverySignals(database: HealthLinkDatabase, options: QueryO
   >[];
 
   return {
+    metadata: buildQueryMetadata(database),
     days,
     signals: rows.reverse()
+  };
+}
+
+export function getWeeklySummary(database: HealthLinkDatabase, options: QueryOptions = {}): unknown {
+  const days = Math.max(1, Math.min(options.days ?? 7, 14));
+  const healthRows = latestHealthRows(database, days);
+  const calendarRows = latestCalendarRows(database, days);
+
+  const sleepValues = healthRows
+    .map((row) => row.sleep_minutes)
+    .filter((value): value is number => typeof value === "number");
+  const stepsValues = healthRows
+    .map((row) => row.steps)
+    .filter((value): value is number => typeof value === "number");
+  const activeEnergyValues = healthRows
+    .map((row) => row.active_energy_kcal)
+    .filter((value): value is number => typeof value === "number");
+  const workoutMinutesValues = healthRows
+    .map((row) => row.workout_minutes)
+    .filter((value): value is number => typeof value === "number");
+  const busyMinutesValues = calendarRows.map((row) => row.busy_minutes);
+
+  return {
+    metadata: buildQueryMetadata(database),
+    days,
+    date_range: {
+      start: minString([...healthRows.map((row) => row.date), ...calendarRows.map((row) => row.date)]),
+      end: maxString([...healthRows.map((row) => row.date), ...calendarRows.map((row) => row.date)])
+    },
+    coverage: {
+      health_days: healthRows.length,
+      calendar_days: calendarRows.length
+    },
+    sleep: {
+      average_minutes: average(sleepValues),
+      total_minutes: sum(sleepValues)
+    },
+    activity: {
+      average_steps: average(stepsValues),
+      total_steps: sum(stepsValues),
+      total_active_energy_kcal: sum(activeEnergyValues)
+    },
+    workouts: {
+      total_minutes: sum(workoutMinutesValues),
+      days_with_workouts: workoutMinutesValues.filter((value) => value > 0).length
+    },
+    calendar: {
+      total_busy_minutes: sum(busyMinutesValues),
+      average_busy_minutes: average(busyMinutesValues)
+    },
+    daily: healthRows.map((row) => ({
+      date: row.date,
+      steps: row.steps,
+      sleep_minutes: row.sleep_minutes,
+      active_energy_kcal: row.active_energy_kcal,
+      workout_minutes: row.workout_minutes
+    }))
+  };
+}
+
+export function buildQueryMetadata(database: HealthLinkDatabase): {
+  freshness: {
+    latest_sync_at: string | null;
+    latest_health_updated_at: string | null;
+    latest_calendar_updated_at: string | null;
+  };
+  source_coverage: SourceCoverageRow[];
+  missing_metrics: string[];
+} {
+  const status = getHealthStatus(database);
+  const latestHealthUpdatedAt = database.sqlite.prepare(`
+    select max(updated_at) as value
+    from health_daily_summaries
+  `).get() as { value: string | null };
+  const latestCalendarUpdatedAt = database.sqlite.prepare(`
+    select max(updated_at) as value
+    from calendar_daily_summaries
+  `).get() as { value: string | null };
+  const sourceCoverage = database.sqlite.prepare(`
+    select
+      devices.id as device_id,
+      devices.name as device_name,
+      devices.platform as device_platform,
+      max(sync_batches.received_at) as last_sync_at,
+      count(sync_batches.sync_id) as sync_count
+    from devices
+    left join sync_batches on sync_batches.device_id = devices.id
+    where devices.revoked_at is null
+    group by devices.id
+    order by devices.created_at desc
+  `).all() as SourceCoverageRow[];
+
+  return {
+    freshness: {
+      latest_sync_at: status.last_sync_at,
+      latest_health_updated_at: latestHealthUpdatedAt.value,
+      latest_calendar_updated_at: latestCalendarUpdatedAt.value
+    },
+    source_coverage: sourceCoverage,
+    missing_metrics: missingMetrics({
+      healthCount: countRows(database, "health_daily_summaries"),
+      calendarCount: countRows(database, "calendar_daily_summaries"),
+      workoutCount: countRows(database, "health_workouts")
+    })
   };
 }
 
@@ -299,6 +419,89 @@ function findCalendarDaily(database: HealthLinkDatabase, date?: string): Calenda
     order by date desc, updated_at desc
     limit 1
   `).get() as CalendarDailyRow | undefined;
+}
+
+function latestHealthRows(database: HealthLinkDatabase, days: number): HealthDailyRow[] {
+  const rows = database.sqlite.prepare(`
+    select *
+    from (
+      select
+        *,
+        row_number() over (
+          partition by date
+          order by updated_at desc, id desc
+        ) as row_number
+      from health_daily_summaries
+    )
+    where row_number = 1
+    order by date desc
+    limit ?
+  `).all(days) as HealthDailyRow[];
+
+  return rows.reverse();
+}
+
+function latestCalendarRows(database: HealthLinkDatabase, days: number): CalendarDailyRow[] {
+  const rows = database.sqlite.prepare(`
+    select *
+    from (
+      select
+        *,
+        row_number() over (
+          partition by date
+          order by updated_at desc, id desc
+        ) as row_number
+      from calendar_daily_summaries
+    )
+    where row_number = 1
+    order by date desc
+    limit ?
+  `).all(days) as CalendarDailyRow[];
+
+  return rows.reverse();
+}
+
+function countRows(database: HealthLinkDatabase, table: string): number {
+  const row = database.sqlite.prepare(`select count(*) as value from ${table}`).get() as { value: number };
+  return row.value;
+}
+
+function missingMetrics(input: {
+  healthCount: number;
+  calendarCount: number;
+  workoutCount: number;
+}): string[] {
+  const missing: string[] = [];
+  if (input.healthCount === 0) {
+    missing.push("health.daily_summary");
+  }
+  if (input.calendarCount === 0) {
+    missing.push("calendar.daily_summary");
+  }
+  if (input.workoutCount === 0) {
+    missing.push("health.workouts");
+  }
+  return missing;
+}
+
+function sum(values: number[]): number | null {
+  if (values.length === 0) {
+    return null;
+  }
+  return values.reduce((total, value) => total + value, 0);
+}
+
+function average(values: number[]): number | null {
+  const total = sum(values);
+  return total === null ? null : Math.round((total / values.length) * 10) / 10;
+}
+
+function minString(values: string[]): string | null {
+  return values.length === 0 ? null : values.reduce((min, value) => value < min ? value : min);
+}
+
+function maxString(values: string[]): string | null {
+  return values.length === 0 ? null : values.reduce((max, value) => value > max ? value : max);
 }
 
 function clampDays(days?: number): number {

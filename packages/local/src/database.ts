@@ -66,6 +66,26 @@ function migrate(sqlite: BetterSqliteDatabase): void {
     create unique index if not exists idx_devices_token_hash
       on devices(token_hash);
 
+    create table if not exists agent_clients (
+      id text primary key,
+      name text not null,
+      runtime text not null,
+      scopes_json text not null,
+      created_at text not null,
+      revoked_at text
+    );
+
+    create table if not exists agent_audit_log (
+      id text primary key,
+      agent_client_id text not null references agent_clients(id),
+      tool_name text not null,
+      scopes_used_json text not null,
+      read_at text not null
+    );
+
+    create index if not exists idx_agent_audit_log_client_read_at
+      on agent_audit_log(agent_client_id, read_at);
+
     create table if not exists sync_batches (
       sync_id text primary key,
       device_id text not null references devices(id),
