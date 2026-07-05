@@ -101,6 +101,12 @@ If setup reports that port `8787` is already in use, check the process and stop 
 lsof -nP -iTCP:8787 -sTCP:LISTEN
 ```
 
+The CLI also tries to identify the listener automatically. If the listener is an old foreground `healthlink-local init` process, stop that terminal with `Ctrl-C`. If the background receiver is already running, do not run setup again; print a fresh QR instead:
+
+```bash
+npx -y healthlink-local pair
+```
+
 Foreground compatibility command:
 
 ```bash
@@ -138,7 +144,7 @@ npx -y healthlink-local logs
 npx -y healthlink-local pair
 ```
 
-`service status` prints the launchd plist, database path, stdout log, stderr log, and last sync timestamp. `logs` tails the daemon stdout and stderr logs without requiring the user to remember the log paths. Use `logs --lines 200` when debugging longer startup or sync sessions. The daemon logs live under:
+`service status` prints the launchd plist, database path, receiver reachability, stdout log, stderr log, and last sync timestamp. `logs` tails the daemon stdout and stderr logs without requiring the user to remember the log paths. Use `logs --lines 200` when debugging longer startup or sync sessions. The daemon logs live under:
 
 ```text
 ~/.healthlink/logs/daemon.out.log
@@ -146,6 +152,16 @@ npx -y healthlink-local pair
 ```
 
 The iPhone must use the LAN, Tailscale, tunnel, or public HTTPS address. `127.0.0.1` only works from the same machine as the receiver.
+
+If launchd says the service is running but `Receiver` is not reachable, use:
+
+```bash
+npx -y healthlink-local logs
+npx -y healthlink-local doctor --agent hermes
+lsof -nP -iTCP:8787 -sTCP:LISTEN
+```
+
+This usually means the daemon failed during startup, Node.js is not available from the launchd environment, or another process owns the configured port.
 
 Pairing is persistent. After the first setup, the iOS app keeps the server URL, device ID, and device token, while `healthlink-local` stores synced summaries in the same SQLite database used by MCP. The Agent does not need to reload MCP after every sync; it reads the latest database rows the next time a tool is called.
 
