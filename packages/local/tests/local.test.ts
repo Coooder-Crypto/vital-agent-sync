@@ -30,6 +30,7 @@ import {
   buildLaunchdPlist,
   getLaunchdServicePaths,
   installLaunchdService,
+  readLaunchdServiceLog,
   readLaunchdPlist
 } from "../src/service.js";
 import { runServiceSetupWorkflow } from "../src/setup.js";
@@ -514,6 +515,48 @@ test("launchd service plist uses daemon command and expected keepalive settings"
     assert.equal(status.running, false);
     assert.equal(status.plistPath, paths.plistPath);
     assert.match(readLaunchdPlist({ homeDir: tempDir }) ?? "", /daemon\.out\.log/);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("launchd service log reader tails stdout and stderr logs", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-service-log-test-"));
+  try {
+    const paths = getLaunchdServicePaths({ homeDir: tempDir });
+    const missing = readLaunchdServiceLog({
+      homeDir: tempDir,
+      stream: "stderr",
+      lines: 2
+    });
+    assert.equal(missing.exists, false);
+    assert.equal(missing.path, paths.stderrPath);
+
+    installLaunchdService({
+      homeDir: tempDir,
+      cliCommand: "/tmp/healthlink-local",
+      databasePath: join(tempDir, "healthlink.sqlite"),
+      host: "0.0.0.0",
+      port: 8787,
+      transport: "lan"
+    });
+    writeFileSync(paths.stdoutPath, "one\ntwo\nthree\n", "utf8");
+    writeFileSync(paths.stderrPath, "alpha\nbeta\ngamma\n", "utf8");
+
+    const stdout = readLaunchdServiceLog({
+      homeDir: tempDir,
+      stream: "stdout",
+      lines: 2
+    });
+    const stderr = readLaunchdServiceLog({
+      homeDir: tempDir,
+      stream: "stderr",
+      lines: 1
+    });
+
+    assert.equal(stdout.exists, true);
+    assert.equal(stdout.content, "two\nthree");
+    assert.equal(stderr.content, "gamma");
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }

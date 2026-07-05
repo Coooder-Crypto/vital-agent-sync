@@ -33,6 +33,12 @@ export type HealthLinkServiceStatus = HealthLinkServicePaths & {
   running: boolean;
 };
 
+export type HealthLinkServiceLog = {
+  path: string;
+  exists: boolean;
+  content: string;
+};
+
 export function getLaunchdServicePaths(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath"> = {}): HealthLinkServicePaths {
   const home = options.homeDir ?? homedir();
   const healthlinkDir = join(home, ".healthlink");
@@ -147,6 +153,27 @@ export function readLaunchdPlist(options: Pick<LaunchdServiceOptions, "homeDir" 
   return existsSync(plistPath) ? readFileSync(plistPath, "utf8") : undefined;
 }
 
+export function readLaunchdServiceLog(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath"> & {
+  stream: "stdout" | "stderr";
+  lines?: number;
+}): HealthLinkServiceLog {
+  const paths = getLaunchdServicePaths(options);
+  const path = options.stream === "stdout" ? paths.stdoutPath : paths.stderrPath;
+  if (!existsSync(path)) {
+    return {
+      path,
+      exists: false,
+      content: ""
+    };
+  }
+
+  return {
+    path,
+    exists: true,
+    content: tailLines(readFileSync(path, "utf8"), options.lines ?? 80)
+  };
+}
+
 function isLaunchdServiceRunning(): boolean {
   if (process.platform !== "darwin") {
     return false;
@@ -207,6 +234,16 @@ function resolveHomePath(path: string, home: string): string {
     return join(home, path.slice(2));
   }
   return path;
+}
+
+function tailLines(value: string, lines: number): string {
+  const count = Math.max(1, Math.min(Math.floor(lines), 1000));
+  const normalized = value.trimEnd();
+  if (normalized.length === 0) {
+    return "";
+  }
+  const allLines = normalized.split(/\r?\n/);
+  return allLines.slice(-count).join("\n");
 }
 
 function escapeXml(value: string): string {

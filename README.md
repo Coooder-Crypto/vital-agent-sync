@@ -83,7 +83,7 @@ npm run build:local
 node packages/local/dist/cli.js setup --agent hermes --service
 ```
 
-`setup --agent hermes --service` backs up and writes `~/.hermes/config.yaml`, installs and starts the macOS background receiver, prints the iPhone pairing QR, and points Hermes at the same HealthLink database. After pairing and syncing, restart Hermes or run `/reload-mcp`. If the QR expires, run `healthlink-local pair` or `npx -y healthlink-local pair`.
+`setup --agent hermes --service` backs up and writes `~/.hermes/config.yaml`, installs the HealthLink Hermes skill, installs and starts the macOS background receiver, prints the iPhone pairing QR, and points Hermes at the same HealthLink database. After pairing and syncing, restart Hermes or run `/reload-mcp`. If the QR expires, run `healthlink-local pair` or `npx -y healthlink-local pair`.
 
 Foreground compatibility/debug command:
 
@@ -112,6 +112,7 @@ npx -y healthlink-local init --hermes
 npx -y healthlink-local setup --agent hermes --service
 npx -y healthlink-local setup --agent openclaw --service
 npx -y healthlink-local service status
+npx -y healthlink-local logs
 npx -y healthlink-local pair
 npx -y healthlink-local mcp
 npx -y healthlink-local print-mcp-config
@@ -132,7 +133,8 @@ Useful background-service diagnostics:
 
 ```bash
 npx -y healthlink-local service status
-tail -n 100 ~/.healthlink/logs/daemon.err.log
+npx -y healthlink-local logs
+npx -y healthlink-local logs --lines 200
 lsof -nP -iTCP:8787 -sTCP:LISTEN
 ```
 

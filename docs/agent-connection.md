@@ -189,12 +189,12 @@ npx -y healthlink-local setup --agent hermes --service
 - Create `~/.healthlink/`.
 - Initialize SQLite.
 - Back up and write `~/.hermes/config.yaml`.
+- Install or update the HealthLink Hermes skill.
 - Install and start the background HTTP receiver.
 - Create a short-lived pairing session.
 - Open or print the pairing page.
 - Print MCP config for common agents.
 - Tell the user to restart Hermes or run `/reload-mcp`.
-- Optional future behavior: install or update a HealthLink skill for Hermes.
 
 The foreground compatibility receiver remains:
 
@@ -212,6 +212,7 @@ npx -y healthlink-local pair
 npx -y healthlink-local service install
 npx -y healthlink-local service start
 npx -y healthlink-local service status
+npx -y healthlink-local logs
 npx -y healthlink-local service stop
 npx -y healthlink-local service uninstall
 ```
@@ -315,12 +316,13 @@ npx -y healthlink-local install-hermes
 npx -y healthlink-local init --hermes
 npx -y healthlink-local setup --agent hermes --service
 npx -y healthlink-local service status
+npx -y healthlink-local logs
 npx -y healthlink-local pair
 npx -y healthlink-local status
 npx -y healthlink-local doctor
 ```
 
-The helpers should not invent new protocols. They should write or print the same MCP command with the correct database path. `setup --agent hermes --service` uses the same install logic as `install-hermes`, installs/starts the receiver service, and folds pairing into one Agent-driven flow. `init --hermes` remains the foreground compatibility path.
+The helpers should not invent new protocols. They should write or print the same MCP command with the correct database path. `setup --agent hermes --service` uses the same install logic as `install-hermes`, installs the HealthLink Hermes skill by default, installs/starts the receiver service, and folds pairing into one Agent-driven flow. `init --hermes` remains the foreground compatibility path.
 
 ## Skill Layer
 
@@ -387,7 +389,6 @@ P1  foreground auto sync with throttling
 P1  auto sync after pairing / permission grant
 P1  disconnect / revoke paired device
 P1  richer local diagnostics
-P1  optional Hermes skill installer
 P1  background refresh as best-effort, not guaranteed cadence
 P1  public HTTPS mode docs
 P2  tunnel mode

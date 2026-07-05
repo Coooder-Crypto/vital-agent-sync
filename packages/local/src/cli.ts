@@ -11,6 +11,7 @@ import { startMcpServer } from "./mcp.js";
 import {
   getLaunchdServiceStatus,
   installLaunchdService,
+  readLaunchdServiceLog,
   startLaunchdService,
   stopLaunchdService,
   uninstallLaunchdService,
@@ -24,13 +25,14 @@ import { renderTerminalQr } from "./terminal-qr.js";
 import { createTransportProvider, isTransportProviderId, type TransportProviderId } from "./transports.js";
 
 type CliOptions = {
-  command: "server" | "init" | "daemon" | "pair" | "setup" | "service" | "mcp" | "print-mcp-config" | "print-agent-config" | "print-skill" | "install-hermes" | "install-hermes-skill" | "status" | "doctor";
+  command: "server" | "init" | "daemon" | "pair" | "setup" | "service" | "logs" | "mcp" | "print-mcp-config" | "print-agent-config" | "print-skill" | "install-hermes" | "install-hermes-skill" | "status" | "doctor";
   serviceAction?: "install" | "start" | "stop" | "status" | "uninstall";
   port: number;
   host: string;
   useService: boolean;
   installHermes: boolean;
   installSkill: boolean;
+  logLines: number;
   agentId: AgentAdapterId;
   transportId: TransportProviderId;
   databasePath?: string;
@@ -50,6 +52,7 @@ function parseArgs(argv: string[]): CliOptions {
     useService: false,
     installHermes: false,
     installSkill: false,
+    logLines: 80,
     agentId: "generic",
     transportId: "lan"
   };
@@ -66,7 +69,7 @@ function parseArgs(argv: string[]): CliOptions {
         options.serviceAction = action;
         index += 1;
       }
-    } else if (arg === "server" || arg === "init" || arg === "daemon" || arg === "pair" || arg === "setup" || arg === "mcp" || arg === "print-mcp-config" || arg === "print-agent-config" || arg === "print-skill" || arg === "install-hermes" || arg === "install-hermes-skill" || arg === "status" || arg === "doctor") {
+    } else if (arg === "server" || arg === "init" || arg === "daemon" || arg === "pair" || arg === "setup" || arg === "service" || arg === "logs" || arg === "mcp" || arg === "print-mcp-config" || arg === "print-agent-config" || arg === "print-skill" || arg === "install-hermes" || arg === "install-hermes-skill" || arg === "status" || arg === "doctor") {
       options.command = arg;
     } else if (arg === "--port") {
       options.port = Number(argv[index + 1]);
@@ -85,6 +88,9 @@ function parseArgs(argv: string[]): CliOptions {
       index += 1;
     } else if (arg === "--agent-name") {
       options.agentName = argv[index + 1];
+      index += 1;
+    } else if (arg === "--lines") {
+      options.logLines = Number(argv[index + 1]);
       index += 1;
     } else if (arg === "--agent") {
       const value = argv[index + 1];
@@ -127,6 +133,9 @@ function parseArgs(argv: string[]): CliOptions {
 
   if (!Number.isInteger(options.port) || options.port <= 0) {
     throw new Error("Expected --port to be a positive integer.");
+  }
+  if (!Number.isInteger(options.logLines) || options.logLines <= 0) {
+    throw new Error("Expected --lines to be a positive integer.");
   }
 
   return options;
@@ -217,6 +226,11 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (options.command === "logs") {
+    printServiceLogs(options);
+    return;
+  }
+
   if (options.command === "pair") {
     await printPairingSession(options);
     return;
@@ -229,7 +243,8 @@ async function main(): Promise<void> {
 
   const agent = getAgentAdapter(options.agentId);
   const shouldInstallAgent = options.command === "init" && (options.installHermes || options.agentId !== "generic");
-  if (options.installSkill && options.agentId !== "hermes") {
+  const shouldInstallSkill = options.installSkill || options.agentId === "hermes";
+  if (shouldInstallSkill && options.agentId !== "hermes") {
     throw new Error("--install-skill currently supports --agent hermes only.");
   }
   const agentInstall = shouldInstallAgent
@@ -320,7 +335,8 @@ async function runSetup(options: CliOptions): Promise<void> {
   if (!options.useService) {
     throw new Error("setup currently requires --service. Use init for the foreground receiver.");
   }
-  if (options.installSkill && options.agentId !== "hermes") {
+  const shouldInstallSkill = options.installSkill || options.agentId === "hermes";
+  if (shouldInstallSkill && options.agentId !== "hermes") {
     throw new Error("--install-skill currently supports --agent hermes only.");
   }
 
@@ -367,7 +383,7 @@ async function runSetup(options: CliOptions): Promise<void> {
       printSetupNextSteps(agent);
     }
   }, {
-    installSkill: options.installSkill
+    installSkill: shouldInstallSkill
   });
 }
 
@@ -466,6 +482,33 @@ function printServiceStatusDetails(status: ReturnType<typeof getLaunchdServiceSt
   }
 }
 
+function printServiceLogs(options: CliOptions): void {
+  const stdout = readLaunchdServiceLog({
+    databasePath: options.databasePath,
+    stream: "stdout",
+    lines: options.logLines
+  });
+  const stderr = readLaunchdServiceLog({
+    databasePath: options.databasePath,
+    stream: "stderr",
+    lines: options.logLines
+  });
+
+  console.log(`HealthLink service logs (${options.logLines} lines)`);
+  printLogSection("stdout", stdout);
+  printLogSection("stderr", stderr);
+}
+
+function printLogSection(label: string, log: ReturnType<typeof readLaunchdServiceLog>): void {
+  console.log("");
+  console.log(`[${label}] ${log.path}`);
+  if (!log.exists) {
+    console.log("(not created yet)");
+    return;
+  }
+  console.log(log.content.length > 0 ? log.content : "(empty)");
+}
+
 function printSetupNextSteps(agent: ReturnType<typeof getAgentAdapter>): void {
   console.log("");
   console.log("Setup complete");
@@ -478,6 +521,8 @@ function printSetupNextSteps(agent: ReturnType<typeof getAgentAdapter>): void {
   console.log("After the first sync, this terminal can close. The macOS background receiver keeps accepting iOS syncs.");
   console.log("Useful commands:");
   console.log("  healthlink-local service status");
+  console.log("  healthlink-local doctor --agent hermes");
+  console.log("  healthlink-local logs");
   console.log("  healthlink-local pair");
   console.log("  healthlink-local service stop");
 }
@@ -579,6 +624,20 @@ async function printDoctor(options: CliOptions): Promise<void> {
     detail: agentStatus.detail
   });
 
+  const serviceStatus = getLaunchdServiceStatus({
+    databasePath: options.databasePath
+  });
+  results.push({
+    status: serviceStatus.running ? "OK" : serviceStatus.installed ? "WARN" : "WARN",
+    label: "macOS service",
+    detail: serviceStatus.installed
+      ? `${serviceStatus.running ? "running" : "installed but not running"} (${serviceStatus.plistPath})`
+      : `not installed (${serviceStatus.plistPath})`
+  });
+
+  const receiverStatus = await checkLocalReceiver(options);
+  results.push(receiverStatus);
+
   try {
     const transport = createTransportProvider({
       id: options.transportId,
@@ -614,6 +673,40 @@ async function printDoctor(options: CliOptions): Promise<void> {
   }
 }
 
+async function checkLocalReceiver(options: CliOptions): Promise<{
+  status: "OK" | "WARN" | "FAIL";
+  label: string;
+  detail: string;
+}> {
+  const endpoint = `http://127.0.0.1:${options.port}/health/status`;
+  try {
+    const response = await fetch(endpoint);
+    if (!response.ok) {
+      return {
+        status: "WARN",
+        label: "Local receiver",
+        detail: `${endpoint} returned HTTP ${response.status}`
+      };
+    }
+    const body = await response.json() as {
+      device_count?: unknown;
+      sync_count?: unknown;
+      last_sync_at?: unknown;
+    };
+    return {
+      status: "OK",
+      label: "Local receiver",
+      detail: `${endpoint} reachable (${String(body.device_count ?? 0)} source devices, ${String(body.sync_count ?? 0)} syncs, last sync ${String(body.last_sync_at ?? "never")})`
+    };
+  } catch (error) {
+    return {
+      status: "WARN",
+      label: "Local receiver",
+      detail: `${endpoint} is not reachable. Run healthlink-local service start or healthlink-local setup --agent hermes --service. ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+}
+
 main().catch((error: unknown) => {
   console.error(formatCliError(error));
   process.exitCode = 1;
@@ -638,7 +731,7 @@ function formatCliError(error: unknown): string {
       `HealthLink Local failed: ${message}`,
       "",
       "Check service status with: healthlink-local service status",
-      "Check daemon logs under: ~/.healthlink/logs/daemon.err.log",
+      "Check daemon logs with: healthlink-local logs",
       "If port 8787 is occupied, stop the old receiver or rerun with --port <free-port>."
     ].join("\n");
   }
