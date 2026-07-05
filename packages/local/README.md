@@ -27,18 +27,9 @@ Current package commands:
 
 ```bash
 npx -y @healthlink/local
-npx -y @healthlink/local setup --agent hermes --service
-npx -y @healthlink/local setup --agent openclaw --service
 npx -y @healthlink/local init
 npx -y @healthlink/local init --agent hermes
 npx -y @healthlink/local init --hermes
-npx -y @healthlink/local daemon
-npx -y @healthlink/local pair
-npx -y @healthlink/local service install
-npx -y @healthlink/local service start
-npx -y @healthlink/local service status
-npx -y @healthlink/local service stop
-npx -y @healthlink/local service uninstall
 npx -y @healthlink/local init --transport lan
 npx -y @healthlink/local init --transport tailscale --tailscale-name my-mac.tailnet.ts.net
 npx -y @healthlink/local --port 8787
@@ -54,25 +45,17 @@ npx -y @healthlink/local status
 npx -y @healthlink/local doctor --agent hermes --transport lan
 ```
 
-Recommended background pairing command:
-
-```bash
-npx -y @healthlink/local setup --agent hermes --service
-```
-
-This writes the Agent MCP config, installs and starts the macOS launchd receiver, waits for it to become reachable, and prints a 10-minute pairing QR. After pairing, the terminal can close while the background receiver keeps accepting iOS syncs.
-
-Foreground compatibility command:
+Foolproof local pairing command:
 
 ```bash
 npx -y @healthlink/local init --hermes
 ```
 
-`init` starts the receiver, creates a pairing session, prints a terminal QR code, shows the QR page URL, and prints MCP config hints for agents. It runs in the foreground and remains useful for debugging. Add `--agent hermes` or the compatible `--hermes` alias to also back up and write `~/.hermes/config.yaml` before the receiver starts, so Hermes uses the same default database after restart or `/reload-mcp`.
+`init` starts the receiver, creates a pairing session, prints a terminal QR code, shows the QR page URL, and prints MCP config hints for agents. It runs in the foreground. Add `--agent hermes` or the compatible `--hermes` alias to also back up and write `~/.hermes/config.yaml` before the receiver starts, so Hermes uses the same default database after restart or `/reload-mcp`.
 
 ## Pairing And Sync
 
-Run the local receiver in the foreground:
+Run the local receiver:
 
 ```bash
 npm run dev:local
@@ -90,13 +73,6 @@ Database:     ~/.healthlink/healthlink.sqlite
 ```
 
 Open the pairing page or scan the terminal QR code with HealthLink iOS, approve the pairing, then sync from the iOS app.
-
-For the background receiver, use:
-
-```bash
-npx -y @healthlink/local service status
-npx -y @healthlink/local pair
-```
 
 The iPhone must use the LAN, Tailscale, tunnel, or public HTTPS address. `127.0.0.1` only works from the same machine as the receiver.
 
@@ -211,25 +187,3 @@ Transport providers are selected with `--transport`. `lan` is the default provid
 For Tailscale MagicDNS, pass `--tailscale-name <host.tailnet.ts.net>` or set `HEALTHLINK_TAILSCALE_NAME`. If neither is provided, HealthLink attempts to read `tailscale status --json` and falls back to the local Tailscale IPv4 address.
 
 The source-device API is available at `/source-devices` and `/source-devices/:source_device_id/revoke`. The older `/devices` endpoints and MCP tools remain for compatibility with the current iOS app and older agent configs.
-
-## Background Service And Remote Agents
-
-On macOS, `service install` writes `~/Library/LaunchAgents/com.healthlink.local.plist` and runs:
-
-```bash
-healthlink-local daemon --host 0.0.0.0 --port 8787 --db ~/.healthlink/healthlink.sqlite --transport lan
-```
-
-The service logs to `~/.healthlink/logs/daemon.out.log` and `~/.healthlink/logs/daemon.err.log`.
-
-For remote or self-hosted Agents, run `daemon` under the server's own process manager, such as systemd, Docker, or PM2:
-
-```bash
-healthlink-local daemon \
-  --host 0.0.0.0 \
-  --port 8787 \
-  --transport public_https \
-  --server-url https://agent.example.com/healthlink
-```
-
-The `pair` command still talks to the receiver through `http://127.0.0.1:<port>/pair/start`; for remote deployments, run `pair` on the Agent host or generate the pairing URL through the receiver's trusted admin surface.

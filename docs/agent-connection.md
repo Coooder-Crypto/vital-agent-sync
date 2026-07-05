@@ -180,41 +180,30 @@ HealthLink can also try to read Tailscale MagicDNS from `tailscale status --json
 The Hermes-first local install command should be:
 
 ```bash
-npx -y @healthlink/local setup --agent hermes --service
+npx -y @healthlink/local init --hermes
 ```
 
-`setup --agent hermes --service` should:
+`init --hermes` should:
 
 - Check Node.js version.
 - Create `~/.healthlink/`.
 - Initialize SQLite.
 - Back up and write `~/.hermes/config.yaml`.
-- Install and start the background HTTP receiver.
+- Generate or reuse local receiver identity.
+- Start the HTTP receiver.
 - Create a short-lived pairing session.
 - Open or print the pairing page.
 - Print MCP config for common agents.
 - Tell the user to restart Hermes or run `/reload-mcp`.
 - Optional future behavior: install or update a HealthLink skill for Hermes.
 
-The foreground compatibility receiver remains:
+The generic receiver remains:
 
 ```bash
 npx -y @healthlink/local init
 ```
 
-It starts the same receiver without writing a Hermes config and remains attached to the terminal.
-
-The background service commands are:
-
-```bash
-npx -y @healthlink/local daemon
-npx -y @healthlink/local pair
-npx -y @healthlink/local service install
-npx -y @healthlink/local service start
-npx -y @healthlink/local service status
-npx -y @healthlink/local service stop
-npx -y @healthlink/local service uninstall
-```
+It starts the same receiver without writing a Hermes config.
 
 Expected output:
 
@@ -244,7 +233,7 @@ Implemented local MVP command:
 
 ```bash
 npm run build:local
-node packages/local/dist/cli.js setup --agent hermes --service
+node packages/local/dist/cli.js init --hermes
 ```
 
 ## Pairing QR Payload
@@ -313,14 +302,11 @@ Implemented helpers:
 npx -y @healthlink/local print-mcp-config
 npx -y @healthlink/local install-hermes
 npx -y @healthlink/local init --hermes
-npx -y @healthlink/local setup --agent hermes --service
-npx -y @healthlink/local service status
-npx -y @healthlink/local pair
 npx -y @healthlink/local status
 npx -y @healthlink/local doctor
 ```
 
-The helpers should not invent new protocols. They should write or print the same MCP command with the correct database path. `setup --agent hermes --service` uses the same install logic as `install-hermes`, installs/starts the receiver service, and folds pairing into one Agent-driven flow. `init --hermes` remains the foreground compatibility path.
+The helpers should not invent new protocols. They should write or print the same MCP command with the correct database path. `init --hermes` uses the same install logic as `install-hermes`, but folds it into the pairing flow so users do not need a separate config-writing command.
 
 ## Skill Layer
 

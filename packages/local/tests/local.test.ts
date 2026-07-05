@@ -23,15 +23,7 @@ import {
   getWorkoutLoad
 } from "../src/health-query.js";
 import { getHermesMcpInstallStatus, installHermesMcpConfig } from "../src/mcp-config.js";
-import { requestPairingSession } from "../src/pairing-client.js";
 import { PairingStore } from "../src/pairing.js";
-import {
-  buildLaunchdPlist,
-  getLaunchdServicePaths,
-  installLaunchdService,
-  readLaunchdPlist
-} from "../src/service.js";
-import { runServiceSetupWorkflow } from "../src/setup.js";
 import {
   SOURCE_PLATFORM_CAPABILITIES,
   listSourceDevices,
@@ -471,117 +463,6 @@ test("Transport providers keep LAN default and allow explicit future URLs", asyn
     port: 8787
   });
   await assert.rejects(() => cloudflare.getAdvertisedUrl(), /not implemented/);
-});
-
-test("launchd service plist uses daemon command and expected keepalive settings", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-service-test-"));
-  try {
-    const plist = buildLaunchdPlist({
-      homeDir: tempDir,
-      cliCommand: "/tmp/healthlink-local",
-      databasePath: join(tempDir, "healthlink.sqlite"),
-      host: "0.0.0.0",
-      port: 8787,
-      transport: "lan"
-    });
-
-    assert.match(plist, /<string>com\.healthlink\.local<\/string>/);
-    assert.match(plist, /<string>\/tmp\/healthlink-local<\/string>/);
-    assert.match(plist, /<string>daemon<\/string>/);
-    assert.match(plist, /<string>--db<\/string>/);
-    assert.match(plist, /<string>--transport<\/string>/);
-    assert.match(plist, /<string>lan<\/string>/);
-    assert.match(plist, /<key>RunAtLoad<\/key>\s*<true\/>/);
-    assert.match(plist, /<key>KeepAlive<\/key>\s*<true\/>/);
-
-    const status = installLaunchdService({
-      homeDir: tempDir,
-      cliCommand: "/tmp/healthlink-local",
-      databasePath: join(tempDir, "healthlink.sqlite"),
-      host: "0.0.0.0",
-      port: 8787,
-      transport: "lan"
-    });
-    const paths = getLaunchdServicePaths({
-      homeDir: tempDir,
-      databasePath: join(tempDir, "healthlink.sqlite")
-    });
-
-    assert.equal(status.installed, true);
-    assert.equal(status.running, false);
-    assert.equal(status.plistPath, paths.plistPath);
-    assert.match(readLaunchdPlist({ homeDir: tempDir }) ?? "", /daemon\.out\.log/);
-  } finally {
-    rmSync(tempDir, { recursive: true, force: true });
-  }
-});
-
-test("pairing client reports unreachable daemon and parses pair/start responses", async () => {
-  await assert.rejects(
-    () => requestPairingSession({
-      port: 8787,
-      agentName: "Hermes Agent",
-      transport: "lan",
-      fetchImpl: (async () => {
-        throw new Error("connection refused");
-      }) as typeof fetch
-    }),
-    /receiver is not reachable/
-  );
-
-  const session = await requestPairingSession({
-    port: 8787,
-    agentName: "Hermes Agent",
-    transport: "lan",
-    fetchImpl: (async (_input, init) => {
-      assert.equal(init?.method, "POST");
-      const body = JSON.parse(String(init?.body)) as { agent_name: string; transport: string };
-      assert.equal(body.agent_name, "Hermes Agent");
-      assert.equal(body.transport, "lan");
-      return new Response(JSON.stringify({
-        pairing_code: "ABCD-1234",
-        pairing_url: "healthlink://pair?server=http%3A%2F%2F127.0.0.1%3A8787&code=ABCD-1234",
-        expires_in_seconds: 600
-      }), {
-        status: 200,
-        headers: {
-          "content-type": "application/json"
-        }
-      });
-    }) as typeof fetch
-  });
-
-  assert.equal(session.pairing_code, "ABCD-1234");
-  assert.equal(session.expires_in_seconds, 600);
-});
-
-test("service setup workflow installs agent, starts service, waits, pairs, then prints reload hint", async () => {
-  const calls: string[] = [];
-  await runServiceSetupWorkflow({
-    installAgent: () => calls.push("install-agent"),
-    installSkill: () => calls.push("install-skill"),
-    installService: () => calls.push("install-service"),
-    startService: () => calls.push("start-service"),
-    waitForReady: async () => {
-      calls.push("wait-ready");
-    },
-    pair: async () => {
-      calls.push("pair");
-    },
-    printReloadHint: () => calls.push("reload-hint")
-  }, {
-    installSkill: true
-  });
-
-  assert.deepEqual(calls, [
-    "install-agent",
-    "install-skill",
-    "install-service",
-    "start-service",
-    "wait-ready",
-    "pair",
-    "reload-hint"
-  ]);
 });
 
 test("Source platform capability metadata includes future app surfaces", () => {
