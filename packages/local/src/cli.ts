@@ -18,6 +18,7 @@ import {
   type LaunchdServiceOptions
 } from "./service.js";
 import { requestPairingSession } from "./pairing-client.js";
+import { describePortListeners } from "./port-diagnostics.js";
 import { runServiceSetupWorkflow } from "./setup.js";
 import { buildHealthLinkSkillMarkdown } from "./skill.js";
 import { listSourceDevices } from "./source-devices.js";
@@ -222,7 +223,7 @@ async function main(): Promise<void> {
   }
 
   if (options.command === "service") {
-    runServiceCommand(options);
+    await runServiceCommand(options);
     return;
   }
 
@@ -299,34 +300,34 @@ async function main(): Promise<void> {
   }
 }
 
-function runServiceCommand(options: CliOptions): void {
+async function runServiceCommand(options: CliOptions): Promise<void> {
   const action = options.serviceAction ?? "status";
   const serviceOptions = toServiceOptions(options);
   if (action === "install") {
     const status = installLaunchdService(serviceOptions);
     console.log("HealthLink service installed");
-    printServiceStatusDetails(status, options);
+    await printServiceStatusDetails(status, options);
     return;
   }
   if (action === "start") {
     const status = startLaunchdService(serviceOptions);
     console.log("HealthLink service start requested");
-    printServiceStatusDetails(status, options);
+    await printServiceStatusDetails(status, options);
     return;
   }
   if (action === "stop") {
     const status = stopLaunchdService(serviceOptions);
     console.log("HealthLink service stop requested");
-    printServiceStatusDetails(status, options);
+    await printServiceStatusDetails(status, options);
     return;
   }
   if (action === "uninstall") {
     const status = uninstallLaunchdService(serviceOptions);
     console.log("HealthLink service uninstalled");
-    printServiceStatusDetails(status, options);
+    await printServiceStatusDetails(status, options);
     return;
   }
-  printServiceStatusDetails(getLaunchdServiceStatus({
+  await printServiceStatusDetails(getLaunchdServiceStatus({
     databasePath: options.databasePath
   }), options);
 }
@@ -426,22 +427,17 @@ async function createPairingSession(options: CliOptions): Promise<{
 }
 
 async function waitForLocalReceiver(options: CliOptions): Promise<void> {
-  const endpoint = `http://127.0.0.1:${options.port}/health/status`;
   const deadline = Date.now() + 5000;
   let lastError = "";
   while (Date.now() < deadline) {
-    try {
-      const response = await fetch(endpoint);
-      if (response.ok) {
-        return;
-      }
-      lastError = `HTTP ${response.status}`;
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : String(error);
+    const probe = await probeLocalReceiver(options);
+    if (probe.reachable) {
+      return;
     }
+    lastError = probe.detail;
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error(`HealthLink service did not become ready at ${endpoint} within 5 seconds. ${lastError}`);
+  throw new Error(`HealthLink service did not become ready at ${localReceiverStatusEndpoint(options)} within 5 seconds. ${lastError}`);
 }
 
 function toServiceOptions(options: CliOptions): LaunchdServiceOptions {
@@ -455,14 +451,16 @@ function toServiceOptions(options: CliOptions): LaunchdServiceOptions {
   };
 }
 
-function printServiceStatusDetails(status: ReturnType<typeof getLaunchdServiceStatus>, options: CliOptions): void {
+async function printServiceStatusDetails(status: ReturnType<typeof getLaunchdServiceStatus>, options: CliOptions): Promise<void> {
   const database = openHealthLinkDatabase({ path: options.databasePath });
   try {
     const health = getHealthStatus(database);
+    const receiver = await probeLocalReceiver(options);
     console.log("HealthLink service");
     console.log(`Label:     ${status.label}`);
     console.log(`Installed: ${status.installed ? "yes" : "no"}`);
     console.log(`Running:   ${status.running ? "yes" : "no"}`);
+    console.log(`Receiver:  ${receiver.reachable ? "reachable" : "not reachable"} (${receiver.detail})`);
     console.log(`Plist:     ${status.plistPath}`);
     console.log(`Local API: http://127.0.0.1:${options.port}`);
     console.log(`Database:  ${database.path}`);
@@ -474,6 +472,8 @@ function printServiceStatusDetails(status: ReturnType<typeof getLaunchdServiceSt
       console.log("Next: run healthlink-local setup --agent hermes --service to install and start the receiver.");
     } else if (!status.running) {
       console.log("Next: run healthlink-local service start, then healthlink-local pair.");
+    } else if (!receiver.reachable) {
+      console.log(`Next: check healthlink-local logs and confirm port ${options.port} is not occupied by another process.`);
     } else {
       console.log("Next: run healthlink-local pair to print a new QR, or scan the browser QR at the Local API /pair page.");
     }
@@ -678,33 +678,67 @@ async function checkLocalReceiver(options: CliOptions): Promise<{
   label: string;
   detail: string;
 }> {
-  const endpoint = `http://127.0.0.1:${options.port}/health/status`;
+  const probe = await probeLocalReceiver(options);
+  return {
+    status: probe.reachable ? "OK" : "WARN",
+    label: "Local receiver",
+    detail: probe.detail
+  };
+}
+
+type ReceiverProbeResult = {
+  reachable: boolean;
+  detail: string;
+};
+
+async function probeLocalReceiver(options: CliOptions): Promise<ReceiverProbeResult> {
+  const endpoint = localReceiverStatusEndpoint(options);
   try {
-    const response = await fetch(endpoint);
+    const response = await fetch(endpoint, {
+      signal: AbortSignal.timeout(1500)
+    });
     if (!response.ok) {
       return {
-        status: "WARN",
-        label: "Local receiver",
+        reachable: false,
         detail: `${endpoint} returned HTTP ${response.status}`
       };
     }
-    const body = await response.json() as {
-      device_count?: unknown;
-      sync_count?: unknown;
-      last_sync_at?: unknown;
-    };
+    const body = await response.json() as unknown;
+    if (!isReceiverHealthStatus(body)) {
+      return {
+        reachable: false,
+        detail: `${endpoint} responded, but it does not look like a HealthLink receiver`
+      };
+    }
     return {
-      status: "OK",
-      label: "Local receiver",
+      reachable: true,
       detail: `${endpoint} reachable (${String(body.device_count ?? 0)} source devices, ${String(body.sync_count ?? 0)} syncs, last sync ${String(body.last_sync_at ?? "never")})`
     };
   } catch (error) {
+    const listener = describePortListeners(options.port);
+    const listenerDetail = listener ? ` Listener on port ${options.port}: ${listener}.` : "";
     return {
-      status: "WARN",
-      label: "Local receiver",
-      detail: `${endpoint} is not reachable. Run healthlink-local service start or healthlink-local setup --agent hermes --service. ${error instanceof Error ? error.message : String(error)}`
+      reachable: false,
+      detail: `${endpoint} is not reachable. Run healthlink-local service start or healthlink-local setup --agent hermes --service.${listenerDetail} ${error instanceof Error ? error.message : String(error)}`
     };
   }
+}
+
+function localReceiverStatusEndpoint(options: Pick<CliOptions, "port">): string {
+  return `http://127.0.0.1:${options.port}/health/status`;
+}
+
+function isReceiverHealthStatus(value: unknown): value is {
+  device_count?: unknown;
+  sync_count?: unknown;
+  last_sync_at?: unknown;
+} {
+  return typeof value === "object" && value !== null && (
+    "device_count" in value ||
+    "sync_count" in value ||
+    "last_sync_at" in value ||
+    "status" in value
+  );
 }
 
 main().catch((error: unknown) => {
@@ -717,10 +751,13 @@ function formatCliError(error: unknown): string {
   if (message.includes("EADDRINUSE")) {
     const portMatch = message.match(/:(\d+)\b/);
     const port = portMatch?.[1] ?? "8787";
+    const portNumber = Number(port);
+    const listener = describePortListeners(Number.isInteger(portNumber) ? portNumber : 8787);
     return [
       `HealthLink Local failed: ${message}`,
       "",
       `Port ${port} is already in use.`,
+      listener ? `Current listener: ${listener}` : "Current listener: could not be identified automatically.",
       `Check the process with: lsof -nP -iTCP:${port} -sTCP:LISTEN`,
       "If it is an old foreground receiver, stop it with Ctrl-C and retry.",
       "If the background service is already running, use: healthlink-local pair"
