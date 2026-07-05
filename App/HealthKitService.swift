@@ -35,9 +35,25 @@ final class HealthKitService {
 
         async let steps = cumulativeQuantity(.stepCount, unit: .count(), for: date)
         async let activeEnergy = cumulativeQuantity(.activeEnergyBurned, unit: .kilocalorie(), for: date)
+        async let basalEnergy = cumulativeQuantity(.basalEnergyBurned, unit: .kilocalorie(), for: date)
+        async let walkingRunningDistance = cumulativeQuantity(.distanceWalkingRunning, unit: .meter(), for: date)
+        async let cyclingDistance = cumulativeQuantity(.distanceCycling, unit: .meter(), for: date)
+        async let flightsClimbed = cumulativeQuantity(.flightsClimbed, unit: .count(), for: date)
+        async let exerciseMinutes = cumulativeQuantity(.appleExerciseTime, unit: .minute(), for: date)
+        async let standMinutes = cumulativeQuantity(.appleStandTime, unit: .minute(), for: date)
         async let restingHeartRate = averageQuantity(.restingHeartRate, unit: heartRateUnit, for: date)
         async let averageHeartRate = averageQuantity(.heartRate, unit: heartRateUnit, for: date)
         async let maxHeartRate = maxQuantity(.heartRate, unit: heartRateUnit, for: date)
+        async let hrv = averageQuantity(.heartRateVariabilitySDNN, unit: .secondUnit(with: .milli), for: date)
+        async let walkingHeartRateAverage = averageQuantity(.walkingHeartRateAverage, unit: heartRateUnit, for: date)
+        async let vo2Max = averageQuantity(.vo2Max, unit: HKUnit(from: "mL/kg*min"), for: date)
+        async let oxygenSaturation = averageQuantity(.oxygenSaturation, unit: .percent(), for: date)
+        async let respiratoryRate = averageQuantity(.respiratoryRate, unit: heartRateUnit, for: date)
+        async let bodyTemperature = averageQuantity(.bodyTemperature, unit: .degreeCelsius(), for: date)
+        async let bodyMass = averageQuantity(.bodyMass, unit: .gramUnit(with: .kilo), for: date)
+        async let bodyFat = averageQuantity(.bodyFatPercentage, unit: .percent(), for: date)
+        async let leanBodyMass = averageQuantity(.leanBodyMass, unit: .gramUnit(with: .kilo), for: date)
+        async let bodyMassIndex = averageQuantity(.bodyMassIndex, unit: .count(), for: date)
         async let sleepMinutes = sleepMinutes(for: date)
         async let workouts = workouts(for: date)
 
@@ -54,6 +70,22 @@ final class HealthKitService {
             avg_heart_rate_bpm: try await averageHeartRate?.rounded(toPlaces: 1),
             max_heart_rate_bpm: try await maxHeartRate?.rounded(toPlaces: 1),
             active_energy_kcal: try await activeEnergy?.rounded(toPlaces: 1),
+            basal_energy_kcal: try await basalEnergy?.rounded(toPlaces: 1),
+            distance_walking_running_m: try await walkingRunningDistance?.rounded(toPlaces: 1),
+            distance_cycling_m: try await cyclingDistance?.rounded(toPlaces: 1),
+            flights_climbed: try await flightsClimbed.map { Int($0.rounded()) },
+            exercise_minutes: try await exerciseMinutes.map { Int($0.rounded()) },
+            stand_minutes: try await standMinutes.map { Int($0.rounded()) },
+            heart_rate_variability_ms: try await hrv?.rounded(toPlaces: 1),
+            walking_heart_rate_average_bpm: try await walkingHeartRateAverage?.rounded(toPlaces: 1),
+            vo2_max_ml_kg_min: try await vo2Max?.rounded(toPlaces: 1),
+            oxygen_saturation_percent: try await oxygenSaturation.map { ($0 * 100).rounded(toPlaces: 1) },
+            respiratory_rate_bpm: try await respiratoryRate?.rounded(toPlaces: 1),
+            body_temperature_c: try await bodyTemperature?.rounded(toPlaces: 1),
+            body_mass_kg: try await bodyMass?.rounded(toPlaces: 1),
+            body_fat_percentage: try await bodyFat.map { ($0 * 100).rounded(toPlaces: 1) },
+            lean_body_mass_kg: try await leanBodyMass?.rounded(toPlaces: 1),
+            body_mass_index: try await bodyMassIndex?.rounded(toPlaces: 1),
             workout_minutes: workoutMinutes,
             workouts: workoutSummaries
         )
@@ -71,8 +103,24 @@ final class HealthKitService {
         [
             HKQuantityTypeIdentifier.stepCount,
             .activeEnergyBurned,
+            .basalEnergyBurned,
+            .distanceWalkingRunning,
+            .distanceCycling,
+            .flightsClimbed,
+            .appleExerciseTime,
+            .appleStandTime,
             .heartRate,
-            .restingHeartRate
+            .restingHeartRate,
+            .heartRateVariabilitySDNN,
+            .walkingHeartRateAverage,
+            .vo2Max,
+            .oxygenSaturation,
+            .respiratoryRate,
+            .bodyTemperature,
+            .bodyMass,
+            .bodyFatPercentage,
+            .leanBodyMass,
+            .bodyMassIndex
         ].compactMap { HKObjectType.quantityType(forIdentifier: $0) }.forEach { types.append($0) }
 
         if let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) {

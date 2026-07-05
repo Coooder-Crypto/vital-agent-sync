@@ -21,6 +21,22 @@ struct DailyHealthSummary: Codable, Identifiable {
     let avg_heart_rate_bpm: Double?
     let max_heart_rate_bpm: Double?
     let active_energy_kcal: Double?
+    let basal_energy_kcal: Double?
+    let distance_walking_running_m: Double?
+    let distance_cycling_m: Double?
+    let flights_climbed: Int?
+    let exercise_minutes: Int?
+    let stand_minutes: Int?
+    let heart_rate_variability_ms: Double?
+    let walking_heart_rate_average_bpm: Double?
+    let vo2_max_ml_kg_min: Double?
+    let oxygen_saturation_percent: Double?
+    let respiratory_rate_bpm: Double?
+    let body_temperature_c: Double?
+    let body_mass_kg: Double?
+    let body_fat_percentage: Double?
+    let lean_body_mass_kg: Double?
+    let body_mass_index: Double?
     let workout_minutes: Int?
     let workouts: [WorkoutSummary]
 }

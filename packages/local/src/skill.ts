@@ -38,7 +38,7 @@ HealthLink data comes from MCP tools. Do not invent health, sleep, workout, or r
 ## When to Use
 
 - The user asks "How am I today?", "Should I exercise?", "Am I recovered?", or similar.
-- The user asks for analysis that may benefit from sleep, activity, heart-rate, or workout context.
+- The user asks for analysis that may benefit from sleep, activity, heart-rate, HRV, VO2 max, blood oxygen, respiratory rate, body temperature, body composition, or workout context.
 - The user asks whether recent sync data is available.
 - The user asks to revoke, inspect, or troubleshoot connected HealthLink source devices.
 
@@ -48,10 +48,10 @@ Do not use this skill for diagnosis, prescriptions, emergency advice, or unsuppo
 
 1. Call \`get_personal_context\` first for broad questions about today, recovery, energy, or activity.
 2. Use lower-level tools only for follow-up detail:
-   - \`get_daily_health_summary\` for a specific date's health metrics.
+   - \`get_daily_health_summary\` for a specific date's health metrics, including activity, sleep, heart, respiratory, temperature, and body-composition summaries when available.
    - \`get_sleep_trend\` for sleep continuity.
    - \`get_workout_load\` for workout and activity load.
-   - \`get_recovery_signals\` for sleep, heart-rate, activity, and workout-minutes context.
+   - \`get_recovery_signals\` for sleep, heart-rate, HRV, oxygen, respiratory, temperature, activity, and workout-minutes context.
    - \`get_weekly_summary\` for compact 7-day health, activity, and recovery summaries.
    - \`healthlink_status\`, \`list_source_devices\`, and \`revoke_source_device\` for setup and troubleshooting.
    - \`list_devices\` and \`revoke_device\` only as legacy aliases when an older agent flow expects those names.

@@ -58,7 +58,7 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
     "get_daily_health_summary",
     {
       title: "Get Daily Health Summary",
-      description: "Get Apple Health daily summary data for questions about steps, sleep minutes, heart rate, active energy, workouts, physical activity, tiredness, body state, or today's health. If date is omitted, returns the latest synced date.",
+      description: "Get Apple Health daily summary data for questions about steps, sleep, heart rate, HRV, VO2 max, blood oxygen, respiratory rate, body temperature, body composition, active/basal energy, distance, exercise minutes, stand minutes, workouts, physical activity, tiredness, body state, or today's health. If date is omitted, returns the latest synced date.",
       inputSchema: z.object({
         date: dateSchema.describe("Optional date in YYYY-MM-DD format.")
       })
@@ -94,7 +94,7 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
     "get_recovery_signals",
     {
       title: "Get Recovery Signals",
-      description: "Get recovery signals from sleep, resting heart rate, average heart rate, active energy, and workout minutes. Use for questions about readiness, overtraining, fatigue, rest needs, or whether the user should prioritize recovery.",
+      description: "Get recovery signals from sleep, resting heart rate, HRV, VO2 max, blood oxygen, respiratory rate, body temperature, active/basal energy, and workout minutes. Use for questions about readiness, overtraining, fatigue, rest needs, or whether the user should prioritize recovery.",
       inputSchema: z.object({
         days: daysSchema.describe("Number of latest synced days to return. Defaults to 7, max 90.")
       })
