@@ -20,6 +20,7 @@ export type LocalServerOptions = {
   port: number;
   databasePath?: string;
   serverUrl?: string;
+  tailscaleName?: string;
   transport?: TransportProviderId;
   agentName?: string;
   mode?: "server" | "init";
@@ -33,7 +34,8 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
     id: options.transport,
     bindHost: options.host,
     port: options.port,
-    serverUrl: options.serverUrl
+    serverUrl: options.serverUrl,
+    tailscaleName: options.tailscaleName
   });
   await transport.start?.();
   const advertisedUrl = await transport.getAdvertisedUrl();

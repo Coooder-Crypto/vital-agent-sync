@@ -1,4 +1,5 @@
 import { networkInterfaces } from "node:os";
+import { execFileSync } from "node:child_process";
 
 export const TRANSPORT_PROVIDER_IDS = [
   "lan",
@@ -30,6 +31,7 @@ export type TransportProviderOptions = {
   bindHost: string;
   port: number;
   serverUrl?: string;
+  tailscaleName?: string;
 };
 
 export function createTransportProvider(options: TransportProviderOptions): TransportProvider {
@@ -85,9 +87,13 @@ function createTailscaleTransportProvider(options: TransportProviderOptions): Tr
       if (options.serverUrl) {
         return normalizeServerUrl(options.serverUrl);
       }
+      const magicDnsName = getTailscaleMagicDnsName(options);
+      if (magicDnsName) {
+        return `http://${magicDnsName}:${options.port}`;
+      }
       const address = findTailscaleIpv4();
       if (!address) {
-        throw new Error("Tailscale transport could not find a local 100.64.0.0/10 IPv4 address. Pass --server-url or use --transport lan.");
+        throw new Error("Tailscale transport could not find a MagicDNS name or local 100.64.0.0/10 IPv4 address. Pass --tailscale-name, --server-url, or use --transport lan.");
       }
       return `http://${address}:${options.port}`;
     },
@@ -99,16 +105,24 @@ function createTailscaleTransportProvider(options: TransportProviderOptions): Tr
           advertisedUrl: normalizeServerUrl(options.serverUrl)
         };
       }
+      const magicDnsName = getTailscaleMagicDnsName(options);
+      if (magicDnsName) {
+        return {
+          status: "ok",
+          detail: `Advertising http://${magicDnsName}:${options.port} from Tailscale MagicDNS.`,
+          advertisedUrl: `http://${magicDnsName}:${options.port}`
+        };
+      }
       const address = findTailscaleIpv4();
       if (!address) {
         return {
           status: "fail",
-          detail: "No local Tailscale IPv4 address was found. Start Tailscale, pass --server-url, or use --transport lan."
+          detail: "No local Tailscale MagicDNS name or IPv4 address was found. Start Tailscale, pass --tailscale-name, pass --server-url, or use --transport lan."
         };
       }
       return {
         status: "ok",
-        detail: `Advertising http://${address}:${options.port} from local Tailscale IPv4. MagicDNS support is still planned.`,
+        detail: `Advertising http://${address}:${options.port} from local Tailscale IPv4.`,
         advertisedUrl: `http://${address}:${options.port}`
       };
     }
@@ -181,6 +195,37 @@ function findTailscaleIpv4(): string | undefined {
     }
   }
   return undefined;
+}
+
+function getTailscaleMagicDnsName(options: TransportProviderOptions): string | undefined {
+  const explicit = normalizeTailscaleName(options.tailscaleName ?? process.env.HEALTHLINK_TAILSCALE_NAME ?? process.env.TAILSCALE_HOSTNAME);
+  if (explicit) {
+    return explicit;
+  }
+  return detectTailscaleMagicDnsName();
+}
+
+function detectTailscaleMagicDnsName(): string | undefined {
+  try {
+    const raw = execFileSync("tailscale", ["status", "--json"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 1000
+    });
+    const parsed = JSON.parse(raw) as {
+      Self?: {
+        DNSName?: unknown;
+      };
+    };
+    return normalizeTailscaleName(typeof parsed.Self?.DNSName === "string" ? parsed.Self.DNSName : undefined);
+  } catch {
+    return undefined;
+  }
+}
+
+function normalizeTailscaleName(value: string | undefined): string | undefined {
+  const trimmed = value?.trim().replace(/^https?:\/\//, "").replace(/\/+$/, "").replace(/\.$/, "");
+  return trimmed || undefined;
 }
 
 function isTailscaleIpv4(address: string): boolean {

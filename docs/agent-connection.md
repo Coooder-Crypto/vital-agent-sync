@@ -3,6 +3,7 @@
 This document defines the target "foolproof" path for connecting HealthLink iOS to Hermes Agent or any other agent runtime.
 
 For the longer-term adapter architecture and implementation checklist covering Android, Xiaomi, OpenClaw, WorkBuddy, Tailscale, tunnels, and public HTTPS, see [architecture-upgrade-todo.md](architecture-upgrade-todo.md).
+For adapter implementation guidance, see [architecture-adapter-design.md](architecture-adapter-design.md).
 
 ## Target User Experience
 
@@ -51,11 +52,11 @@ HealthLink does not rely on a live socket between iOS and the Agent. Pairing cre
 ```text
 iOS app
   server URL
-  device_id
+  source_device_id
   device token in Keychain
 
 @healthlink/local
-  paired devices
+  paired source devices
   scoped token hashes
   ~/.healthlink/healthlink.sqlite
 
@@ -163,6 +164,16 @@ iPhone -> tunnel or relay URL -> user Agent receiver -> storage -> MCP -> Agent
 ```
 
 The relay must be a transport layer, not a data platform. Payloads should be end-to-end encrypted before this mode is treated as production-quality.
+
+### Mode D: Tailscale
+
+For users who already run a tailnet:
+
+```bash
+healthlink-local init --transport tailscale --tailscale-name my-mac.tailnet.ts.net
+```
+
+HealthLink can also try to read Tailscale MagicDNS from `tailscale status --json`, or fall back to the local 100.64.0.0/10 address when available.
 
 ## CLI Shape
 
@@ -335,6 +346,10 @@ get_calendar_availability
 get_sleep_trend
 get_workout_load
 get_recovery_signals
+get_weekly_summary
+record_feedback
+list_source_devices
+revoke_source_device
 list_devices
 revoke_device
 ```
@@ -342,6 +357,8 @@ revoke_device
 Tool rules:
 
 - Use `get_personal_context` first for broad natural-language questions about today, energy, recovery, exercise readiness, schedule pressure, and day planning.
+- Use `list_source_devices` and `revoke_source_device` for setup and troubleshooting. `list_devices` and `revoke_device` remain legacy aliases.
+- Use `record_feedback` only when the user explicitly gives a correction, preference, or usefulness rating.
 - Return compact summaries, not raw samples.
 - Include enough timestamps for freshness checks.
 - Redact calendar event titles by default.

@@ -19,13 +19,31 @@ export type HermesInstallOptions = McpConfigOptions & {
   configPath?: string;
 };
 
+export type OpenClawInstallOptions = McpConfigOptions & {
+  openclawHome?: string;
+  configPath?: string;
+};
+
 export type HermesInstallResult = {
   configPath: string;
   backupPath?: string;
   server: McpCommandConfig;
 };
 
+export type OpenClawInstallResult = {
+  configPath: string;
+  backupPath?: string;
+  server: McpCommandConfig;
+};
+
 export type HermesMcpInstallStatus = {
+  configPath: string;
+  exists: boolean;
+  installed: boolean;
+  server?: unknown;
+};
+
+export type OpenClawMcpInstallStatus = {
   configPath: string;
   exists: boolean;
   installed: boolean;
@@ -57,6 +75,26 @@ export function buildStandardMcpConfig(options: McpConfigOptions = {}): {
 
 export function formatStandardMcpConfig(options: McpConfigOptions = {}): string {
   return `${JSON.stringify(buildStandardMcpConfig(options), null, 2)}\n`;
+}
+
+export function buildOpenClawMcpConfig(options: McpConfigOptions = {}): {
+  mcp: {
+    servers: {
+      healthlink: McpCommandConfig;
+    };
+  };
+} {
+  return {
+    mcp: {
+      servers: {
+        healthlink: buildHealthLinkMcpServerConfig(options)
+      }
+    }
+  };
+}
+
+export function formatOpenClawMcpConfig(options: McpConfigOptions = {}): string {
+  return `${JSON.stringify(buildOpenClawMcpConfig(options), null, 2)}\n`;
 }
 
 export function installHermesMcpConfig(options: HermesInstallOptions = {}): HermesInstallResult {
@@ -91,6 +129,38 @@ export function installHermesMcpConfig(options: HermesInstallOptions = {}): Herm
   };
 }
 
+export function installOpenClawMcpConfig(options: OpenClawInstallOptions = {}): OpenClawInstallResult {
+  const configPath = getOpenClawConfigPath(options);
+  mkdirSync(dirname(configPath), { recursive: true });
+
+  const existing = existsSync(configPath) ? readFileSync(configPath, "utf8") : "";
+  const backupPath = existsSync(configPath) ? uniqueBackupPath(configPath) : undefined;
+  if (backupPath) {
+    copyFileSync(configPath, backupPath);
+  }
+
+  const root = existing.trim().length > 0 ? parseJsonRecord(existing, "OpenClaw") : {};
+  const mcp = isRecord(root.mcp) ? root.mcp : {};
+  const servers = isRecord(mcp.servers) ? mcp.servers : {};
+  const server = buildHealthLinkMcpServerConfig(options);
+
+  root.mcp = {
+    ...mcp,
+    servers: {
+      ...servers,
+      healthlink: server
+    }
+  };
+
+  writeFileSync(configPath, `${JSON.stringify(root, null, 2)}\n`, "utf8");
+
+  return {
+    configPath,
+    backupPath,
+    server
+  };
+}
+
 export function getHermesMcpInstallStatus(options: HermesInstallOptions = {}): HermesMcpInstallStatus {
   const configPath = getHermesConfigPath(options);
   if (!existsSync(configPath)) {
@@ -112,13 +182,49 @@ export function getHermesMcpInstallStatus(options: HermesInstallOptions = {}): H
   };
 }
 
+export function getOpenClawMcpInstallStatus(options: OpenClawInstallOptions = {}): OpenClawMcpInstallStatus {
+  const configPath = getOpenClawConfigPath(options);
+  if (!existsSync(configPath)) {
+    return {
+      configPath,
+      exists: false,
+      installed: false
+    };
+  }
+
+  const config = parseJsonRecord(readFileSync(configPath, "utf8"), "OpenClaw");
+  const mcp = isRecord(config.mcp) ? config.mcp : {};
+  const servers = isRecord(mcp.servers) ? mcp.servers : {};
+  const server = servers.healthlink;
+  return {
+    configPath,
+    exists: true,
+    installed: isRecord(server),
+    server
+  };
+}
+
 function getHermesConfigPath(options: HermesInstallOptions = {}): string {
   return resolveHomePath(options.configPath ?? join(options.hermesHome ?? process.env.HERMES_HOME ?? "~/.hermes", "config.yaml"));
+}
+
+function getOpenClawConfigPath(options: OpenClawInstallOptions = {}): string {
+  return resolveHomePath(options.configPath ?? join(options.openclawHome ?? process.env.OPENCLAW_HOME ?? "~/.openclaw", "openclaw.json"));
 }
 
 function parseYamlRecord(value: string): Record<string, unknown> {
   const parsed = YAML.parse(value) as unknown;
   return isRecord(parsed) ? parsed : {};
+}
+
+function parseJsonRecord(value: string, owner: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return isRecord(parsed) ? parsed : {};
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`${owner} config must be valid JSON for automatic HealthLink install. Use print-agent-config to merge manually if the config uses comments or JSON5 syntax. ${detail}`);
+  }
 }
 
 function getCliCommandPath(): string {
@@ -163,7 +269,7 @@ function uniqueBackupPath(configPath: string): string {
     }
   }
 
-  throw new Error("Could not allocate a unique Hermes config backup path.");
+  throw new Error("Could not allocate a unique HealthLink config backup path.");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

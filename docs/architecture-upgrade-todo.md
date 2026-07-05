@@ -2,6 +2,8 @@
 
 This document tracks the architecture upgrade from the current local iOS + Hermes MVP to a multi-source, multi-agent, multi-transport personal data gateway.
 
+Implementation guidance for the remaining adapter work lives in [architecture-adapter-design.md](architecture-adapter-design.md).
+
 ## Target
 
 HealthLink should support:
@@ -174,7 +176,7 @@ feedback_events
 
 Source adapters should only know how to collect data and sync normalized payloads. They should not know about Hermes, OpenClaw, or other Agents.
 
-- [ ] Rename internal "device" language toward "source device" in docs and types.
+- [x] Rename internal "device" language toward "source device" in docs and types.
 - [x] Keep backward compatibility for current `/devices` endpoint while introducing source-device naming.
 - [x] Define `source_platform` values:
   - `ios`
@@ -182,9 +184,9 @@ Source adapters should only know how to collect data and sync normalized payload
   - `xiaomi`
   - `calendar_connector`
   - `manual_import`
-- [ ] Define a provider-neutral health summary schema.
-- [ ] Add Health Connect mapping design for Android.
-- [ ] Add Xiaomi / Mi Fitness connector research notes.
+- [x] Define a provider-neutral health summary schema.
+- [x] Add Health Connect mapping design for Android.
+- [x] Add Xiaomi / Mi Fitness connector research notes.
 - [x] Add connector capability metadata:
   - supported metrics
   - sync cadence
@@ -214,12 +216,12 @@ Tasks:
 - [x] Add `healthlink-local init --agent hermes` as an alias for `--hermes`.
 - [x] Keep `healthlink-local init --hermes` for compatibility.
 - [x] Add `healthlink-local print-agent-config --agent generic`.
-- [ ] Add OpenClaw adapter research:
+- [x] Add OpenClaw adapter research:
   - config location
   - MCP format
   - reload mechanism
   - skill/rule format
-- [ ] Add WorkBuddy adapter research:
+- [x] Add WorkBuddy adapter research:
   - config location
   - tool integration format
   - prompt/rule package format
@@ -242,7 +244,7 @@ Tasks:
   - freshness reporting
   - privacy and medical-safety boundaries
   - language matching
-- [ ] Document how non-Hermes agents can import the skill/rule text.
+- [x] Document how non-Hermes agents can import the skill/rule text.
 
 ## Transport Provider TODO
 
@@ -268,12 +270,12 @@ Tasks:
 - [x] Add Tailscale detection:
   - local Tailscale IP
   - reachability hints
-- [ ] Add Tailscale MagicDNS name support.
-- [ ] Add tunnel provider design:
+- [x] Add Tailscale MagicDNS name support.
+- [x] Add tunnel provider design:
   - Cloudflare Tunnel
   - ngrok
   - user-provided tunnel URL
-- [ ] Add public HTTPS mode docs.
+- [x] Add public HTTPS mode docs.
 - [x] Add pairing status payload field `transport`.
 - [x] Add `healthlink-local doctor --transport <id>`.
 
@@ -300,11 +302,11 @@ Foreground auto-sync:
 
 Background best-effort:
 
-- [ ] Add `BGAppRefreshTask` design.
-- [ ] Add `BGProcessingTask` design only if needed.
-- [ ] Add HealthKit observer query design.
-- [ ] Add HealthKit background delivery design.
-- [ ] Avoid product copy that promises exact sync intervals.
+- [x] Add `BGAppRefreshTask` design.
+- [x] Add `BGProcessingTask` design only if needed.
+- [x] Add HealthKit observer query design.
+- [x] Add HealthKit background delivery design.
+- [x] Avoid product copy that promises exact sync intervals.
 
 ## Query / MCP TODO
 
@@ -326,7 +328,7 @@ Do not break the current local MVP.
 
 Phase 1:
 
-- [ ] Document architecture boundaries.
+- [x] Document architecture boundaries.
 - [x] Add adapter interfaces without moving all code.
 - [x] Keep existing commands working.
 
@@ -334,7 +336,7 @@ Phase 2:
 
 - [x] Move Hermes install logic into `AgentAdapter`.
 - [x] Move LAN URL logic into `TransportProvider`.
-- [ ] Rename docs/types from device to source device where safe.
+- [x] Rename docs/types from device to source device where safe.
 
 Phase 3:
 
@@ -344,9 +346,9 @@ Phase 3:
 
 Phase 4:
 
-- [ ] Add Android / Health Connect design.
-- [ ] Add OpenClaw adapter.
-- [ ] Add first non-LAN transport.
+- [x] Add Android / Health Connect design.
+- [x] Add OpenClaw adapter.
+- [x] Add first non-LAN transport.
 
 ## Non-Goals For This Upgrade
 

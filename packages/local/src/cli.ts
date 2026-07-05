@@ -5,11 +5,11 @@ import {
 } from "./mcp-config.js";
 import { getAgentAdapter, isAgentAdapterId, type AgentAdapterId } from "./agents.js";
 import { openHealthLinkDatabase } from "./database.js";
-import { listDevices } from "./devices.js";
 import { getHealthStatus } from "./health-ingest.js";
 import { startLocalServer } from "./server.js";
 import { startMcpServer } from "./mcp.js";
 import { buildHealthLinkSkillMarkdown } from "./skill.js";
+import { listSourceDevices } from "./source-devices.js";
 import { createTransportProvider, isTransportProviderId, type TransportProviderId } from "./transports.js";
 
 type CliOptions = {
@@ -22,9 +22,11 @@ type CliOptions = {
   transportId: TransportProviderId;
   databasePath?: string;
   serverUrl?: string;
+  tailscaleName?: string;
   agentName?: string;
   hermesConfigPath?: string;
   hermesSkillPath?: string;
+  openclawConfigPath?: string;
 };
 
 function parseArgs(argv: string[]): CliOptions {
@@ -54,6 +56,9 @@ function parseArgs(argv: string[]): CliOptions {
     } else if (arg === "--server-url") {
       options.serverUrl = argv[index + 1];
       index += 1;
+    } else if (arg === "--tailscale-name") {
+      options.tailscaleName = argv[index + 1];
+      index += 1;
     } else if (arg === "--agent-name") {
       options.agentName = argv[index + 1];
       index += 1;
@@ -73,6 +78,9 @@ function parseArgs(argv: string[]): CliOptions {
       index += 1;
     } else if (arg === "--hermes-config") {
       options.hermesConfigPath = argv[index + 1];
+      index += 1;
+    } else if (arg === "--openclaw-config") {
+      options.openclawConfigPath = argv[index + 1];
       index += 1;
     } else if (arg === "--hermes-skill-path") {
       options.hermesSkillPath = argv[index + 1];
@@ -175,16 +183,17 @@ async function main(): Promise<void> {
   }
 
   const agent = getAgentAdapter(options.agentId);
-  const shouldInstallAgent = options.command === "init" && (options.installHermes || options.agentId === "hermes");
+  const shouldInstallAgent = options.command === "init" && (options.installHermes || options.agentId !== "generic");
   if (options.installSkill && options.agentId !== "hermes") {
     throw new Error("--install-skill currently supports --agent hermes only.");
   }
   const agentInstall = shouldInstallAgent
     ? agent.installMcp({
-        databasePath: options.databasePath
-      }, {
-        hermesConfigPath: options.hermesConfigPath
-      })
+      databasePath: options.databasePath
+    }, {
+      hermesConfigPath: options.hermesConfigPath,
+      openclawConfigPath: options.openclawConfigPath
+    })
     : undefined;
   const skillInstall = options.command === "init" && options.installSkill
     ? agent.installSkill?.({
@@ -197,6 +206,7 @@ async function main(): Promise<void> {
     port: options.port,
     databasePath: options.databasePath,
     serverUrl: options.serverUrl,
+    tailscaleName: options.tailscaleName,
     transport: options.transportId,
     agentName: options.agentName ?? (options.agentId === "hermes" ? "Hermes Agent" : undefined),
     mode: options.command === "init" ? "init" : "server"
@@ -233,21 +243,21 @@ function printStatus(options: CliOptions): void {
   const database = openHealthLinkDatabase({ path: options.databasePath });
   try {
     const status = getHealthStatus(database);
-    const devices = listDevices(database);
+    const sourceDevices = listSourceDevices(database);
     console.log("HealthLink Local status");
     console.log(`Database:   ${database.path}`);
-    console.log(`Devices:    ${status.device_count}`);
+    console.log(`Sources:    ${status.device_count}`);
     console.log(`Syncs:      ${status.sync_count}`);
     console.log(`Last sync:  ${status.last_sync_at ?? "never"}`);
     console.log("");
-    if (devices.length === 0) {
-      console.log("No paired devices.");
+    if (sourceDevices.length === 0) {
+      console.log("No paired source devices.");
       return;
     }
 
-    for (const device of devices) {
-      const state = device.revoked_at ? `revoked ${device.revoked_at}` : "active";
-      console.log(`${device.device_id}  ${device.device_name}  ${state}  syncs=${device.sync_count}  last=${device.last_sync_at ?? "never"}`);
+    for (const sourceDevice of sourceDevices) {
+      const state = sourceDevice.revoked_at ? `revoked ${sourceDevice.revoked_at}` : "active";
+      console.log(`${sourceDevice.source_device_id}  ${sourceDevice.name}  ${sourceDevice.platform}  ${state}  syncs=${sourceDevice.sync_count}  last=${sourceDevice.last_sync_at ?? "never"}`);
     }
   } finally {
     database.close();
@@ -276,7 +286,7 @@ async function printDoctor(options: CliOptions): Promise<void> {
     results.push({
       status: "OK",
       label: "Database",
-      detail: `${database.path} (${status.device_count} active devices, ${status.sync_count} syncs)`
+      detail: `${database.path} (${status.device_count} active source devices, ${status.sync_count} syncs)`
     });
     database.close();
   } catch (error) {
@@ -304,7 +314,8 @@ async function printDoctor(options: CliOptions): Promise<void> {
 
   const agent = getAgentAdapter(options.agentId);
   const agentStatus = agent.detect({
-    hermesConfigPath: options.hermesConfigPath
+    hermesConfigPath: options.hermesConfigPath,
+    openclawConfigPath: options.openclawConfigPath
   });
   results.push({
     status: agentStatus.installed ? "OK" : "WARN",
@@ -317,7 +328,8 @@ async function printDoctor(options: CliOptions): Promise<void> {
       id: options.transportId,
       bindHost: options.host,
       port: options.port,
-      serverUrl: options.serverUrl
+      serverUrl: options.serverUrl,
+      tailscaleName: options.tailscaleName
     });
     const transportStatus = await transport.healthCheck?.();
     if (transportStatus) {

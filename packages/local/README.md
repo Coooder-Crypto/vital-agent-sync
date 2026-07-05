@@ -31,11 +31,13 @@ npx -y @healthlink/local init
 npx -y @healthlink/local init --agent hermes
 npx -y @healthlink/local init --hermes
 npx -y @healthlink/local init --transport lan
+npx -y @healthlink/local init --transport tailscale --tailscale-name my-mac.tailnet.ts.net
 npx -y @healthlink/local --port 8787
 npx -y @healthlink/local --db ~/.healthlink/healthlink.sqlite
 npx -y @healthlink/local mcp
 npx -y @healthlink/local print-mcp-config
 npx -y @healthlink/local print-agent-config --agent generic
+npx -y @healthlink/local print-agent-config --agent openclaw
 npx -y @healthlink/local print-skill
 npx -y @healthlink/local install-hermes
 npx -y @healthlink/local install-hermes-skill
@@ -129,6 +131,8 @@ Available MCP tools:
 - `get_workout_load`
 - `get_recovery_signals`
 - `get_weekly_summary`
+- `list_source_devices`
+- `revoke_source_device`
 - `list_devices`
 - `revoke_device`
 - `record_feedback`
@@ -165,17 +169,21 @@ npx -y @healthlink/local print-skill
 npx -y @healthlink/local install-hermes
 npx -y @healthlink/local install-hermes-skill
 npx -y @healthlink/local init --agent hermes
+npx -y @healthlink/local init --agent openclaw
 npx -y @healthlink/local init --hermes --install-skill
 npx -y @healthlink/local doctor --agent hermes
+npx -y @healthlink/local doctor --agent openclaw
 npx -y @healthlink/local doctor --transport lan
 ```
 
-`print-mcp-config` and `print-agent-config --agent generic` print standard `mcpServers.healthlink` JSON. `print-agent-config --agent hermes` prints a Hermes-style `mcp_servers.healthlink` YAML snippet. `install-hermes` backs up `~/.hermes/config.yaml`, writes `mcp_servers.healthlink`, and uses the same local database and tool surface as `@healthlink/local mcp`. `init --agent hermes` and `init --hermes` perform the same Hermes install step as part of the foreground pairing flow.
+`print-mcp-config` and `print-agent-config --agent generic` print standard `mcpServers.healthlink` JSON. `print-agent-config --agent hermes` prints a Hermes-style `mcp_servers.healthlink` YAML snippet. `print-agent-config --agent openclaw` prints an OpenClaw-style `mcp.servers.healthlink` JSON snippet. `install-hermes` backs up `~/.hermes/config.yaml`, writes `mcp_servers.healthlink`, and uses the same local database and tool surface as `@healthlink/local mcp`. `init --agent hermes` and `init --hermes` perform the same Hermes install step as part of the foreground pairing flow. `init --agent openclaw` backs up and writes `~/.openclaw/openclaw.json` when it is valid JSON; use `--openclaw-config <path>` for a custom file.
 
 `print-skill` prints the portable HealthLink skill Markdown. `install-hermes-skill` writes it to `~/.hermes/skills/health/healthlink-personal-context/SKILL.md` with a timestamped backup when replacing an existing file. Use `init --hermes --install-skill` to install both MCP config and the Hermes skill in the same local pairing flow.
 
-Use `status` to inspect the local database and paired devices. Use `doctor` to check Node.js, the SQLite database, MCP command generation, the selected Agent adapter, and the selected transport provider.
+Use `status` to inspect the local database and paired source devices. Use `doctor` to check Node.js, the SQLite database, MCP command generation, the selected Agent adapter, and the selected transport provider.
 
 Transport providers are selected with `--transport`. `lan` is the default provider. `tailscale` can advertise the local 100.64.0.0/10 IPv4 address when Tailscale is active. Future transports such as `cloudflare`, `ngrok`, and `public_https` can be selected for diagnostics and can advertise an explicit endpoint with `--server-url` until their native provider implementations land.
 
-The source-device API is available at `/source-devices` and `/source-devices/:source_device_id/revoke`. The older `/devices` endpoints remain for compatibility with the current iOS app.
+For Tailscale MagicDNS, pass `--tailscale-name <host.tailnet.ts.net>` or set `HEALTHLINK_TAILSCALE_NAME`. If neither is provided, HealthLink attempts to read `tailscale status --json` and falls back to the local Tailscale IPv4 address.
+
+The source-device API is available at `/source-devices` and `/source-devices/:source_device_id/revoke`. The older `/devices` endpoints and MCP tools remain for compatibility with the current iOS app and older agent configs.

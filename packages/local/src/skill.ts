@@ -40,7 +40,7 @@ HealthLink data comes from MCP tools. Do not invent health, calendar, sleep, wor
 - The user asks "How am I today?", "How should I plan today?", "Should I exercise?", "Am I recovered?", or similar.
 - The user asks for analysis that may benefit from sleep, activity, heart-rate, workout, or calendar availability context.
 - The user asks whether recent sync data is available.
-- The user asks to revoke, inspect, or troubleshoot connected HealthLink devices.
+- The user asks to revoke, inspect, or troubleshoot connected HealthLink source devices.
 
 Do not use this skill for diagnosis, prescriptions, emergency advice, or unsupported medical claims.
 
@@ -54,7 +54,8 @@ Do not use this skill for diagnosis, prescriptions, emergency advice, or unsuppo
    - \`get_workout_load\` for workout and activity load.
    - \`get_recovery_signals\` for sleep, heart-rate, activity, and workout-minutes context.
    - \`get_weekly_summary\` for compact 7-day health, activity, recovery, and calendar pressure summaries.
-   - \`healthlink_status\`, \`list_devices\`, and \`revoke_device\` for setup and troubleshooting.
+   - \`healthlink_status\`, \`list_source_devices\`, and \`revoke_source_device\` for setup and troubleshooting.
+   - \`list_devices\` and \`revoke_device\` only as legacy aliases when an older agent flow expects those names.
    - \`record_feedback\` only when the user explicitly gives feedback, a correction, or a preference that should improve future HealthLink analysis.
 3. Mention data freshness before analysis when the answer depends on recency.
 4. If the latest sync is stale or missing, say that plainly and suggest syncing HealthLink.

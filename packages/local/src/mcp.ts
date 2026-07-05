@@ -5,6 +5,7 @@ import { z } from "zod";
 import { ensureDefaultMcpAgentClient, recordAgentRead } from "./agent-audit.js";
 import { openHealthLinkDatabase } from "./database.js";
 import { listDevices, revokeDevice } from "./devices.js";
+import { listSourceDevices, revokeSourceDevice } from "./source-devices.js";
 import {
   getAgentHealthStatus,
   getCalendarAvailability,
@@ -127,10 +128,39 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
   );
 
   server.registerTool(
+    "list_source_devices",
+    {
+      title: "List HealthLink Source Devices",
+      description: "List paired HealthLink source devices, platform, accepted scopes, revocation state, sync count, and latest sync time."
+    },
+    async () => auditedJsonResult(database, agentClient.id, "list_source_devices", {
+      source_devices: listSourceDevices(database)
+    })
+  );
+
+  server.registerTool(
+    "revoke_source_device",
+    {
+      title: "Revoke HealthLink Source Device",
+      description: "Revoke a paired HealthLink source device so its token can no longer sync.",
+      inputSchema: z.object({
+        source_device_id: z.string().min(1).describe("Source device ID to revoke.")
+      })
+    },
+    async ({ source_device_id }) => {
+      const sourceDevice = revokeSourceDevice(database, source_device_id);
+      return auditedJsonResult(database, agentClient.id, "revoke_source_device", {
+        ok: Boolean(sourceDevice),
+        source_device: sourceDevice ?? null
+      });
+    }
+  );
+
+  server.registerTool(
     "list_devices",
     {
       title: "List HealthLink Devices",
-      description: "List paired HealthLink devices, revocation state, sync count, and latest sync time."
+      description: "Legacy alias for listing paired HealthLink source devices. Prefer list_source_devices in new integrations."
     },
     async () => auditedJsonResult(database, agentClient.id, "list_devices", {
       devices: listDevices(database)
@@ -141,7 +171,7 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
     "revoke_device",
     {
       title: "Revoke HealthLink Device",
-      description: "Revoke a paired HealthLink device so its token can no longer sync.",
+      description: "Legacy alias for revoking a paired HealthLink source device. Prefer revoke_source_device in new integrations.",
       inputSchema: z.object({
         device_id: z.string().min(1).describe("Device ID to revoke.")
       })

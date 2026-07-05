@@ -385,6 +385,25 @@ test("Agent adapters expose generic MCP config and Hermes install behavior", () 
     assert.equal(installed.id, "hermes");
     assert.equal(status.installed, true);
     assert.match(hermes.formatMcpConfig({ databasePath: join(tempDir, "healthlink.sqlite") }), /mcp_servers:/);
+
+    const openclaw = getAgentAdapter("openclaw");
+    const openclawConfigPath = join(tempDir, "openclaw.json");
+    writeFileSync(openclawConfigPath, JSON.stringify({ model: { provider: "test" } }, null, 2), "utf8");
+    const openclawInstalled = openclaw.installMcp({
+      databasePath: join(tempDir, "healthlink.sqlite")
+    }, {
+      openclawConfigPath
+    });
+    const openclawStatus = openclaw.detect({ openclawConfigPath });
+    const openclawConfig = JSON.parse(openclaw.formatMcpConfig({
+      databasePath: join(tempDir, "healthlink.sqlite")
+    })) as {
+      mcp: { servers: { healthlink: { args: string[] } } };
+    };
+
+    assert.equal(openclawInstalled.id, "openclaw");
+    assert.equal(openclawStatus.installed, true);
+    assert.deepEqual(openclawConfig.mcp.servers.healthlink.args.slice(0, 2), ["mcp", "--db"]);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
@@ -428,6 +447,15 @@ test("Transport providers keep LAN default and allow explicit future URLs", asyn
   });
   assert.equal(await tailscale.getAdvertisedUrl(), "https://healthlink.example.ts.net");
   assert.equal((await tailscale.healthCheck?.())?.status, "warn");
+
+  const tailscaleMagicDns = createTransportProvider({
+    id: "tailscale",
+    bindHost: "0.0.0.0",
+    port: 8787,
+    tailscaleName: "healthlink.tailnet.ts.net."
+  });
+  assert.equal(await tailscaleMagicDns.getAdvertisedUrl(), "http://healthlink.tailnet.ts.net:8787");
+  assert.match((await tailscaleMagicDns.healthCheck?.())?.detail ?? "", /MagicDNS/);
 
   const cloudflare = createTransportProvider({
     id: "cloudflare",

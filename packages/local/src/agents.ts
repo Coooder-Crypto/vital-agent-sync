@@ -1,12 +1,16 @@
 import YAML from "yaml";
 import {
   buildHealthLinkMcpServerConfig,
+  formatOpenClawMcpConfig,
   formatStandardMcpConfig,
   getHermesMcpInstallStatus,
+  getOpenClawMcpInstallStatus,
   installHermesMcpConfig,
+  installOpenClawMcpConfig,
   type HermesInstallOptions,
   type McpCommandConfig,
-  type McpConfigOptions
+  type McpConfigOptions,
+  type OpenClawInstallOptions
 } from "./mcp-config.js";
 import { installHermesHealthLinkSkill, type SkillInstallOptions, type SkillInstallResult } from "./skill.js";
 
@@ -49,6 +53,8 @@ export type AgentAdapterOptions = {
   hermesConfigPath?: string;
   hermesHome?: string;
   hermesSkillPath?: string;
+  openclawConfigPath?: string;
+  openclawHome?: string;
 };
 
 export function getAgentAdapter(id: AgentAdapterId): AgentAdapter {
@@ -58,6 +64,7 @@ export function getAgentAdapter(id: AgentAdapterId): AgentAdapter {
   case "hermes":
     return hermesAgentAdapter;
   case "openclaw":
+    return openClawAgentAdapter;
   case "workbuddy":
     return createResearchAgentAdapter(id);
   }
@@ -72,6 +79,14 @@ function toHermesOptions(options: AgentAdapterOptions | undefined, config: McpCo
     databasePath: config.databasePath,
     configPath: options?.hermesConfigPath,
     hermesHome: options?.hermesHome
+  };
+}
+
+function toOpenClawOptions(options: AgentAdapterOptions | undefined, config: McpConfigOptions): OpenClawInstallOptions {
+  return {
+    databasePath: config.databasePath,
+    configPath: options?.openclawConfigPath,
+    openclawHome: options?.openclawHome
   };
 }
 
@@ -144,8 +159,54 @@ const hermesAgentAdapter: AgentAdapter = {
   }
 };
 
-function createResearchAgentAdapter(id: "openclaw" | "workbuddy"): AgentAdapter {
-  const displayName = id === "openclaw" ? "OpenClaw" : "WorkBuddy";
+const openClawAgentAdapter: AgentAdapter = {
+  id: "openclaw",
+  displayName: "OpenClaw",
+  detect(options) {
+    try {
+      const status = getOpenClawMcpInstallStatus({
+        configPath: options?.openclawConfigPath,
+        openclawHome: options?.openclawHome
+      });
+      return {
+        id: "openclaw",
+        available: status.exists,
+        installed: status.installed,
+        configPath: status.configPath,
+        detail: status.installed
+          ? `healthlink MCP is installed in ${status.configPath}`
+          : `${status.configPath} ${status.exists ? "does not include" : "does not exist for"} healthlink`
+      };
+    } catch (error) {
+      return {
+        id: "openclaw",
+        available: true,
+        installed: false,
+        configPath: options?.openclawConfigPath,
+        detail: error instanceof Error ? error.message : String(error)
+      };
+    }
+  },
+  installMcp(config, options) {
+    const result = installOpenClawMcpConfig(toOpenClawOptions(options, config));
+    return {
+      id: "openclaw",
+      configPath: result.configPath,
+      backupPath: result.backupPath,
+      server: result.server,
+      message: `HealthLink MCP installed for OpenClaw in ${result.configPath}`
+    };
+  },
+  formatMcpConfig(config) {
+    return formatOpenClawMcpConfig(config);
+  },
+  reloadHint() {
+    return "OpenClaw should load MCP config changes automatically; restart OpenClaw if the healthlink tools do not appear.";
+  }
+};
+
+function createResearchAgentAdapter(id: "workbuddy"): AgentAdapter {
+  const displayName = "WorkBuddy";
   return {
     id,
     displayName,
