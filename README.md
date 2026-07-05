@@ -1,10 +1,10 @@
 # HealthLink iOS
 
-HealthLink is a small iOS data gateway for agent systems. The first MVP reads user-authorized Apple Health and Calendar summaries, then uploads compact daily context to a configurable server.
+HealthLink is a private iOS data gateway for agent systems. The MVP reads user-authorized Apple Health and Calendar summaries, uploads compact daily context to the user's Agent-side receiver, stores it locally, and exposes it to agents through MCP tools.
 
 It is intentionally not an agent. It is a user-controlled data connector.
 
-For the broader product plan covering local daemon, MCP, tunnel mode, self-hosting, pairing, scopes, and packaging, see [docs/product-plan.md](docs/product-plan.md).
+For the broader product plan covering local daemon, MCP, tunnel mode, self-hosting, pairing, scopes, and packaging, see [docs/product-plan.md](docs/product-plan.md). For the target "install, scan QR, sync, agent reads data" UX, see [docs/agent-connection.md](docs/agent-connection.md). For the multi-source, multi-agent, multi-transport upgrade TODO, see [docs/architecture-upgrade-todo.md](docs/architecture-upgrade-todo.md).
 
 ## Scope
 
@@ -19,12 +19,17 @@ For the broader product plan covering local daemon, MCP, tunnel mode, self-hosti
   - busy minutes
   - free windows
   - next event metadata with title redacted
-- Local configuration:
-  - server URL in `UserDefaults`
-  - API token in Keychain
-- Upload endpoints:
-  - `POST /api/health/daily-summary`
-  - `POST /api/calendar/daily-summary`
+- Local pairing configuration:
+  - paired server URL in `UserDefaults`
+  - paired device ID in `UserDefaults`
+  - device token in Keychain
+- Sync lifecycle:
+  - current MVP supports manual user-triggered sync
+  - target UX is pair once, authorize once, then auto-sync when the app is active or iOS grants background time
+- Upload endpoint:
+  - `POST /health/sync`
+- Agent access:
+  - MCP stdio tools from `@healthlink/local`
 
 ## Generate The Xcode Project
 
@@ -37,14 +42,65 @@ open HealthLink.xcodeproj
 
 ## Agent-Side Local Package
 
-This repo also contains the first Agent-side npm workspace:
+This repo also contains the Agent-side npm workspace:
 
 ```bash
 npm install
 npm run dev:local
 ```
 
-The local package lives in `packages/local` and is planned to become `@healthlink/local`.
+The local package lives in `packages/local` and is named `@healthlink/local`. It is private in this repository until the package is ready to publish.
+
+The current local development loop is:
+
+```text
+iPhone app
+  -> HealthKit / Calendar summaries
+  -> POST /health/sync on manual or automatic sync
+  -> @healthlink/local
+  -> SQLite
+  -> MCP tools
+  -> Hermes or another agent
+```
+
+MCP development command:
+
+```bash
+npm run build:local
+node packages/local/dist/cli.js mcp --db ~/.healthlink/healthlink.sqlite
+```
+
+One-command local pairing loop:
+
+```bash
+npm run build:local
+node packages/local/dist/cli.js init --hermes
+```
+
+`init --hermes` starts the local receiver, prints the iPhone pairing QR, backs up and writes `~/.hermes/config.yaml`, and points Hermes at the same HealthLink database. After pairing and syncing, restart Hermes or run `/reload-mcp`.
+
+After that first setup, Hermes does not need to reconnect for every sync. iOS writes new summaries to the same local database, and Hermes MCP tools read the latest rows when the user asks a question.
+
+Agent integration helpers:
+
+```bash
+node packages/local/dist/cli.js print-mcp-config
+node packages/local/dist/cli.js install-hermes
+node packages/local/dist/cli.js status
+node packages/local/dist/cli.js doctor
+```
+
+Published package shape:
+
+```bash
+npx -y @healthlink/local init
+npx -y @healthlink/local init --hermes
+npx -y @healthlink/local mcp
+npx -y @healthlink/local print-mcp-config
+npx -y @healthlink/local install-hermes
+npx -y @healthlink/local status
+npx -y @healthlink/local doctor
+```
 
 ## Device Setup
 
@@ -54,9 +110,36 @@ HealthKit requires a real iPhone for meaningful testing. In Xcode:
 2. Set your Apple Developer Team.
 3. Keep the HealthKit capability enabled.
 4. Run on a physical iPhone.
-5. Grant Health and Calendar permissions inside the app.
+5. Run `node packages/local/dist/cli.js init --hermes` on the Agent machine.
+6. Scan the pairing QR in the app Settings tab.
+7. Confirm the server/scopes, then grant Health and Calendar permissions.
+8. Sync once, then restart Hermes or run `/reload-mcp`.
+9. Ask Hermes a natural-language question, such as `我今天状态怎么样？`.
 
-## Server Contract
+Normal use after setup:
+
+```text
+iOS syncs latest summaries -> ~/.healthlink/healthlink.sqlite
+Hermes calls HealthLink MCP -> reads the latest summaries
+```
+
+No repeated QR scan, `install-hermes`, or `/reload-mcp` is needed unless the pairing, database path, MCP configuration, or skill files change.
+
+## Agent Skills
+
+MCP is the stable integration contract. Skills are optional agent-side usage guidance that help an AI decide when to call HealthLink and how to format analysis.
+
+For Hermes, the preferred skill behavior is:
+
+- use `get_personal_context` first for broad questions about today, energy, recovery, exercise readiness, schedule pressure, or planning
+- call lower-level tools only for follow-up details
+- mention data freshness before analysis
+- avoid medical diagnosis or prescriptions
+- keep calendar titles redacted
+
+Product installs should keep the generic MCP path available for non-Hermes agents, while Hermes-first setup can install or update a HealthLink skill as an experience enhancement.
+
+## Sync Contract
 
 All requests use:
 
@@ -65,47 +148,55 @@ Authorization: Bearer <token>
 Content-Type: application/json
 ```
 
-Health payload:
+Unified payload:
 
 ```json
 {
-  "date": "2026-06-21",
+  "device_id": "device_...",
+  "sync_id": "sync_...",
+  "generated_at": "2026-06-21T10:20:00+08:00",
   "timezone": "Asia/Shanghai",
-  "provider": "apple_health",
-  "steps": 8420,
-  "sleep_minutes": 392,
-  "resting_heart_rate_bpm": 63.0,
-  "avg_heart_rate_bpm": 82.0,
-  "max_heart_rate_bpm": 146.0,
-  "active_energy_kcal": 480.0,
-  "workout_minutes": 45,
-  "workouts": []
-}
-```
-
-Calendar payload:
-
-```json
-{
-  "date": "2026-06-21",
-  "timezone": "Asia/Shanghai",
-  "provider": "apple_calendar",
-  "busy_minutes": 240,
-  "free_windows": [
-    {"start": "2026-06-21T19:00:00+08:00", "end": "2026-06-21T21:00:00+08:00"}
+  "health_daily_summaries": [
+    {
+      "date": "2026-06-21",
+      "timezone": "Asia/Shanghai",
+      "provider": "apple_health",
+      "steps": 8420,
+      "sleep_minutes": 392,
+      "resting_heart_rate_bpm": 63.0,
+      "avg_heart_rate_bpm": 82.0,
+      "max_heart_rate_bpm": 146.0,
+      "active_energy_kcal": 480.0,
+      "workout_minutes": 45,
+      "workouts": []
+    }
   ],
-  "next_event": {
-    "starts_at": "2026-06-21T14:00:00+08:00",
-    "duration_minutes": 60,
-    "title_redacted": true
-  }
+  "calendar_daily_summaries": [
+    {
+      "date": "2026-06-21",
+      "timezone": "Asia/Shanghai",
+      "provider": "apple_calendar",
+      "busy_minutes": 240,
+      "free_windows": [
+        {"start": "2026-06-21T19:00:00+08:00", "end": "2026-06-21T21:00:00+08:00"}
+      ],
+      "next_event": {
+        "starts_at": "2026-06-21T14:00:00+08:00",
+        "duration_minutes": 60,
+        "title_redacted": true
+      }
+    }
+  ]
 }
 ```
 
 ## Next Steps
 
+- Add foreground auto sync after pairing, app launch, and app foregrounding with throttling.
 - Add `HKAnchoredObjectQuery` for incremental sample sync.
-- Add `HKObserverQuery` and background delivery as a best-effort trigger.
+- Add `HKObserverQuery`, `BGAppRefreshTask`, and background delivery as best-effort triggers.
+- Add an optional bundled HealthLink skill installer for Hermes.
+- Add automated iOS UI coverage after real-device workflow stabilizes.
+- Add tunnel and public HTTPS transports.
 - Add Reminders summaries.
-- Add an MCP bridge on the server side.
 - Add a Watch app for quick feedback and training controls.

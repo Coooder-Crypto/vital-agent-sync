@@ -9,14 +9,17 @@ The product is not an agent. It is an agent data gateway.
 The target experience:
 
 ```text
-Agent installs HealthLink.
-Agent shows a pairing code.
-iOS app scans the code.
-User chooses permissions.
-Agent can query authorized personal context.
+User asks an agent or runs a command to install HealthLink.
+HealthLink starts a receiver and shows a QR code.
+iOS app scans the QR code and pairs with the receiver.
+User chooses which data to expose and grants Apple permissions once.
+iOS app syncs compact summaries manually or automatically.
+Agent queries the latest authorized personal context.
 ```
 
-The user should not need to manually export files after setup. The iOS app syncs compact summaries to a user-controlled gateway endpoint. Agents query the latest available context through MCP or an SDK.
+The user should not need to manually export files after setup. The iOS app syncs compact summaries to a user-controlled gateway endpoint. Agents query the latest available context through MCP or an SDK. The intended steady state is "pair once, authorize once, keep syncing, ask the Agent anytime."
+
+For the detailed Agent connection UX, see [agent-connection.md](agent-connection.md). For the multi-source, multi-agent, multi-transport upgrade checklist, see [architecture-upgrade-todo.md](architecture-upgrade-todo.md).
 
 ## Principles
 
@@ -80,7 +83,7 @@ iPhone
 User command:
 
 ```bash
-npx -y @healthlink/local
+npx -y @healthlink/local init --hermes
 ```
 
 The daemon prints:
@@ -91,7 +94,15 @@ LAN API:   http://192.168.31.25:8787
 Pairing:   healthlink://pair?server=http://192.168.31.25:8787&code=8K2F-J91Q
 ```
 
-The iOS app syncs summaries to the LAN or Tailscale endpoint. The agent talks to the local MCP server or local HTTP API.
+The iOS app syncs summaries to the LAN or Tailscale endpoint. The agent talks to the local MCP stdio server. New syncs update SQLite; the agent reads fresh data on the next MCP tool call and does not need to reconnect after every sync.
+
+Current development commands:
+
+```bash
+npm run dev:local
+npm run build:local
+node packages/local/dist/cli.js mcp
+```
 
 ### 2. Tunnel Mode
 
@@ -122,7 +133,7 @@ Remote Pairing: healthlink://pair?server=https://abc.trycloudflare.com&code=8K2F
 Remote MCP:     https://abc.trycloudflare.com/mcp
 ```
 
-The cloud agent connects to `https://abc.trycloudflare.com/mcp`. The tunnel only transports requests; the local daemon still enforces scopes and tokens.
+The cloud agent should connect through a remote MCP endpoint or a tunnel-aware adapter. The tunnel only transports requests; the local daemon still enforces scopes and tokens.
 
 Supported tunnel providers can be added progressively:
 
@@ -177,17 +188,19 @@ Cloud mode has the easiest UX but the highest privacy and compliance burden. It 
 The pairing flow should follow the shape of OAuth Device Code Flow, but the user-facing language should be "pairing code".
 
 ```text
-1. Agent starts HealthLink MCP.
-2. Agent calls pair_device.
-3. Gateway creates a short-lived pairing session.
-4. Agent displays code and QR link.
-5. iOS app scans code.
-6. iOS app fetches pairing details.
-7. User selects scopes and approves.
-8. Gateway issues a scoped agent token.
-9. MCP receives the token and persists it locally.
-10. Agent can call authorized tools.
+1. User runs `@healthlink/local init` or asks an agent to run it.
+2. Gateway creates a short-lived pairing session.
+3. Gateway displays a QR link.
+4. iOS app scans the QR link.
+5. iOS app shows server, transport mode, and requested scopes.
+6. User selects scopes and approves.
+7. Gateway issues a scoped device token.
+8. iOS stores the paired server and token.
+9. iOS pushes selected summaries to `/health/sync` manually or automatically.
+10. Agent calls MCP tools against the local store.
 ```
+
+After step 10, the link is persistent. Re-pairing is only needed when the user switches machines, revokes the device, deletes local data, changes the database path, or disconnects the iOS app.
 
 Pairing session shape:
 
@@ -217,32 +230,61 @@ The iOS app owns:
 - Connected agents list.
 - Agent revocation.
 - Sync status and error visibility.
+- Foreground auto-sync after pairing, app launch, and app foregrounding.
+- Best-effort background sync through iOS-supported background mechanisms.
 
 The iOS app does not need to run an agent, model, or MCP server.
+
+Auto-sync should be user-controlled and throttled. It should not promise strict intervals because iOS background execution is opportunistic.
 
 ## Agent-Side Tools
 
 The MCP server should expose a small, stable tool surface:
 
 ```text
-pair_device
-list_permissions
-get_current_context
-get_health_daily_summary
-get_health_weekly_trends
+healthlink_status
+get_personal_context
+get_daily_health_summary
 get_calendar_availability
-record_feedback
-request_refresh
+get_sleep_trend
+get_workout_load
+get_recovery_signals
+list_devices
+revoke_device
 ```
 
 Tool behavior:
 
-- `pair_device` creates a pairing session.
-- `get_current_context` returns compact current state with freshness metadata.
-- `get_health_daily_summary` returns daily health summary only.
+- `healthlink_status` returns device count, sync count, and latest sync time.
+- `get_personal_context` returns the preferred combined context for broad questions about today, energy, recovery, schedule pressure, and planning.
+- `get_daily_health_summary` returns daily health summary only.
 - `get_calendar_availability` returns busy/free data, not event titles by default.
-- `record_feedback` stores user feedback such as done, snooze, skip, low energy, or not feeling well.
-- `request_refresh` marks the gateway as needing fresh data; iOS fulfills it on next foreground/background opportunity.
+- Trend and load tools return compact multi-day signals.
+- Device tools list and revoke paired devices.
+- Missing data should be represented as `null`, empty arrays, or structured no-data responses.
+
+Future tools:
+
+```text
+generate_weekly_health_report
+record_feedback
+request_refresh
+```
+
+## Agent Skill Layer
+
+MCP remains the core protocol. A skill is an optional agent-specific usage guide.
+
+HealthLink should ship a portable skill document, with Hermes as the first supported target. The skill should:
+
+- trigger on natural-language questions about personal status, recovery, exercise readiness, daily planning, and schedule pressure
+- call `get_personal_context` first
+- use lower-level MCP tools for drill-down questions
+- report data freshness
+- avoid diagnosis, prescriptions, and unsupported medical claims
+- keep calendar titles redacted
+
+This should be additive. A generic MCP-compatible agent should still work without installing a HealthLink skill.
 
 ## Scope Model
 
@@ -378,10 +420,12 @@ For MVP, local HTTP can be allowed for LAN development. Production should prefer
 - `@healthlink/local`
 - SQLite store
 - health/calendar sync endpoints
-- current context endpoint
+- MCP query tools
 - pairing sessions
 - scoped agent tokens
 - local MCP stdio support
+
+Status: implemented for the local development path.
 
 ### Milestone 2: iOS Pairing
 
@@ -390,16 +434,38 @@ For MVP, local HTTP can be allowed for LAN development. Production should prefer
 - approve scopes
 - connected agents list
 - revoke agent
-- sync to paired local daemon
+- manual sync to paired local daemon
+- foreground auto-sync with throttling
+- best-effort background refresh
 
-### Milestone 3: Remote Agent Support
+Status: partially implemented. QR scanner, scope confirmation, manual sync, connected device display, and revocation are implemented for the local path. Foreground auto-sync and background refresh remain.
+
+### Milestone 3: Foolproof Agent Linking
+
+- `@healthlink/local init`
+- `@healthlink/local init --hermes`
+- QR page opened or printed automatically
+- `print-mcp-config`
+- `install-hermes`
+- `status` and `doctor`
+- optional HealthLink skill installer
+- generic MCP config docs for other agents
+
+Exit criteria:
+
+- A user can install the receiver with one command.
+- The iOS app can pair by scanning, without copying URL/token text.
+- An agent can query HealthLink without hand-authoring MCP JSON.
+- After the first reload/restart, new iOS syncs are visible to the agent without reconnecting.
+
+### Milestone 4: Remote Agent Support
 
 - `--tunnel cloudflare`
 - remote MCP endpoint
 - token enforcement over tunnel
 - audit log UI
 
-### Milestone 4: SDK And Packaging
+### Milestone 5: SDK And Packaging
 
 - `@healthlink/sdk`
 - TypeScript types
@@ -407,7 +473,7 @@ For MVP, local HTTP can be allowed for LAN development. Production should prefer
 - webhook verifier
 - install docs for common agents
 
-### Milestone 5: Self-Hosted Server
+### Milestone 6: Self-Hosted Server
 
 - Docker image
 - HTTPS deployment guide
@@ -428,13 +494,12 @@ For MVP, local HTTP can be allowed for LAN development. Production should prefer
 First useful demo:
 
 ```text
-User runs @healthlink/local.
-Agent shows pairing code.
-iOS app approves scopes.
+User runs @healthlink/local or npm run dev:local.
+Receiver shows pairing code.
+iOS app pairs with receiver.
 iOS app syncs Apple Health and Calendar summaries.
-Agent calls get_current_context and receives useful fresh context.
-User revokes the agent from iOS.
-Agent can no longer access data.
+Agent calls MCP tools and receives useful fresh context.
+iOS syncs again and the agent reads updated context without re-pairing or reloading MCP.
 ```
 
 Product-quality criteria:
