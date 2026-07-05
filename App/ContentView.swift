@@ -203,6 +203,7 @@ struct ConnectionView: View {
 
     @State private var receiverStatus: ReceiverCheckState = .idle
     @State private var isAdvancedExpanded = false
+    @State private var isConfirmingAgentRemoval = false
     @State private var receiverCheckTask: Task<Void, Never>?
 
     var body: some View {
@@ -232,9 +233,9 @@ struct ConnectionView: View {
 
                         if settings.isPaired {
                             Button(role: .destructive) {
-                                Task { await settings.disconnect() }
+                                isConfirmingAgentRemoval = true
                             } label: {
-                                Label("Disconnect Agent", systemImage: "iphone.slash")
+                                Label("Remove Paired Agent", systemImage: "trash")
                                     .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.bordered)
@@ -244,8 +245,8 @@ struct ConnectionView: View {
                         if let message = settings.pairingMessage {
                             StatusMessage(
                                 message: message,
-                                systemImage: settings.isPaired ? "checkmark.circle" : "exclamationmark.triangle",
-                                color: settings.isPaired ? GatewayStyle.success : GatewayStyle.warning
+                                systemImage: messageIcon(message),
+                                color: messageColor(message)
                             )
                             .padding(.horizontal, 2)
                         }
@@ -257,6 +258,21 @@ struct ConnectionView: View {
             }
             .navigationTitle("Connection")
             .navigationBarTitleDisplayMode(.inline)
+            .confirmationDialog(
+                "Remove paired agent?",
+                isPresented: $isConfirmingAgentRemoval,
+                titleVisibility: .visible
+            ) {
+                Button("Remove Agent", role: .destructive) {
+                    Task {
+                        await settings.disconnect()
+                        BackgroundSyncManager.scheduleAppRefresh(settings: settings)
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("HealthLink will remove this pairing from the iPhone. If the receiver is reachable, it will also revoke the device token on the agent side.")
+            }
             .onAppear {
                 scheduleDeferredReceiverCheck()
             }
@@ -298,6 +314,23 @@ struct ConnectionView: View {
         } catch {
             receiverStatus = .offline(error.localizedDescription)
         }
+    }
+
+    private func messageIcon(_ message: String) -> String {
+        isWarningMessage(message) ? "exclamationmark.triangle" : "checkmark.circle"
+    }
+
+    private func messageColor(_ message: String) -> Color {
+        isWarningMessage(message) ? GatewayStyle.warning : GatewayStyle.success
+    }
+
+    private func isWarningMessage(_ message: String) -> Bool {
+        let lowercased = message.lowercased()
+        return lowercased.contains("failed")
+            || lowercased.contains("invalid")
+            || lowercased.contains("rejected")
+            || lowercased.contains("not reachable")
+            || lowercased.contains("error")
     }
 }
 

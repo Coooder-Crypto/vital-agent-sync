@@ -147,16 +147,26 @@ final class GatewaySettings: ObservableObject {
         let serverURL = self.serverURL
         let token = apiTokenText.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        do {
-            if revokeRemote,
-               let deviceID,
-               let serverURL,
-               !token.isEmpty {
+        var revokeError: Error?
+        if revokeRemote,
+           let deviceID,
+           let serverURL,
+           !token.isEmpty {
+            do {
                 let client = GatewayAPIClient(serverURL: serverURL, apiToken: token)
                 _ = try await client.revokeDevice(deviceID: deviceID)
+            } catch {
+                revokeError = error
             }
+        }
+
+        do {
             try clearPairing()
-            pairingMessage = "Disconnected"
+            if let revokeError {
+                pairingMessage = "Removed locally. Receiver revoke failed: \(revokeError.localizedDescription)"
+            } else {
+                pairingMessage = "Agent removed"
+            }
         } catch {
             pairingMessage = error.localizedDescription
         }
