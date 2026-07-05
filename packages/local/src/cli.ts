@@ -8,14 +8,27 @@ import { openHealthLinkDatabase } from "./database.js";
 import { getHealthStatus } from "./health-ingest.js";
 import { startLocalServer } from "./server.js";
 import { startMcpServer } from "./mcp.js";
+import {
+  getLaunchdServiceStatus,
+  installLaunchdService,
+  startLaunchdService,
+  stopLaunchdService,
+  uninstallLaunchdService,
+  type LaunchdServiceOptions
+} from "./service.js";
+import { requestPairingSession } from "./pairing-client.js";
+import { runServiceSetupWorkflow } from "./setup.js";
 import { buildHealthLinkSkillMarkdown } from "./skill.js";
 import { listSourceDevices } from "./source-devices.js";
+import { renderTerminalQr } from "./terminal-qr.js";
 import { createTransportProvider, isTransportProviderId, type TransportProviderId } from "./transports.js";
 
 type CliOptions = {
-  command: "server" | "init" | "mcp" | "print-mcp-config" | "print-agent-config" | "print-skill" | "install-hermes" | "install-hermes-skill" | "status" | "doctor";
+  command: "server" | "init" | "daemon" | "pair" | "setup" | "service" | "mcp" | "print-mcp-config" | "print-agent-config" | "print-skill" | "install-hermes" | "install-hermes-skill" | "status" | "doctor";
+  serviceAction?: "install" | "start" | "stop" | "status" | "uninstall";
   port: number;
   host: string;
+  useService: boolean;
   installHermes: boolean;
   installSkill: boolean;
   agentId: AgentAdapterId;
@@ -34,6 +47,7 @@ function parseArgs(argv: string[]): CliOptions {
     command: "server",
     port: 8787,
     host: "0.0.0.0",
+    useService: false,
     installHermes: false,
     installSkill: false,
     agentId: "generic",
@@ -42,7 +56,17 @@ function parseArgs(argv: string[]): CliOptions {
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (arg === "server" || arg === "init" || arg === "mcp" || arg === "print-mcp-config" || arg === "print-agent-config" || arg === "print-skill" || arg === "install-hermes" || arg === "install-hermes-skill" || arg === "status" || arg === "doctor") {
+    if (arg === "service") {
+      options.command = "service";
+      const action = argv[index + 1];
+      if (action && !action.startsWith("--")) {
+        if (!isServiceAction(action)) {
+          throw new Error("Expected service action to be one of: install, start, stop, status, uninstall.");
+        }
+        options.serviceAction = action;
+        index += 1;
+      }
+    } else if (arg === "server" || arg === "init" || arg === "daemon" || arg === "pair" || arg === "setup" || arg === "mcp" || arg === "print-mcp-config" || arg === "print-agent-config" || arg === "print-skill" || arg === "install-hermes" || arg === "install-hermes-skill" || arg === "status" || arg === "doctor") {
       options.command = arg;
     } else if (arg === "--port") {
       options.port = Number(argv[index + 1]);
@@ -96,6 +120,8 @@ function parseArgs(argv: string[]): CliOptions {
       options.agentId = "hermes";
     } else if (arg === "--install-skill") {
       options.installSkill = true;
+    } else if (arg === "--service") {
+      options.useService = true;
     }
   }
 
@@ -104,6 +130,10 @@ function parseArgs(argv: string[]): CliOptions {
   }
 
   return options;
+}
+
+function isServiceAction(value: string): value is NonNullable<CliOptions["serviceAction"]> {
+  return value === "install" || value === "start" || value === "stop" || value === "status" || value === "uninstall";
 }
 
 async function main(): Promise<void> {
@@ -182,6 +212,21 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (options.command === "service") {
+    runServiceCommand(options);
+    return;
+  }
+
+  if (options.command === "pair") {
+    await printPairingSession(options);
+    return;
+  }
+
+  if (options.command === "setup") {
+    await runSetup(options);
+    return;
+  }
+
   const agent = getAgentAdapter(options.agentId);
   const shouldInstallAgent = options.command === "init" && (options.installHermes || options.agentId !== "generic");
   if (options.installSkill && options.agentId !== "hermes") {
@@ -237,6 +282,180 @@ async function main(): Promise<void> {
     }
     console.log("");
   }
+}
+
+function runServiceCommand(options: CliOptions): void {
+  const action = options.serviceAction ?? "status";
+  const serviceOptions = toServiceOptions(options);
+  if (action === "install") {
+    const status = installLaunchdService(serviceOptions);
+    console.log("HealthLink service installed");
+    printServiceStatusDetails(status, options);
+    return;
+  }
+  if (action === "start") {
+    const status = startLaunchdService(serviceOptions);
+    console.log("HealthLink service start requested");
+    printServiceStatusDetails(status, options);
+    return;
+  }
+  if (action === "stop") {
+    const status = stopLaunchdService(serviceOptions);
+    console.log("HealthLink service stop requested");
+    printServiceStatusDetails(status, options);
+    return;
+  }
+  if (action === "uninstall") {
+    const status = uninstallLaunchdService(serviceOptions);
+    console.log("HealthLink service uninstalled");
+    printServiceStatusDetails(status, options);
+    return;
+  }
+  printServiceStatusDetails(getLaunchdServiceStatus({
+    databasePath: options.databasePath
+  }), options);
+}
+
+async function runSetup(options: CliOptions): Promise<void> {
+  if (!options.useService) {
+    throw new Error("setup currently requires --service. Use init for the foreground receiver.");
+  }
+  if (options.installSkill && options.agentId !== "hermes") {
+    throw new Error("--install-skill currently supports --agent hermes only.");
+  }
+
+  const agent = getAgentAdapter(options.agentId);
+  await runServiceSetupWorkflow({
+    installAgent: () => {
+      if (options.agentId === "generic") {
+        return;
+      }
+      const agentInstall = agent.installMcp({
+        databasePath: options.databasePath
+      }, {
+        hermesConfigPath: options.hermesConfigPath,
+        openclawConfigPath: options.openclawConfigPath
+      });
+      console.log(agentInstall.message);
+      if (agentInstall.backupPath) {
+        console.log(`Backup: ${agentInstall.backupPath}`);
+      }
+    },
+    installSkill: () => {
+      const skillInstall = agent.installSkill?.({
+        hermesSkillPath: options.hermesSkillPath
+      });
+      if (skillInstall) {
+        console.log(`HealthLink skill installed: ${skillInstall.skillPath}`);
+      }
+    },
+    installService: () => {
+      installLaunchdService(toServiceOptions(options));
+    },
+    startService: () => {
+      startLaunchdService(toServiceOptions(options));
+    },
+    waitForReady: () => waitForLocalReceiver(options),
+    pair: () => printPairingSession(options),
+    printReloadHint: () => {
+      console.log("");
+      console.log(agent.reloadHint());
+    }
+  }, {
+    installSkill: options.installSkill
+  });
+}
+
+async function printPairingSession(options: CliOptions): Promise<void> {
+  const response = await createPairingSession(options);
+  const qr = renderTerminalQr(response.pairing_url);
+  const loopback = `http://127.0.0.1:${options.port}`;
+  console.log("");
+  console.log("Pair with iPhone:");
+  console.log(`Pairing code: ${response.pairing_code}`);
+  console.log(`Pairing URL:  ${response.pairing_url}`);
+  console.log(`Expires:      ${Math.round(response.expires_in_seconds / 60)} minutes`);
+  console.log("");
+  if (qr.rendered) {
+    console.log("Scan QR:");
+    console.log(qr.text);
+  } else {
+    console.log(`Scan QR: terminal is too narrow (${qr.requiredColumns} columns needed).`);
+    console.log(`Open ${loopback}/pair to scan the browser QR, or paste the Pairing URL in the app.`);
+  }
+  console.log("");
+}
+
+async function createPairingSession(options: CliOptions): Promise<{
+  pairing_code: string;
+  pairing_url: string;
+  expires_in_seconds: number;
+}> {
+  return requestPairingSession({
+    port: options.port,
+    agentName: options.agentName ?? defaultAgentName(options.agentId),
+    transport: options.transportId,
+    serverUrl: options.serverUrl
+  });
+}
+
+async function waitForLocalReceiver(options: CliOptions): Promise<void> {
+  const endpoint = `http://127.0.0.1:${options.port}/health/status`;
+  const deadline = Date.now() + 5000;
+  let lastError = "";
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(endpoint);
+      if (response.ok) {
+        return;
+      }
+      lastError = `HTTP ${response.status}`;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error(`HealthLink service did not become ready at ${endpoint} within 5 seconds. ${lastError}`);
+}
+
+function toServiceOptions(options: CliOptions): LaunchdServiceOptions {
+  return {
+    databasePath: options.databasePath,
+    host: options.host,
+    port: options.port,
+    transport: options.transportId,
+    serverUrl: options.serverUrl,
+    tailscaleName: options.tailscaleName
+  };
+}
+
+function printServiceStatusDetails(status: ReturnType<typeof getLaunchdServiceStatus>, options: CliOptions): void {
+  const database = openHealthLinkDatabase({ path: options.databasePath });
+  try {
+    const health = getHealthStatus(database);
+    console.log("HealthLink service");
+    console.log(`Installed: ${status.installed ? "yes" : "no"}`);
+    console.log(`Running:   ${status.running ? "yes" : "no"}`);
+    console.log(`Plist:     ${status.plistPath}`);
+    console.log(`Local API: http://127.0.0.1:${options.port}`);
+    console.log(`Database:  ${database.path}`);
+    console.log(`Last sync: ${health.last_sync_at ?? "never"}`);
+  } finally {
+    database.close();
+  }
+}
+
+function defaultAgentName(agentId: AgentAdapterId): string {
+  if (agentId === "hermes") {
+    return "Hermes Agent";
+  }
+  if (agentId === "openclaw") {
+    return "OpenClaw Agent";
+  }
+  if (agentId === "workbuddy") {
+    return "WorkBuddy Agent";
+  }
+  return "Local Agent";
 }
 
 function printStatus(options: CliOptions): void {
