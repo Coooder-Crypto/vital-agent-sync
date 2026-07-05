@@ -42,6 +42,7 @@ function migrate(sqlite: BetterSqliteDatabase): void {
       pairing_url text not null,
       server_url text not null,
       agent_name text not null,
+      transport text not null default 'lan',
       requested_scopes_json text not null,
       expires_in_seconds integer not null,
       created_at text not null,
@@ -129,6 +130,15 @@ function migrate(sqlite: BetterSqliteDatabase): void {
       end text not null
     );
   `);
+
+  ensureColumn(sqlite, "pairing_sessions", "transport", "text not null default 'lan'");
+}
+
+function ensureColumn(sqlite: BetterSqliteDatabase, table: string, column: string, definition: string): void {
+  const rows = sqlite.prepare(`pragma table_info(${table})`).all() as Array<{ name: string }>;
+  if (!rows.some((row) => row.name === column)) {
+    sqlite.exec(`alter table ${table} add column ${column} ${definition}`);
+  }
 }
 
 function expandHomePath(path: string): string {

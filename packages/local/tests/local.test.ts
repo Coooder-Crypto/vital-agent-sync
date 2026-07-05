@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { getAgentAdapter } from "../src/agents.js";
 import { openHealthLinkDatabase } from "../src/database.js";
 import { listDevices, revokeDevice } from "../src/devices.js";
 import { authenticateDevice, ingestHealthSync } from "../src/health-ingest.js";
@@ -16,7 +17,18 @@ import {
 } from "../src/health-query.js";
 import { getHermesMcpInstallStatus, installHermesMcpConfig } from "../src/mcp-config.js";
 import { PairingStore } from "../src/pairing.js";
+import {
+  SOURCE_PLATFORM_CAPABILITIES,
+  listSourceDevices,
+  revokeSourceDevice
+} from "../src/source-devices.js";
+import {
+  buildHealthLinkSkillMarkdown,
+  installHermesHealthLinkSkill,
+  readInstalledHermesSkill
+} from "../src/skill.js";
 import { renderTerminalQr } from "../src/terminal-qr.js";
+import { createTransportProvider } from "../src/transports.js";
 
 test("pairing creates a scoped device that can sync and be queried", () => {
   withTempDatabase((databasePath) => {
@@ -25,8 +37,12 @@ test("pairing creates a scoped device that can sync and be queried", () => {
       const pairings = new PairingStore(database);
       const session = pairings.createSession({
         serverUrl: "http://127.0.0.1:8787",
-        agentName: "Test Agent"
+        agentName: "Test Agent",
+        transport: "lan"
       });
+      const pairingStatus = pairings.getStatus(session.pairing_code);
+      assert.equal(pairingStatus.transport, "lan");
+      assert.match(session.pairing_url, /transport=lan/);
       const confirmed = pairings.confirm({
         pairing_code: session.pairing_code,
         device_name: "Test iPhone",
@@ -110,6 +126,35 @@ test("revoked device token can no longer authenticate", () => {
         /invalid or revoked/
       );
       assert.equal(listDevices(database)[0]?.device_id, confirmed.device_id);
+    } finally {
+      database.close();
+    }
+  });
+});
+
+test("source-device wrapper preserves device compatibility", () => {
+  withTempDatabase((databasePath) => {
+    const database = openHealthLinkDatabase({ path: databasePath });
+    try {
+      const pairings = new PairingStore(database);
+      const session = pairings.createSession({
+        serverUrl: "http://127.0.0.1:8787",
+        agentName: "Test Agent"
+      });
+      const confirmed = pairings.confirm({
+        pairing_code: session.pairing_code,
+        device_name: "Test iPhone",
+        device_platform: "ios",
+        accepted_scopes: session.requested_scopes
+      });
+
+      const sourceDevice = listSourceDevices(database)[0];
+      assert.equal(sourceDevice?.source_device_id, confirmed.device_id);
+      assert.equal(sourceDevice?.legacy_device_id, confirmed.device_id);
+      assert.equal(sourceDevice?.platform, "ios");
+
+      const revoked = revokeSourceDevice(database, confirmed.device_id);
+      assert.equal(revoked?.revoked_at !== null, true);
     } finally {
       database.close();
     }
@@ -241,6 +286,95 @@ test("Hermes MCP install writes healthlink server idempotently with backups", ()
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
+});
+
+test("Agent adapters expose generic MCP config and Hermes install behavior", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-agent-test-"));
+  try {
+    const generic = getAgentAdapter("generic");
+    const genericConfig = JSON.parse(generic.formatMcpConfig({
+      databasePath: join(tempDir, "healthlink.sqlite")
+    })) as {
+      mcpServers: { healthlink: { args: string[] } };
+    };
+    assert.deepEqual(genericConfig.mcpServers.healthlink.args.slice(0, 2), ["mcp", "--db"]);
+    assert.equal(generic.detect().installed, true);
+
+    const hermes = getAgentAdapter("hermes");
+    const configPath = join(tempDir, "config.yaml");
+    writeFileSync(configPath, "model:\n  provider: test\n", "utf8");
+    const installed = hermes.installMcp({
+      databasePath: join(tempDir, "healthlink.sqlite")
+    }, {
+      hermesConfigPath: configPath
+    });
+    const status = hermes.detect({ hermesConfigPath: configPath });
+
+    assert.equal(installed.id, "hermes");
+    assert.equal(status.installed, true);
+    assert.match(hermes.formatMcpConfig({ databasePath: join(tempDir, "healthlink.sqlite") }), /mcp_servers:/);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("HealthLink skill can be printed and installed for Hermes", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-skill-test-"));
+  try {
+    const skillPath = join(tempDir, "skills", "health", "healthlink-personal-context", "SKILL.md");
+    const markdown = buildHealthLinkSkillMarkdown();
+    assert.match(markdown, /name: healthlink-personal-context/);
+    assert.match(markdown, /get_personal_context/);
+
+    const first = installHermesHealthLinkSkill({ skillPath });
+    const second = installHermesHealthLinkSkill({ skillPath });
+    const installed = readInstalledHermesSkill({ skillPath });
+
+    assert.equal(first.skillPath, skillPath);
+    assert.ok(second.backupPath);
+    assert.match(installed ?? "", /HealthLink Personal Context/);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("Transport providers keep LAN default and allow explicit future URLs", async () => {
+  const lan = createTransportProvider({
+    id: "lan",
+    bindHost: "127.0.0.1",
+    port: 8787,
+    serverUrl: "http://127.0.0.1:8787/"
+  });
+  assert.equal(await lan.getAdvertisedUrl(), "http://127.0.0.1:8787");
+  assert.equal((await lan.healthCheck?.())?.status, "warn");
+
+  const tailscale = createTransportProvider({
+    id: "tailscale",
+    bindHost: "0.0.0.0",
+    port: 8787,
+    serverUrl: "https://healthlink.example.ts.net/"
+  });
+  assert.equal(await tailscale.getAdvertisedUrl(), "https://healthlink.example.ts.net");
+  assert.equal((await tailscale.healthCheck?.())?.status, "warn");
+
+  const cloudflare = createTransportProvider({
+    id: "cloudflare",
+    bindHost: "0.0.0.0",
+    port: 8787
+  });
+  await assert.rejects(() => cloudflare.getAdvertisedUrl(), /not implemented/);
+});
+
+test("Source platform capability metadata includes future app surfaces", () => {
+  assert.deepEqual(Object.keys(SOURCE_PLATFORM_CAPABILITIES).sort(), [
+    "android",
+    "calendar_connector",
+    "ios",
+    "manual_import",
+    "xiaomi"
+  ]);
+  assert.equal(SOURCE_PLATFORM_CAPABILITIES.ios.metrics.includes("health.daily_summary"), true);
+  assert.equal(SOURCE_PLATFORM_CAPABILITIES.android.syncCadence, "background_best_effort");
 });
 
 test("terminal QR renders visible Unicode blocks without ANSI backgrounds", () => {

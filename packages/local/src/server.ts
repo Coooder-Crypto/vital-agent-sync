@@ -10,15 +10,17 @@ import {
   ingestHealthSync,
   parseHealthSyncPayload
 } from "./health-ingest.js";
-import { getAdvertisedServerUrl } from "./network.js";
 import { PairingError, PairingStore } from "./pairing.js";
+import { SOURCE_PLATFORMS, listSourceDevices, revokeSourceDevice } from "./source-devices.js";
 import { type TerminalQrRenderResult, renderTerminalQr } from "./terminal-qr.js";
+import { createTransportProvider, TRANSPORT_PROVIDER_IDS, type TransportProviderId } from "./transports.js";
 
 export type LocalServerOptions = {
   host: string;
   port: number;
   databasePath?: string;
   serverUrl?: string;
+  transport?: TransportProviderId;
   agentName?: string;
   mode?: "server" | "init";
 };
@@ -27,11 +29,14 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
   const app = Fastify({
     logger: true
   });
-  const advertisedUrl = getAdvertisedServerUrl({
+  const transport = createTransportProvider({
+    id: options.transport,
     bindHost: options.host,
     port: options.port,
     serverUrl: options.serverUrl
   });
+  await transport.start?.();
+  const advertisedUrl = await transport.getAdvertisedUrl();
   const agentName = options.agentName ?? "Local Agent";
   const database = openHealthLinkDatabase({
     path: options.databasePath
@@ -39,6 +44,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
   const pairings = new PairingStore(database);
 
   app.addHook("onClose", async () => {
+    await transport.stop?.();
     database.close();
   });
 
@@ -47,6 +53,11 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
   app.get("/devices", async () => ({
     ok: true,
     devices: listDevices(database)
+  }));
+
+  app.get("/source-devices", async () => ({
+    ok: true,
+    source_devices: listSourceDevices(database)
   }));
 
   app.post("/devices/:device_id/revoke", async (request, reply) => {
@@ -75,6 +86,32 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
     }
   });
 
+  app.post("/source-devices/:source_device_id/revoke", async (request, reply) => {
+    const params = sourceDeviceParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return reply.code(400).send(errorResponse("invalid_params", "source_device_id is required."));
+    }
+
+    try {
+      const device = authenticateDevice(database, request.headers.authorization);
+      if (device.device_id !== params.data.source_device_id) {
+        return reply.code(403).send(errorResponse("source_device_mismatch", "Source device token cannot revoke another source device."));
+      }
+
+      const revoked = revokeSourceDevice(database, params.data.source_device_id);
+      if (!revoked) {
+        return reply.code(404).send(errorResponse("source_device_not_found", "Source device was not found."));
+      }
+
+      return {
+        ok: true,
+        source_device: revoked
+      };
+    } catch (error) {
+      return sendHealthIngestError(reply, error);
+    }
+  });
+
   app.post("/health/sync", async (request, reply) => {
     try {
       const device = authenticateDevice(database, request.headers.authorization);
@@ -88,7 +125,8 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
   app.get("/pair", async (_request, reply) => {
     const session = pairings.createSession({
       serverUrl: advertisedUrl,
-      agentName
+      agentName,
+      transport: transport.id
     });
     const qrDataUrl = await QRCode.toDataURL(session.pairing_url, {
       margin: 1,
@@ -115,7 +153,8 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
 
     return pairings.createSession({
       serverUrl: body.data.server_url ?? advertisedUrl,
-      agentName: body.data.agent_name ?? agentName
+      agentName: body.data.agent_name ?? agentName,
+      transport: body.data.transport ?? transport.id
     });
   });
 
@@ -153,7 +192,8 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
   const initialSession = options.mode === "init"
     ? pairings.createSession({
         serverUrl: advertisedUrl,
-        agentName
+        agentName,
+        transport: transport.id
       })
     : undefined;
 
@@ -161,12 +201,12 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
     ? renderTerminalQr(initialSession.pairing_url)
     : undefined;
 
-  printStartupInfo(options, database.path, advertisedUrl, initialSession, initialQr);
+  printStartupInfo(options, database.path, advertisedUrl, transport.label, initialSession, initialQr);
 }
 
 const startPairingSchema = z.object({
   agent_name: z.string().trim().min(1).max(120).optional(),
-  transport: z.enum(["lan", "tailscale", "tunnel", "public_https"]).optional(),
+  transport: z.enum(TRANSPORT_PROVIDER_IDS).optional(),
   server_url: z.string().url().optional()
 });
 
@@ -178,10 +218,14 @@ const deviceParamsSchema = z.object({
   device_id: z.string().min(1)
 });
 
+const sourceDeviceParamsSchema = z.object({
+  source_device_id: z.string().min(1)
+});
+
 const confirmPairingSchema = z.object({
   pairing_code: z.string().min(1),
   device_name: z.string().trim().min(1).max(120),
-  device_platform: z.literal("ios"),
+  device_platform: z.enum(SOURCE_PLATFORMS),
   accepted_scopes: z.array(z.string().min(1)).min(1)
 });
 
@@ -241,6 +285,7 @@ function printStartupInfo(
   options: LocalServerOptions,
   databasePath: string,
   advertisedUrl: string,
+  transportLabel: string,
   initialSession?: {
     pairing_code: string;
     pairing_url: string;
@@ -253,7 +298,7 @@ function printStartupInfo(
   console.log("HealthLink Local running");
   console.log("");
   console.log(`Pairing page: ${loopback}/pair`);
-  console.log(`LAN address:  ${advertisedUrl}`);
+  console.log(`${transportLabel} address:  ${advertisedUrl}`);
   console.log(`Local API:    ${loopback}`);
   console.log(`Bind host:    ${options.host}`);
   console.log(`Database:     ${databasePath}`);

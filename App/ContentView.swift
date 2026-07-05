@@ -138,6 +138,7 @@ struct HeaderPanel: View {
 
 struct PermissionPanel: View {
     @Environment(\.openURL) private var openURL
+    @EnvironmentObject private var settings: GatewaySettings
 
     @ObservedObject var sync: SyncCoordinator
 
@@ -151,7 +152,7 @@ struct PermissionPanel: View {
                     systemImage: "heart.text.square",
                     disabled: sync.isSyncing
                 ) {
-                    Task { await sync.requestHealthAuthorization() }
+                    Task { await sync.requestHealthAuthorization(settings: settings) }
                 }
 
                 PermissionButton(
@@ -159,7 +160,7 @@ struct PermissionPanel: View {
                     systemImage: "calendar.badge.clock",
                     disabled: sync.isSyncing
                 ) {
-                    Task { await sync.requestCalendarAuthorization() }
+                    Task { await sync.requestCalendarAuthorization(settings: settings) }
                 }
             }
 
@@ -209,7 +210,7 @@ struct SyncPanel: View {
                 }
 
                 Button {
-                    Task { await sync.sync(settings: settings) }
+                    Task { await sync.sync(settings: settings, trigger: .manual) }
                 } label: {
                     HStack(spacing: 12) {
                         ZStack {
@@ -264,6 +265,10 @@ struct SyncPanel: View {
                     )
                 }
 
+                if settings.autoSyncEnabled {
+                    AutoSyncStatusRow(settings: settings)
+                }
+
                 if let message = sync.status.lastSuccessMessage {
                     StatusMessage(
                         message: message,
@@ -316,6 +321,43 @@ struct StatusMessage: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct AutoSyncStatusRow: View {
+    @ObservedObject var settings: GatewaySettings
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "timer")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(GatewayStyle.primary)
+                .frame(width: 16)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Auto Sync")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(GatewayStyle.text)
+
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(GatewayStyle.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var detail: String {
+        if let lastAutoSyncAt = settings.lastAutoSyncAt {
+            return "Last \(lastAutoSyncAt.formatted(date: .omitted, time: .shortened))"
+        }
+        if let nextEligibleAutoSyncAt = settings.nextEligibleAutoSyncAt {
+            return "Next eligible \(nextEligibleAutoSyncAt.formatted(date: .omitted, time: .shortened))"
+        }
+        return "Ready when the app is active"
     }
 }
 
@@ -416,6 +458,7 @@ struct EmptySummaryPanel: View {
 
 struct SettingsView: View {
     @EnvironmentObject private var settings: GatewaySettings
+    @EnvironmentObject private var sync: SyncCoordinator
     @State private var isShowingScanner = false
 
     var body: some View {
@@ -510,6 +553,31 @@ struct SettingsView: View {
                     }
                 }
 
+                Section("Auto Sync") {
+                    Toggle(isOn: $settings.autoSyncEnabled) {
+                        Label("Auto Sync", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                    .onChange(of: settings.autoSyncEnabled) { _, _ in
+                        settings.saveAutoSyncSettings()
+                    }
+
+                    Stepper(value: $settings.autoSyncMinimumIntervalMinutes, in: 5...240, step: 5) {
+                        Label("Minimum \(settings.autoSyncMinimumIntervalMinutes)m", systemImage: "timer")
+                    }
+                    .disabled(!settings.autoSyncEnabled)
+                    .onChange(of: settings.autoSyncMinimumIntervalMinutes) { _, _ in
+                        settings.saveAutoSyncSettings()
+                    }
+
+                    if let lastAutoSyncAt = settings.lastAutoSyncAt {
+                        LabeledContent("Last auto sync", value: lastAutoSyncAt.formatted(date: .omitted, time: .shortened))
+                    }
+
+                    if let nextEligibleAutoSyncAt = settings.nextEligibleAutoSyncAt {
+                        LabeledContent("Next eligible", value: nextEligibleAutoSyncAt.formatted(date: .omitted, time: .shortened))
+                    }
+                }
+
                 Section {
                     Button {
                         settings.save()
@@ -546,7 +614,12 @@ struct SettingsView: View {
                         settings.cancelPendingPairing()
                     },
                     onConfirm: {
-                        Task { await settings.confirmPairing(preview) }
+                        Task {
+                            let paired = await settings.confirmPairing(preview)
+                            if paired {
+                                await sync.attemptAutoSync(settings: settings, reason: "pairing")
+                            }
+                        }
                     }
                 )
             }
@@ -590,6 +663,9 @@ struct PairingConfirmationView: View {
                 Section("Agent") {
                     LabeledContent("Name", value: preview.status.agent_name)
                     LabeledContent("Server", value: preview.status.server_url)
+                    if let transport = preview.status.transport {
+                        LabeledContent("Transport", value: transport)
+                    }
                     LabeledContent("Code", value: preview.status.pairing_code)
                     LabeledContent("Expires", value: preview.status.expires_at)
                 }

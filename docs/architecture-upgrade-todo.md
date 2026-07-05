@@ -175,8 +175,8 @@ feedback_events
 Source adapters should only know how to collect data and sync normalized payloads. They should not know about Hermes, OpenClaw, or other Agents.
 
 - [ ] Rename internal "device" language toward "source device" in docs and types.
-- [ ] Keep backward compatibility for current `/devices` endpoint while introducing source-device naming.
-- [ ] Define `source_platform` values:
+- [x] Keep backward compatibility for current `/devices` endpoint while introducing source-device naming.
+- [x] Define `source_platform` values:
   - `ios`
   - `android`
   - `xiaomi`
@@ -185,7 +185,7 @@ Source adapters should only know how to collect data and sync normalized payload
 - [ ] Define a provider-neutral health summary schema.
 - [ ] Add Health Connect mapping design for Android.
 - [ ] Add Xiaomi / Mi Fitness connector research notes.
-- [ ] Add connector capability metadata:
+- [x] Add connector capability metadata:
   - supported metrics
   - sync cadence
   - freshness
@@ -210,10 +210,10 @@ type AgentAdapter = {
 
 Tasks:
 
-- [ ] Move Hermes config writing behind `AgentAdapter`.
-- [ ] Add `healthlink-local init --agent hermes` as an alias for `--hermes`.
-- [ ] Keep `healthlink-local init --hermes` for compatibility.
-- [ ] Add `healthlink-local print-agent-config --agent generic`.
+- [x] Move Hermes config writing behind `AgentAdapter`.
+- [x] Add `healthlink-local init --agent hermes` as an alias for `--hermes`.
+- [x] Keep `healthlink-local init --hermes` for compatibility.
+- [x] Add `healthlink-local print-agent-config --agent generic`.
 - [ ] Add OpenClaw adapter research:
   - config location
   - MCP format
@@ -223,8 +223,8 @@ Tasks:
   - config location
   - tool integration format
   - prompt/rule package format
-- [ ] Add `healthlink-local doctor --agent <id>`.
-- [ ] Add tests using temporary agent homes/config files.
+- [x] Add `healthlink-local doctor --agent <id>`.
+- [x] Add tests using temporary agent homes/config files.
 
 ## Skill Layer TODO
 
@@ -232,11 +232,11 @@ MCP is the product protocol. Skills are optional instructions that improve natur
 
 Tasks:
 
-- [ ] Add a bundled HealthLink skill Markdown template.
-- [ ] Add `healthlink-local print-skill --format markdown`.
-- [ ] Add `healthlink-local install-hermes-skill`.
-- [ ] Add `healthlink-local init --hermes --install-skill`.
-- [ ] Define a generic skill contract:
+- [x] Add a bundled HealthLink skill Markdown template.
+- [x] Add `healthlink-local print-skill --format markdown`.
+- [x] Add `healthlink-local install-hermes-skill`.
+- [x] Add `healthlink-local init --hermes --install-skill`.
+- [x] Define a generic skill contract:
   - when to call `get_personal_context`
   - how to use lower-level tools
   - freshness reporting
@@ -262,20 +262,20 @@ type TransportProvider = {
 
 Tasks:
 
-- [ ] Move LAN advertised URL logic behind `TransportProvider`.
-- [ ] Add `--transport lan` explicitly.
-- [ ] Keep current LAN behavior as default.
-- [ ] Add Tailscale detection:
+- [x] Move LAN advertised URL logic behind `TransportProvider`.
+- [x] Add `--transport lan` explicitly.
+- [x] Keep current LAN behavior as default.
+- [x] Add Tailscale detection:
   - local Tailscale IP
-  - MagicDNS name
   - reachability hints
+- [ ] Add Tailscale MagicDNS name support.
 - [ ] Add tunnel provider design:
   - Cloudflare Tunnel
   - ngrok
   - user-provided tunnel URL
 - [ ] Add public HTTPS mode docs.
-- [ ] Add pairing status payload field `transport`.
-- [ ] Add `healthlink-local doctor --transport <id>`.
+- [x] Add pairing status payload field `transport`.
+- [x] Add `healthlink-local doctor --transport <id>`.
 
 ## iOS Auto Sync TODO
 
@@ -283,20 +283,20 @@ Expected product behavior is "authorize once, then keep syncing automatically." 
 
 Foreground auto-sync:
 
-- [ ] Add Auto Sync setting, default on after pairing.
-- [ ] Add minimum sync interval setting, default 30 minutes.
-- [ ] Record:
+- [x] Add Auto Sync setting, default on after pairing.
+- [x] Add minimum sync interval setting, default 30 minutes.
+- [x] Record:
   - `lastAutoSyncAt`
   - `lastManualSyncAt`
   - `lastSyncAttemptAt`
   - `lastSyncError`
-- [ ] Trigger auto-sync after successful pairing.
-- [ ] Trigger auto-sync after HealthKit / Calendar permission grant.
-- [ ] Trigger auto-sync on app launch.
-- [ ] Trigger auto-sync when app returns to foreground.
-- [ ] Skip when already syncing, unpaired, missing token, missing permissions, or throttled.
-- [ ] Keep manual Sync button.
-- [ ] Show last sync and next eligible auto-sync in UI.
+- [x] Trigger auto-sync after successful pairing.
+- [x] Trigger auto-sync after HealthKit / Calendar permission grant.
+- [x] Trigger auto-sync on app launch.
+- [x] Trigger auto-sync when app returns to foreground.
+- [x] Skip when already syncing, unpaired, missing token, missing permissions, or throttled.
+- [x] Keep manual Sync button.
+- [x] Show last sync and next eligible auto-sync in UI.
 
 Background best-effort:
 
@@ -327,19 +327,19 @@ Do not break the current local MVP.
 Phase 1:
 
 - [ ] Document architecture boundaries.
-- [ ] Add adapter interfaces without moving all code.
-- [ ] Keep existing commands working.
+- [x] Add adapter interfaces without moving all code.
+- [x] Keep existing commands working.
 
 Phase 2:
 
-- [ ] Move Hermes install logic into `AgentAdapter`.
-- [ ] Move LAN URL logic into `TransportProvider`.
+- [x] Move Hermes install logic into `AgentAdapter`.
+- [x] Move LAN URL logic into `TransportProvider`.
 - [ ] Rename docs/types from device to source device where safe.
 
 Phase 3:
 
-- [ ] Add foreground auto-sync.
-- [ ] Add bundled skill installer.
+- [x] Add foreground auto-sync.
+- [x] Add bundled skill installer.
 - [ ] Add agent audit logging.
 
 Phase 4:

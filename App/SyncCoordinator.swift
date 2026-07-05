@@ -10,22 +10,35 @@ final class SyncCoordinator: ObservableObject {
     private let healthService = HealthKitService()
     private let calendarService = CalendarService()
 
-    func requestHealthAuthorization() async {
-        await run {
+    enum SyncTrigger {
+        case manual
+        case automatic(reason: String)
+    }
+
+    func requestHealthAuthorization(settings: GatewaySettings? = nil) async {
+        let succeeded = await run {
             try await self.healthService.requestAuthorization()
             self.status.lastSuccessMessage = "Health permission request completed"
         }
-    }
-
-    func requestCalendarAuthorization() async {
-        await run {
-            try await self.calendarService.requestAuthorization()
-            self.status.lastSuccessMessage = "Calendar permission granted"
+        if succeeded, let settings {
+            await attemptAutoSync(settings: settings, reason: "health_permission")
         }
     }
 
-    func sync(settings: GatewaySettings, daysBack: Int = 1) async {
-        await run {
+    func requestCalendarAuthorization(settings: GatewaySettings? = nil) async {
+        let succeeded = await run {
+            try await self.calendarService.requestAuthorization()
+            self.status.lastSuccessMessage = "Calendar permission granted"
+        }
+        if succeeded, let settings {
+            await attemptAutoSync(settings: settings, reason: "calendar_permission")
+        }
+    }
+
+    @discardableResult
+    func sync(settings: GatewaySettings, daysBack: Int = 1, trigger: SyncTrigger = .manual) async -> Bool {
+        settings.recordSyncAttempt()
+        let succeeded = await run {
             guard let serverURL = settings.serverURL else {
                 throw GatewayError.missingServerURL
             }
@@ -77,6 +90,23 @@ final class SyncCoordinator: ObservableObject {
             }
             self.status.lastSuccessMessage = "Uploaded \(response.health_daily_count) health / \(response.calendar_daily_count) calendar"
         }
+
+        switch trigger {
+        case .manual:
+            settings.recordManualSyncResult(success: succeeded, error: status.lastError)
+        case .automatic:
+            settings.recordAutoSyncResult(success: succeeded, error: status.lastError)
+        }
+
+        return succeeded
+    }
+
+    func attemptAutoSync(settings: GatewaySettings, reason: String) async {
+        guard settings.canAttemptAutoSync(), !isSyncing else {
+            return
+        }
+
+        await sync(settings: settings, trigger: .automatic(reason: reason))
     }
 
     private func datesToSync(daysBack: Int) -> [Date] {
@@ -92,7 +122,8 @@ final class SyncCoordinator: ObservableObject {
         "sync_\(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased())"
     }
 
-    private func run(_ operation: @escaping () async throws -> Void) async {
+    @discardableResult
+    private func run(_ operation: @escaping () async throws -> Void) async -> Bool {
         isSyncing = true
         status.lastError = nil
         status.lastSuccessMessage = nil
@@ -100,8 +131,10 @@ final class SyncCoordinator: ObservableObject {
 
         do {
             try await operation()
+            return true
         } catch {
             status.lastError = error.localizedDescription
+            return false
         }
     }
 }

@@ -12,6 +12,12 @@ final class GatewaySettings: ObservableObject {
     @Published var pairingMessage: String?
     @Published var uploadHealthEnabled: Bool
     @Published var uploadCalendarEnabled: Bool
+    @Published var autoSyncEnabled: Bool
+    @Published var autoSyncMinimumIntervalMinutes: Int
+    @Published private(set) var lastAutoSyncAt: Date?
+    @Published private(set) var lastManualSyncAt: Date?
+    @Published private(set) var lastSyncAttemptAt: Date?
+    @Published private(set) var lastSyncError: String?
     @Published var lastSavedMessage: String?
 
     private let defaults = UserDefaults.standard
@@ -24,6 +30,12 @@ final class GatewaySettings: ObservableObject {
         static let apiToken = "gateway.apiToken"
         static let pairedDeviceID = "gateway.pairedDeviceID"
         static let acceptedScopes = "gateway.acceptedScopes"
+        static let autoSyncEnabled = "gateway.autoSyncEnabled"
+        static let autoSyncMinimumIntervalMinutes = "gateway.autoSyncMinimumIntervalMinutes"
+        static let lastAutoSyncAt = "gateway.lastAutoSyncAt"
+        static let lastManualSyncAt = "gateway.lastManualSyncAt"
+        static let lastSyncAttemptAt = "gateway.lastSyncAttemptAt"
+        static let lastSyncError = "gateway.lastSyncError"
     }
 
     static let defaultAcceptedScopes = [
@@ -38,6 +50,13 @@ final class GatewaySettings: ObservableObject {
         self.acceptedScopes = defaults.stringArray(forKey: Keys.acceptedScopes) ?? Self.defaultAcceptedScopes
         self.uploadHealthEnabled = defaults.object(forKey: Keys.uploadHealthEnabled) as? Bool ?? true
         self.uploadCalendarEnabled = defaults.object(forKey: Keys.uploadCalendarEnabled) as? Bool ?? true
+        self.autoSyncEnabled = defaults.object(forKey: Keys.autoSyncEnabled) as? Bool ?? true
+        let savedInterval = defaults.integer(forKey: Keys.autoSyncMinimumIntervalMinutes)
+        self.autoSyncMinimumIntervalMinutes = savedInterval > 0 ? savedInterval : 30
+        self.lastAutoSyncAt = defaults.object(forKey: Keys.lastAutoSyncAt) as? Date
+        self.lastManualSyncAt = defaults.object(forKey: Keys.lastManualSyncAt) as? Date
+        self.lastSyncAttemptAt = defaults.object(forKey: Keys.lastSyncAttemptAt) as? Date
+        self.lastSyncError = defaults.string(forKey: Keys.lastSyncError)
     }
 
     var serverURL: URL? {
@@ -50,6 +69,17 @@ final class GatewaySettings: ObservableObject {
 
     var isPaired: Bool {
         pairedDeviceID != nil && !apiTokenText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var autoSyncMinimumInterval: TimeInterval {
+        TimeInterval(clampedAutoSyncMinimumIntervalMinutes * 60)
+    }
+
+    var nextEligibleAutoSyncAt: Date? {
+        guard let lastSyncAttemptAt else {
+            return nil
+        }
+        return lastSyncAttemptAt.addingTimeInterval(autoSyncMinimumInterval)
     }
 
     func preparePairingFromText() async {
@@ -73,7 +103,7 @@ final class GatewaySettings: ObservableObject {
         }
     }
 
-    func confirmPairing(_ preview: PairingPreview) async {
+    func confirmPairing(_ preview: PairingPreview) async -> Bool {
         isPairing = true
         pairingMessage = nil
         defer { isPairing = false }
@@ -94,8 +124,10 @@ final class GatewaySettings: ObservableObject {
             pairingURLText = ""
             pendingPairing = nil
             pairingMessage = "Paired"
+            return true
         } catch {
             pairingMessage = error.localizedDescription
+            return false
         }
     }
 
@@ -131,12 +163,61 @@ final class GatewaySettings: ObservableObject {
         defaults.set(serverURLText.trimmingCharacters(in: .whitespacesAndNewlines), forKey: Keys.serverURL)
         defaults.set(uploadHealthEnabled, forKey: Keys.uploadHealthEnabled)
         defaults.set(uploadCalendarEnabled, forKey: Keys.uploadCalendarEnabled)
+        saveAutoSyncSettings()
 
         do {
             try keychain.set(apiTokenText.trimmingCharacters(in: .whitespacesAndNewlines), for: Keys.apiToken)
             lastSavedMessage = "Saved"
         } catch {
             lastSavedMessage = error.localizedDescription
+        }
+    }
+
+    func saveAutoSyncSettings() {
+        autoSyncMinimumIntervalMinutes = clampedAutoSyncMinimumIntervalMinutes
+        defaults.set(autoSyncEnabled, forKey: Keys.autoSyncEnabled)
+        defaults.set(autoSyncMinimumIntervalMinutes, forKey: Keys.autoSyncMinimumIntervalMinutes)
+    }
+
+    func canAttemptAutoSync(now: Date = Date()) -> Bool {
+        guard autoSyncEnabled, isPaired else {
+            return false
+        }
+        guard let lastSyncAttemptAt else {
+            return true
+        }
+        return now.timeIntervalSince(lastSyncAttemptAt) >= autoSyncMinimumInterval
+    }
+
+    func recordSyncAttempt() {
+        let now = Date()
+        lastSyncAttemptAt = now
+        defaults.set(now, forKey: Keys.lastSyncAttemptAt)
+    }
+
+    func recordAutoSyncResult(success: Bool, error: String?) {
+        if success {
+            let now = Date()
+            lastAutoSyncAt = now
+            lastSyncError = nil
+            defaults.set(now, forKey: Keys.lastAutoSyncAt)
+            defaults.removeObject(forKey: Keys.lastSyncError)
+        } else {
+            lastSyncError = error
+            defaults.set(error, forKey: Keys.lastSyncError)
+        }
+    }
+
+    func recordManualSyncResult(success: Bool, error: String?) {
+        if success {
+            let now = Date()
+            lastManualSyncAt = now
+            lastSyncError = nil
+            defaults.set(now, forKey: Keys.lastManualSyncAt)
+            defaults.removeObject(forKey: Keys.lastSyncError)
+        } else {
+            lastSyncError = error
+            defaults.set(error, forKey: Keys.lastSyncError)
         }
     }
 
@@ -156,6 +237,10 @@ final class GatewaySettings: ObservableObject {
         } catch {
             pairingMessage = error.localizedDescription
         }
+    }
+
+    private var clampedAutoSyncMinimumIntervalMinutes: Int {
+        max(5, min(autoSyncMinimumIntervalMinutes, 240))
     }
 
     private func clearPairing() throws {
