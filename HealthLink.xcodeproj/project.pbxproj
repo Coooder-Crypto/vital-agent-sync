@@ -12,6 +12,7 @@
 		56EA2FEB8F496F7A04F96C7C /* HealthKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA3D4F339843410296079D12 /* HealthKitService.swift */; };
 		5DB901C8D2A0D3BCEEBC92BC /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59FD2EA38EE5225C199F26D8 /* ContentView.swift */; };
 		79FD7264F0FA917BD7934AA8 /* GatewayAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4454AFE84260B3EDE5DCA50C /* GatewayAPIClient.swift */; };
+		9F0B00C12FFA812300000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 80B3FC3C2FFA80EC0060B42A /* Assets.xcassets */; };
 		BA1C5B2933A4E0C2EBD4C94C /* GatewaySettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1C6F1A1FAA888F221804AF5 /* GatewaySettings.swift */; };
 		CF0FB2B1ED604D32596BED7B /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9040B578069F229843B3A050 /* Models.swift */; };
 		F46BE2D17D13CDF6EC7D495A /* PairingScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB5D6C5DE291A51AA923E2AC /* PairingScannerView.swift */; };
@@ -26,6 +27,7 @@
 		4873A62EA7906736C2554781 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		4DF53C058557834D8F0959C4 /* HealthLink.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HealthLink.entitlements; sourceTree = "<group>"; };
 		59FD2EA38EE5225C199F26D8 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		80B3FC3C2FFA80EC0060B42A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		81C5730DA6AE4E4190F2E7B6 /* BackgroundSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundSyncManager.swift; sourceTree = "<group>"; };
 		9040B578069F229843B3A050 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		9F4F265F7CEDBBF53FF2072F /* HealthLinkApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthLinkApp.swift; sourceTree = "<group>"; };
@@ -63,10 +65,19 @@
 			path = App;
 			sourceTree = "<group>";
 		};
+		9F0B00C02FFA812300000001 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				80B3FC3C2FFA80EC0060B42A /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		F37E5F8532B7632891C86B30 = {
 			isa = PBXGroup;
 			children = (
 				8C1EBA22457D26B555C7FAA7 /* App */,
+				9F0B00C02FFA812300000001 /* Resources */,
 				36FA1D9EA85381448EF97FD8 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -79,6 +90,7 @@
 			buildConfigurationList = 788C5F0B72EA6BB40238AE00 /* Build configuration list for PBXNativeTarget "HealthLink" */;
 			buildPhases = (
 				BCB9F1E23A9A5D6CDC8C2116 /* Sources */,
+				9F0B00C32FFA812300000001 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -119,6 +131,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		9F0B00C32FFA812300000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9F0B00C12FFA812300000001 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		BCB9F1E23A9A5D6CDC8C2116 /* Sources */ = {
@@ -204,6 +227,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = App/HealthLink.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
@@ -291,6 +315,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = App/HealthLink.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
