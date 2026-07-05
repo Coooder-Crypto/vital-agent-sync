@@ -41,7 +41,7 @@ healthlink-ios
   pairing UI
   connected-agent management
 
-@healthlink/local
+healthlink-local
   local daemon
   HTTP API
   SQLite store
@@ -83,7 +83,7 @@ iPhone
 User command:
 
 ```bash
-npx -y @healthlink/local init --hermes
+npx -y healthlink-local init --hermes
 ```
 
 The daemon prints:
@@ -123,7 +123,7 @@ cloud agent
 User command:
 
 ```bash
-npx -y @healthlink/local --tunnel cloudflare
+npx -y healthlink-local --tunnel cloudflare
 ```
 
 The daemon prints:
@@ -188,7 +188,7 @@ Cloud mode has the easiest UX but the highest privacy and compliance burden. It 
 The pairing flow should follow the shape of OAuth Device Code Flow, but the user-facing language should be "pairing code".
 
 ```text
-1. User runs `@healthlink/local init` or asks an agent to run it.
+1. User runs `healthlink-local init` or asks an agent to run it.
 2. Gateway creates a short-lived pairing session.
 3. Gateway displays a QR link.
 4. iOS app scans the QR link.
@@ -417,7 +417,7 @@ For MVP, local HTTP can be allowed for LAN development. Production should prefer
 
 ### Milestone 1: Local Daemon
 
-- `@healthlink/local`
+- `healthlink-local`
 - SQLite store
 - health/calendar sync endpoints
 - MCP query tools
@@ -442,8 +442,8 @@ Status: partially implemented. QR scanner, scope confirmation, manual sync, conn
 
 ### Milestone 3: Foolproof Agent Linking
 
-- `@healthlink/local init`
-- `@healthlink/local init --hermes`
+- `healthlink-local init`
+- `healthlink-local init --hermes`
 - QR page opened or printed automatically
 - `print-mcp-config`
 - `install-hermes`
@@ -494,7 +494,7 @@ Exit criteria:
 First useful demo:
 
 ```text
-User runs @healthlink/local or npm run dev:local.
+User runs healthlink-local or npm run dev:local.
 Receiver shows pairing code.
 iOS app pairs with receiver.
 iOS app syncs Apple Health and Calendar summaries.

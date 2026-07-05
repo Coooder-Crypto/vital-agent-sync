@@ -1,4 +1,4 @@
-# @healthlink/local
+# healthlink-local
 
 Local Agent-side runtime for HealthLink.
 
@@ -21,51 +21,88 @@ npm run dev:local
 
 The default local server will use port `8787`.
 
+## Install
+
+For the published package, the intended user path is one command:
+
+```bash
+npx -y healthlink-local setup --agent hermes --service
+```
+
+This installs the macOS background receiver, writes the Agent MCP config, starts the receiver, and prints a 10-minute iPhone pairing QR. After the first successful pair and sync, the terminal can close.
+
+For a global install:
+
+```bash
+npm install -g healthlink-local
+healthlink-local setup --agent hermes --service
+```
+
+Run this before publishing a tarball or release:
+
+```bash
+npm run typecheck
+npm test
+npm run pack:check
+```
+
 ## Commands
 
 Current package commands:
 
 ```bash
-npx -y @healthlink/local
-npx -y @healthlink/local setup --agent hermes --service
-npx -y @healthlink/local setup --agent openclaw --service
-npx -y @healthlink/local init
-npx -y @healthlink/local init --agent hermes
-npx -y @healthlink/local init --hermes
-npx -y @healthlink/local daemon
-npx -y @healthlink/local pair
-npx -y @healthlink/local service install
-npx -y @healthlink/local service start
-npx -y @healthlink/local service status
-npx -y @healthlink/local service stop
-npx -y @healthlink/local service uninstall
-npx -y @healthlink/local init --transport lan
-npx -y @healthlink/local init --transport tailscale --tailscale-name my-mac.tailnet.ts.net
-npx -y @healthlink/local --port 8787
-npx -y @healthlink/local --db ~/.healthlink/healthlink.sqlite
-npx -y @healthlink/local mcp
-npx -y @healthlink/local print-mcp-config
-npx -y @healthlink/local print-agent-config --agent generic
-npx -y @healthlink/local print-agent-config --agent openclaw
-npx -y @healthlink/local print-skill
-npx -y @healthlink/local install-hermes
-npx -y @healthlink/local install-hermes-skill
-npx -y @healthlink/local status
-npx -y @healthlink/local doctor --agent hermes --transport lan
+npx -y healthlink-local
+npx -y healthlink-local setup --agent hermes --service
+npx -y healthlink-local setup --agent openclaw --service
+npx -y healthlink-local init
+npx -y healthlink-local init --agent hermes
+npx -y healthlink-local init --hermes
+npx -y healthlink-local daemon
+npx -y healthlink-local pair
+npx -y healthlink-local service install
+npx -y healthlink-local service start
+npx -y healthlink-local service status
+npx -y healthlink-local service stop
+npx -y healthlink-local service uninstall
+npx -y healthlink-local init --transport lan
+npx -y healthlink-local init --transport tailscale --tailscale-name my-mac.tailnet.ts.net
+npx -y healthlink-local --port 8787
+npx -y healthlink-local --db ~/.healthlink/healthlink.sqlite
+npx -y healthlink-local mcp
+npx -y healthlink-local print-mcp-config
+npx -y healthlink-local print-agent-config --agent generic
+npx -y healthlink-local print-agent-config --agent openclaw
+npx -y healthlink-local print-skill
+npx -y healthlink-local install-hermes
+npx -y healthlink-local install-hermes-skill
+npx -y healthlink-local status
+npx -y healthlink-local doctor --agent hermes --transport lan
 ```
 
 Recommended background pairing command:
 
 ```bash
-npx -y @healthlink/local setup --agent hermes --service
+npx -y healthlink-local setup --agent hermes --service
 ```
 
 This writes the Agent MCP config, installs and starts the macOS launchd receiver, waits for it to become reachable, and prints a 10-minute pairing QR. After pairing, the terminal can close while the background receiver keeps accepting iOS syncs.
 
+If the QR expires, do not reinstall the service. Print a fresh pairing code:
+
+```bash
+npx -y healthlink-local pair
+```
+
+If setup reports that port `8787` is already in use, check the process and stop the old foreground receiver if needed:
+
+```bash
+lsof -nP -iTCP:8787 -sTCP:LISTEN
+```
+
 Foreground compatibility command:
 
 ```bash
-npx -y @healthlink/local init --hermes
+npx -y healthlink-local init --hermes
 ```
 
 `init` starts the receiver, creates a pairing session, prints a terminal QR code, shows the QR page URL, and prints MCP config hints for agents. It runs in the foreground and remains useful for debugging. Add `--agent hermes` or the compatible `--hermes` alias to also back up and write `~/.hermes/config.yaml` before the receiver starts, so Hermes uses the same default database after restart or `/reload-mcp`.
@@ -94,13 +131,20 @@ Open the pairing page or scan the terminal QR code with HealthLink iOS, approve 
 For the background receiver, use:
 
 ```bash
-npx -y @healthlink/local service status
-npx -y @healthlink/local pair
+npx -y healthlink-local service status
+npx -y healthlink-local pair
+```
+
+`service status` also prints the launchd plist, database path, stdout log, stderr log, and last sync timestamp. The daemon logs live under:
+
+```text
+~/.healthlink/logs/daemon.out.log
+~/.healthlink/logs/daemon.err.log
 ```
 
 The iPhone must use the LAN, Tailscale, tunnel, or public HTTPS address. `127.0.0.1` only works from the same machine as the receiver.
 
-Pairing is persistent. After the first setup, the iOS app keeps the server URL, device ID, and device token, while `@healthlink/local` stores synced summaries in the same SQLite database used by MCP. The Agent does not need to reload MCP after every sync; it reads the latest database rows the next time a tool is called.
+Pairing is persistent. After the first setup, the iOS app keeps the server URL, device ID, and device token, while `healthlink-local` stores synced summaries in the same SQLite database used by MCP. The Agent does not need to reload MCP after every sync; it reads the latest database rows the next time a tool is called.
 
 Expected product behavior is pair once, authorize once, then keep syncing automatically when the iOS app is active or iOS grants background refresh time. The current local receiver supports the server side of that flow; foreground/background auto-sync scheduling lives in the iOS app.
 
@@ -139,7 +183,7 @@ Published package MCP config:
   "mcpServers": {
     "healthlink": {
       "command": "npx",
-      "args": ["-y", "@healthlink/local", "mcp"]
+      "args": ["-y", "healthlink-local", "mcp"]
     }
   }
 }
@@ -186,21 +230,21 @@ Hermes can install such a skill as an experience enhancement, but generic MCP-co
 ## Adapter Helpers
 
 ```bash
-npx -y @healthlink/local print-mcp-config
-npx -y @healthlink/local print-agent-config --agent generic
-npx -y @healthlink/local print-agent-config --agent hermes
-npx -y @healthlink/local print-skill
-npx -y @healthlink/local install-hermes
-npx -y @healthlink/local install-hermes-skill
-npx -y @healthlink/local init --agent hermes
-npx -y @healthlink/local init --agent openclaw
-npx -y @healthlink/local init --hermes --install-skill
-npx -y @healthlink/local doctor --agent hermes
-npx -y @healthlink/local doctor --agent openclaw
-npx -y @healthlink/local doctor --transport lan
+npx -y healthlink-local print-mcp-config
+npx -y healthlink-local print-agent-config --agent generic
+npx -y healthlink-local print-agent-config --agent hermes
+npx -y healthlink-local print-skill
+npx -y healthlink-local install-hermes
+npx -y healthlink-local install-hermes-skill
+npx -y healthlink-local init --agent hermes
+npx -y healthlink-local init --agent openclaw
+npx -y healthlink-local init --hermes --install-skill
+npx -y healthlink-local doctor --agent hermes
+npx -y healthlink-local doctor --agent openclaw
+npx -y healthlink-local doctor --transport lan
 ```
 
-`print-mcp-config` and `print-agent-config --agent generic` print standard `mcpServers.healthlink` JSON. `print-agent-config --agent hermes` prints a Hermes-style `mcp_servers.healthlink` YAML snippet. `print-agent-config --agent openclaw` prints an OpenClaw-style `mcp.servers.healthlink` JSON snippet. `install-hermes` backs up `~/.hermes/config.yaml`, writes `mcp_servers.healthlink`, and uses the same local database and tool surface as `@healthlink/local mcp`. `init --agent hermes` and `init --hermes` perform the same Hermes install step as part of the foreground pairing flow. `init --agent openclaw` backs up and writes `~/.openclaw/openclaw.json` when it is valid JSON; use `--openclaw-config <path>` for a custom file.
+`print-mcp-config` and `print-agent-config --agent generic` print standard `mcpServers.healthlink` JSON. `print-agent-config --agent hermes` prints a Hermes-style `mcp_servers.healthlink` YAML snippet. `print-agent-config --agent openclaw` prints an OpenClaw-style `mcp.servers.healthlink` JSON snippet. `install-hermes` backs up `~/.hermes/config.yaml`, writes `mcp_servers.healthlink`, and uses the same local database and tool surface as `healthlink-local mcp`. `init --agent hermes` and `init --hermes` perform the same Hermes install step as part of the foreground pairing flow. `init --agent openclaw` backs up and writes `~/.openclaw/openclaw.json` when it is valid JSON; use `--openclaw-config <path>` for a custom file.
 
 `print-skill` prints the portable HealthLink skill Markdown. `install-hermes-skill` writes it to `~/.hermes/skills/health/healthlink-personal-context/SKILL.md` with a timestamped backup when replacing an existing file. Use `init --hermes --install-skill` to install both MCP config and the Hermes skill in the same local pairing flow.
 

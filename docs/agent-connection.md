@@ -31,7 +31,7 @@ HealthLink iOS
   scope selection
   manual and automatic sync
 
-@healthlink/local
+healthlink-local
   pairing QR
   /health/sync receiver
   SQLite/Postgres storage
@@ -55,7 +55,7 @@ iOS app
   source_device_id
   device token in Keychain
 
-@healthlink/local
+healthlink-local
   paired source devices
   scoped token hashes
   ~/.healthlink/healthlink.sqlite
@@ -126,7 +126,7 @@ HealthLink should expose one product flow with multiple transport modes undernea
 Default for MVP and local agents.
 
 ```text
-iPhone -> http://192.168.x.x:8787 -> @healthlink/local -> SQLite -> MCP -> Agent
+iPhone -> http://192.168.x.x:8787 -> healthlink-local -> SQLite -> MCP -> Agent
 ```
 
 Pros:
@@ -180,7 +180,7 @@ HealthLink can also try to read Tailscale MagicDNS from `tailscale status --json
 The Hermes-first local install command should be:
 
 ```bash
-npx -y @healthlink/local setup --agent hermes --service
+npx -y healthlink-local setup --agent hermes --service
 ```
 
 `setup --agent hermes --service` should:
@@ -199,7 +199,7 @@ npx -y @healthlink/local setup --agent hermes --service
 The foreground compatibility receiver remains:
 
 ```bash
-npx -y @healthlink/local init
+npx -y healthlink-local init
 ```
 
 It starts the same receiver without writing a Hermes config and remains attached to the terminal.
@@ -207,13 +207,13 @@ It starts the same receiver without writing a Hermes config and remains attached
 The background service commands are:
 
 ```bash
-npx -y @healthlink/local daemon
-npx -y @healthlink/local pair
-npx -y @healthlink/local service install
-npx -y @healthlink/local service start
-npx -y @healthlink/local service status
-npx -y @healthlink/local service stop
-npx -y @healthlink/local service uninstall
+npx -y healthlink-local daemon
+npx -y healthlink-local pair
+npx -y healthlink-local service install
+npx -y healthlink-local service start
+npx -y healthlink-local service status
+npx -y healthlink-local service stop
+npx -y healthlink-local service uninstall
 ```
 
 Expected output:
@@ -231,7 +231,7 @@ Database:
   ~/.healthlink/healthlink.sqlite
 
 MCP:
-  npx -y @healthlink/local mcp
+  npx -y healthlink-local mcp
 ```
 
 Current development command:
@@ -301,7 +301,7 @@ Published package config:
   "mcpServers": {
     "healthlink": {
       "command": "npx",
-      "args": ["-y", "@healthlink/local", "mcp"]
+      "args": ["-y", "healthlink-local", "mcp"]
     }
   }
 }
@@ -310,14 +310,14 @@ Published package config:
 Implemented helpers:
 
 ```bash
-npx -y @healthlink/local print-mcp-config
-npx -y @healthlink/local install-hermes
-npx -y @healthlink/local init --hermes
-npx -y @healthlink/local setup --agent hermes --service
-npx -y @healthlink/local service status
-npx -y @healthlink/local pair
-npx -y @healthlink/local status
-npx -y @healthlink/local doctor
+npx -y healthlink-local print-mcp-config
+npx -y healthlink-local install-hermes
+npx -y healthlink-local init --hermes
+npx -y healthlink-local setup --agent hermes --service
+npx -y healthlink-local service status
+npx -y healthlink-local pair
+npx -y healthlink-local status
+npx -y healthlink-local doctor
 ```
 
 The helpers should not invent new protocols. They should write or print the same MCP command with the correct database path. `setup --agent hermes --service` uses the same install logic as `install-hermes`, installs/starts the receiver service, and folds pairing into one Agent-driven flow. `init --hermes` remains the foreground compatibility path.
@@ -341,9 +341,9 @@ Skill responsibilities:
 Potential helper commands:
 
 ```bash
-npx -y @healthlink/local print-skill --format markdown
-npx -y @healthlink/local install-hermes-skill
-npx -y @healthlink/local init --hermes --install-skill
+npx -y healthlink-local print-skill --format markdown
+npx -y healthlink-local install-hermes-skill
+npx -y healthlink-local init --hermes --install-skill
 ```
 
 These should remain additive. Non-Hermes agents should still work through generic MCP config alone.
