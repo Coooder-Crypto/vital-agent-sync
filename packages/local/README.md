@@ -29,7 +29,7 @@ For the published package, the intended user path is one command:
 npx -y healthlink-local setup --agent hermes --service
 ```
 
-This installs the macOS background receiver, writes the Agent MCP config, starts the receiver, and prints a 10-minute iPhone pairing QR. After the first successful pair and sync, the terminal can close.
+This installs the macOS background receiver, writes the Agent MCP config, installs the HealthLink Hermes skill for Hermes users, starts the receiver, and prints a 10-minute iPhone pairing QR. After the first successful pair and sync, the terminal can close.
 
 For a global install:
 
@@ -62,6 +62,8 @@ npx -y healthlink-local pair
 npx -y healthlink-local service install
 npx -y healthlink-local service start
 npx -y healthlink-local service status
+npx -y healthlink-local logs
+npx -y healthlink-local logs --lines 200
 npx -y healthlink-local service stop
 npx -y healthlink-local service uninstall
 npx -y healthlink-local init --transport lan
@@ -85,7 +87,7 @@ Recommended background pairing command:
 npx -y healthlink-local setup --agent hermes --service
 ```
 
-This writes the Agent MCP config, installs and starts the macOS launchd receiver, waits for it to become reachable, and prints a 10-minute pairing QR. After pairing, the terminal can close while the background receiver keeps accepting iOS syncs.
+This writes the Agent MCP config, installs the HealthLink Hermes skill when `--agent hermes` is selected, installs and starts the macOS launchd receiver, waits for it to become reachable, and prints a 10-minute pairing QR. After pairing, the terminal can close while the background receiver keeps accepting iOS syncs.
 
 If the QR expires, do not reinstall the service. Print a fresh pairing code:
 
@@ -132,10 +134,11 @@ For the background receiver, use:
 
 ```bash
 npx -y healthlink-local service status
+npx -y healthlink-local logs
 npx -y healthlink-local pair
 ```
 
-`service status` also prints the launchd plist, database path, stdout log, stderr log, and last sync timestamp. The daemon logs live under:
+`service status` prints the launchd plist, database path, stdout log, stderr log, and last sync timestamp. `logs` tails the daemon stdout and stderr logs without requiring the user to remember the log paths. Use `logs --lines 200` when debugging longer startup or sync sessions. The daemon logs live under:
 
 ```text
 ~/.healthlink/logs/daemon.out.log
@@ -246,9 +249,9 @@ npx -y healthlink-local doctor --transport lan
 
 `print-mcp-config` and `print-agent-config --agent generic` print standard `mcpServers.healthlink` JSON. `print-agent-config --agent hermes` prints a Hermes-style `mcp_servers.healthlink` YAML snippet. `print-agent-config --agent openclaw` prints an OpenClaw-style `mcp.servers.healthlink` JSON snippet. `install-hermes` backs up `~/.hermes/config.yaml`, writes `mcp_servers.healthlink`, and uses the same local database and tool surface as `healthlink-local mcp`. `init --agent hermes` and `init --hermes` perform the same Hermes install step as part of the foreground pairing flow. `init --agent openclaw` backs up and writes `~/.openclaw/openclaw.json` when it is valid JSON; use `--openclaw-config <path>` for a custom file.
 
-`print-skill` prints the portable HealthLink skill Markdown. `install-hermes-skill` writes it to `~/.hermes/skills/health/healthlink-personal-context/SKILL.md` with a timestamped backup when replacing an existing file. Use `init --hermes --install-skill` to install both MCP config and the Hermes skill in the same local pairing flow.
+`print-skill` prints the portable HealthLink skill Markdown. `install-hermes-skill` writes it to `~/.hermes/skills/health/healthlink-personal-context/SKILL.md` with a timestamped backup when replacing an existing file. `setup --agent hermes --service` installs the Hermes MCP config and the Hermes skill by default. Use `init --hermes --install-skill` when you want the same skill install behavior in the foreground compatibility flow.
 
-Use `status` to inspect the local database and paired source devices. Use `doctor` to check Node.js, the SQLite database, MCP command generation, the selected Agent adapter, and the selected transport provider.
+Use `status` to inspect the local database and paired source devices. Use `doctor` to check Node.js, the SQLite database, MCP command generation, the selected Agent adapter, the selected transport provider, the macOS service, and local receiver reachability.
 
 Transport providers are selected with `--transport`. `lan` is the default provider. `tailscale` can advertise the local 100.64.0.0/10 IPv4 address when Tailscale is active. Future transports such as `cloudflare`, `ngrok`, and `public_https` can be selected for diagnostics and can advertise an explicit endpoint with `--server-url` until their native provider implementations land.
 
@@ -264,7 +267,7 @@ On macOS, `service install` writes `~/Library/LaunchAgents/com.healthlink.local.
 healthlink-local daemon --host 0.0.0.0 --port 8787 --db ~/.healthlink/healthlink.sqlite --transport lan
 ```
 
-The service logs to `~/.healthlink/logs/daemon.out.log` and `~/.healthlink/logs/daemon.err.log`.
+Use `healthlink-local logs` to inspect the service logs. The raw files are `~/.healthlink/logs/daemon.out.log` and `~/.healthlink/logs/daemon.err.log`.
 
 For remote or self-hosted Agents, run `daemon` under the server's own process manager, such as systemd, Docker, or PM2:
 
