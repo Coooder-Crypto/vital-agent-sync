@@ -16,10 +16,6 @@ final class GatewayAPIClient {
         try await post(summary, path: "/api/health/daily-summary")
     }
 
-    func uploadCalendarSummary(_ summary: DailyCalendarSummary) async throws {
-        try await post(summary, path: "/api/calendar/daily-summary")
-    }
-
     func uploadHealthSync(_ payload: HealthSyncPayload) async throws -> HealthSyncResponse {
         try await post(payload, path: "/health/sync")
     }

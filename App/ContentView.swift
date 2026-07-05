@@ -72,10 +72,9 @@ struct HomeView: View {
                         )
 
                         if settings.isPaired {
-                            if sync.latestHealthSummary != nil || sync.latestCalendarSummary != nil {
+                            if sync.latestHealthSummary != nil {
                                 SummaryPanel(
-                                    health: sync.latestHealthSummary,
-                                    calendar: sync.latestCalendarSummary
+                                    health: sync.latestHealthSummary
                                 )
                             } else {
                                 EmptySummaryPanel()
@@ -121,13 +120,6 @@ struct SourcesView: View {
                     .disabled(sync.isSyncing)
 
                     Button {
-                        Task { await sync.requestCalendarAuthorization(settings: settings) }
-                    } label: {
-                        Label("Allow Calendar Access", systemImage: "calendar.badge.clock")
-                    }
-                    .disabled(sync.isSyncing)
-
-                    Button {
                         openURL(URL(string: UIApplication.openSettingsURLString)!)
                     } label: {
                         Label("Open iOS Settings", systemImage: "gearshape")
@@ -140,13 +132,6 @@ struct SourcesView: View {
                         Label("Health summaries", systemImage: "heart")
                     }
                     .onChange(of: settings.uploadHealthEnabled) { _, _ in
-                        settings.save()
-                    }
-
-                    Toggle(isOn: $settings.uploadCalendarEnabled) {
-                        Label("Calendar availability", systemImage: "calendar")
-                    }
-                    .onChange(of: settings.uploadCalendarEnabled) { _, _ in
                         settings.save()
                     }
                 }
@@ -184,7 +169,6 @@ struct SourcesView: View {
 
                 Section("Sync History") {
                     LabeledContent("Health", value: sync.status.lastHealthSyncAt.map(Self.formatDate) ?? "Never")
-                    LabeledContent("Calendar", value: sync.status.lastCalendarSyncAt.map(Self.formatDate) ?? "Never")
 
                     if let lastSyncError = settings.lastSyncError ?? sync.status.lastError {
                         Label(lastSyncError, systemImage: "exclamationmark.triangle")
@@ -192,13 +176,12 @@ struct SourcesView: View {
                     }
 
                     if let lastBackgroundScheduleError = settings.lastBackgroundScheduleError {
-                        Label(lastBackgroundScheduleError, systemImage: "calendar.badge.exclamationmark")
+                        Label(lastBackgroundScheduleError, systemImage: "arrow.triangle.2.circlepath.circle")
                             .foregroundStyle(GatewayStyle.warning)
                     }
                 }
 
                 Section("Privacy") {
-                    Label("Calendar titles are redacted", systemImage: "calendar.badge.exclamationmark")
                     Label("Health samples are summarized", systemImage: "chart.bar.doc.horizontal")
                 }
                 .font(.footnote)
@@ -434,7 +417,7 @@ struct HomeHeroPanel: View {
     }
 
     private var latestSyncDate: Date? {
-        [sync.status.lastHealthSyncAt, sync.status.lastCalendarSyncAt, settings.lastManualSyncAt, settings.lastAutoSyncAt]
+        [sync.status.lastHealthSyncAt, settings.lastManualSyncAt, settings.lastAutoSyncAt]
             .compactMap { $0 }
             .max()
     }
@@ -496,7 +479,7 @@ struct AgentPromptPanel: View {
             VStack(alignment: .leading, spacing: 10) {
                 PromptRow(text: "How is my day looking?")
                 PromptRow(text: "Review my sleep and recovery.")
-                PromptRow(text: "Plan today around my calendar and energy.")
+                PromptRow(text: "Should I work out or recover today?")
             }
             .padding(14)
             .background(GatewayStyle.surface)
@@ -545,11 +528,6 @@ struct HomeSyncDetails: View {
                         date: sync.status.lastHealthSyncAt
                     )
 
-                    LastSyncTile(
-                        title: "Calendar",
-                        systemImage: "calendar",
-                        date: sync.status.lastCalendarSyncAt
-                    )
                 }
 
                 AutoSyncStatusRow(settings: settings)
@@ -895,7 +873,6 @@ struct AutoSyncStatusRow: View {
 
 struct SummaryPanel: View {
     let health: DailyHealthSummary?
-    let calendar: DailyCalendarSummary?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -926,17 +903,6 @@ struct SummaryPanel: View {
                     systemImage: "figure.strengthtraining.traditional"
                 )
 
-                MetricTile(
-                    title: "Busy",
-                    value: minutes(calendar?.busy_minutes),
-                    systemImage: "calendar"
-                )
-
-                MetricTile(
-                    title: "Free Windows",
-                    value: calendar.map { "\($0.free_windows.count)" } ?? "-",
-                    systemImage: "clock.badge.checkmark"
-                )
             }
         }
     }

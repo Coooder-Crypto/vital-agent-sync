@@ -5,7 +5,6 @@ export const SOURCE_PLATFORMS = [
   "ios",
   "android",
   "xiaomi",
-  "calendar_connector",
   "manual_import"
 ] as const;
 
@@ -32,10 +31,10 @@ export type SourceDeviceSummary = {
 
 export const SOURCE_PLATFORM_CAPABILITIES: Record<SourcePlatform, SourceCapability> = {
   ios: {
-    metrics: ["health.daily_summary", "calendar.daily_summary"],
+    metrics: ["health.daily_summary"],
     syncCadence: "background_best_effort",
     freshness: "periodic",
-    missingDataBehavior: "Missing HealthKit or Calendar permissions are represented as null or empty summaries."
+    missingDataBehavior: "Missing HealthKit permissions are represented as null or empty summaries."
   },
   android: {
     metrics: ["health.daily_summary"],
@@ -49,14 +48,8 @@ export const SOURCE_PLATFORM_CAPABILITIES: Record<SourcePlatform, SourceCapabili
     freshness: "periodic",
     missingDataBehavior: "Connector gaps are reported as missing metrics with source freshness metadata."
   },
-  calendar_connector: {
-    metrics: ["calendar.daily_summary"],
-    syncCadence: "connector_defined",
-    freshness: "periodic",
-    missingDataBehavior: "Calendar event titles remain redacted; unavailable calendars produce empty availability windows."
-  },
   manual_import: {
-    metrics: ["health.daily_summary", "calendar.daily_summary", "feedback.events"],
+    metrics: ["health.daily_summary", "feedback.events"],
     syncCadence: "manual",
     freshness: "manual",
     missingDataBehavior: "Imported files only contribute fields present in the import payload."

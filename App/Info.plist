@@ -22,10 +22,6 @@
 	<string>1</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>HealthLink reads your calendar availability to build redacted daily context for your authorized agents.</string>
-	<key>NSCalendarsUsageDescription</key>
-	<string>HealthLink reads your calendar availability to build redacted daily context for your authorized agents.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>HealthLink reads selected Apple Health data to sync daily summaries to your authorized agent server.</string>
 	<key>NSCameraUsageDescription</key>

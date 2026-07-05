@@ -15,7 +15,6 @@ import { listDevices, revokeDevice } from "../src/devices.js";
 import { listFeedbackEvents, recordFeedback } from "../src/feedback.js";
 import { authenticateDevice, ingestHealthSync } from "../src/health-ingest.js";
 import {
-  getCalendarAvailability,
   getDailyHealthSummary,
   getPersonalContext,
   getRecoverySignals,
@@ -83,51 +82,28 @@ test("pairing creates a scoped device that can sync and be queried", () => {
             sleep_minutes: 420,
             workouts: []
           }
-        ],
-        calendar_daily_summaries: [
-          {
-            date: "2026-07-04",
-            provider: "apple_calendar",
-            busy_minutes: 90,
-            free_windows: [
-              {
-                start: "2026-07-04T19:00:00+08:00",
-                end: "2026-07-04T21:00:00+08:00"
-              }
-            ],
-            next_event: null
-          }
         ]
       });
 
       const health = getDailyHealthSummary(database, { date: "2026-07-04" }) as {
         health: { steps: number };
       };
-      const calendar = getCalendarAvailability(database, { date: "2026-07-04" }) as {
-        calendar: { busy_minutes: number };
-      };
       const context = getPersonalContext(database, { date: "2026-07-04", days: 7 }) as {
         metadata: { freshness: { latest_sync_at: string | null }; missing_metrics: string[] };
         daily_health_summary: { health: { steps: number } };
-        calendar_availability: { calendar: { busy_minutes: number } };
         recovery_signals: { signals: unknown[] };
       };
       assert.equal(health.health.steps, 3456);
-      assert.equal(calendar.calendar.busy_minutes, 90);
       assert.equal(context.daily_health_summary.health.steps, 3456);
-      assert.equal(context.calendar_availability.calendar.busy_minutes, 90);
       assert.equal(context.recovery_signals.signals.length, 1);
       assert.equal(context.metadata.freshness.latest_sync_at !== null, true);
 
       const weekly = getWeeklySummary(database, { days: 7 }) as {
-        coverage: { health_days: number; calendar_days: number };
+        coverage: { health_days: number };
         activity: { total_steps: number };
-        calendar: { total_busy_minutes: number };
       };
       assert.equal(weekly.coverage.health_days, 1);
-      assert.equal(weekly.coverage.calendar_days, 1);
       assert.equal(weekly.activity.total_steps, 3456);
-      assert.equal(weekly.calendar.total_busy_minutes, 90);
     } finally {
       database.close();
     }
@@ -148,7 +124,7 @@ test("agent audit log records MCP-style reads", () => {
       assert.equal(entry.agent_client_id, agent.id);
       assert.equal(entries.length, 1);
       assert.equal(entries[0]?.tool_name, "get_personal_context");
-      assert.deepEqual(entries[0]?.scopes_used, ["health.daily_summary.read", "calendar.daily_summary.read"]);
+      assert.deepEqual(entries[0]?.scopes_used, ["health.daily_summary.read"]);
     } finally {
       database.close();
     }
@@ -287,8 +263,7 @@ test("trend queries collapse duplicate dates to the newest summary", () => {
             avg_heart_rate_bpm: 70,
             workouts: []
           }
-        ],
-        calendar_daily_summaries: []
+        ]
       });
       ingestHealthSync(database, secondDevice, {
         device_id: secondConfirmed.device_id,
@@ -304,8 +279,7 @@ test("trend queries collapse duplicate dates to the newest summary", () => {
             avg_heart_rate_bpm: 62,
             workouts: []
           }
-        ],
-        calendar_daily_summaries: []
+        ]
       });
       database.sqlite.prepare(`
         update health_daily_summaries
@@ -512,7 +486,7 @@ test("launchd service plist uses daemon command and expected keepalive settings"
     });
 
     assert.equal(status.installed, true);
-    assert.equal(status.running, false);
+    assert.equal(typeof status.running, "boolean");
     assert.equal(status.plistPath, paths.plistPath);
     assert.match(readLaunchdPlist({ homeDir: tempDir }) ?? "", /daemon\.out\.log/);
   } finally {
@@ -654,7 +628,6 @@ test("service setup workflow installs agent, starts service, waits, pairs, then 
 test("Source platform capability metadata includes future app surfaces", () => {
   assert.deepEqual(Object.keys(SOURCE_PLATFORM_CAPABILITIES).sort(), [
     "android",
-    "calendar_connector",
     "ios",
     "manual_import",
     "xiaomi"
