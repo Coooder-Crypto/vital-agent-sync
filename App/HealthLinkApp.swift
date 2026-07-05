@@ -12,6 +12,8 @@ struct HealthLinkApp: App {
             ContentView()
                 .environmentObject(settings)
                 .environmentObject(syncCoordinator)
+                .preferredColorScheme(settings.appTheme.colorScheme)
+                .environment(\.locale, settings.appLanguage.locale)
                 .task {
                     await syncCoordinator.attemptAutoSync(settings: settings, reason: "app_launch")
                     BackgroundSyncManager.scheduleAppRefresh(settings: settings)
@@ -39,6 +41,32 @@ struct HealthLinkApp: App {
             await BackgroundSyncManager.scheduleAppRefresh(settings: settings)
             await syncCoordinator.attemptAutoSync(settings: settings, reason: "bg_app_refresh")
             await BackgroundSyncManager.scheduleAppRefresh(settings: settings)
+        }
+    }
+}
+
+private extension AppTheme {
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system:
+            return nil
+        case .light:
+            return .light
+        case .dark:
+            return .dark
+        }
+    }
+}
+
+private extension AppLanguage {
+    var locale: Locale {
+        switch self {
+        case .system:
+            return .current
+        case .english:
+            return Locale(identifier: "en")
+        case .simplifiedChinese:
+            return Locale(identifier: "zh-Hans")
         }
     }
 }

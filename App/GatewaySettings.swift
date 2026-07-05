@@ -1,5 +1,43 @@
 import Foundation
 
+enum AppTheme: String, CaseIterable, Identifiable {
+    case system
+    case light
+    case dark
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .system:
+            return "System"
+        case .light:
+            return "Light"
+        case .dark:
+            return "Dark"
+        }
+    }
+}
+
+enum AppLanguage: String, CaseIterable, Identifiable {
+    case system
+    case english
+    case simplifiedChinese
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .system:
+            return "System"
+        case .english:
+            return "English"
+        case .simplifiedChinese:
+            return "简体中文"
+        }
+    }
+}
+
 @MainActor
 final class GatewaySettings: ObservableObject {
     @Published var serverURLText: String
@@ -19,6 +57,8 @@ final class GatewaySettings: ObservableObject {
     @Published private(set) var lastSyncAttemptAt: Date?
     @Published private(set) var lastSyncError: String?
     @Published private(set) var lastBackgroundScheduleError: String?
+    @Published var appTheme: AppTheme
+    @Published var appLanguage: AppLanguage
     @Published var lastSavedMessage: String?
 
     private let defaults = UserDefaults.standard
@@ -38,6 +78,8 @@ final class GatewaySettings: ObservableObject {
         static let lastSyncAttemptAt = "gateway.lastSyncAttemptAt"
         static let lastSyncError = "gateway.lastSyncError"
         static let lastBackgroundScheduleError = "gateway.lastBackgroundScheduleError"
+        static let appTheme = "gateway.appTheme"
+        static let appLanguage = "gateway.appLanguage"
     }
 
     static let defaultAcceptedScopes = [
@@ -59,6 +101,8 @@ final class GatewaySettings: ObservableObject {
         self.lastSyncAttemptAt = defaults.object(forKey: Keys.lastSyncAttemptAt) as? Date
         self.lastSyncError = defaults.string(forKey: Keys.lastSyncError)
         self.lastBackgroundScheduleError = defaults.string(forKey: Keys.lastBackgroundScheduleError)
+        self.appTheme = AppTheme(rawValue: defaults.string(forKey: Keys.appTheme) ?? "") ?? .system
+        self.appLanguage = AppLanguage(rawValue: defaults.string(forKey: Keys.appLanguage) ?? "") ?? .system
     }
 
     var serverURL: URL? {
@@ -185,10 +229,22 @@ final class GatewaySettings: ObservableObject {
         }
     }
 
+    func saveUploadSettings() {
+        defaults.set(uploadHealthEnabled, forKey: Keys.uploadHealthEnabled)
+    }
+
     func saveAutoSyncSettings() {
-        autoSyncMinimumIntervalMinutes = clampedAutoSyncMinimumIntervalMinutes
+        let clampedInterval = clampedAutoSyncMinimumIntervalMinutes
+        if autoSyncMinimumIntervalMinutes != clampedInterval {
+            autoSyncMinimumIntervalMinutes = clampedInterval
+        }
         defaults.set(autoSyncEnabled, forKey: Keys.autoSyncEnabled)
-        defaults.set(autoSyncMinimumIntervalMinutes, forKey: Keys.autoSyncMinimumIntervalMinutes)
+        defaults.set(clampedInterval, forKey: Keys.autoSyncMinimumIntervalMinutes)
+    }
+
+    func saveAppearanceSettings() {
+        defaults.set(appTheme.rawValue, forKey: Keys.appTheme)
+        defaults.set(appLanguage.rawValue, forKey: Keys.appLanguage)
     }
 
     func canAttemptAutoSync(now: Date = Date()) -> Bool {
