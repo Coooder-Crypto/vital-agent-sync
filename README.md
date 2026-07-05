@@ -10,9 +10,15 @@ For the broader product plan covering local daemon, MCP, tunnel mode, self-hosti
 
 - HealthKit daily summaries:
   - steps
-  - active energy
+  - active / basal energy
+  - walking/running and cycling distance
+  - flights climbed
+  - exercise and stand minutes
   - heart-rate average / max
   - resting heart rate
+  - HRV, walking heart-rate average, VO2 max
+  - blood oxygen, respiratory rate, body temperature
+  - body mass, body fat, lean body mass, BMI
   - sleep minutes
   - workouts
 - Local pairing configuration:
@@ -198,6 +204,22 @@ Unified payload:
       "avg_heart_rate_bpm": 82.0,
       "max_heart_rate_bpm": 146.0,
       "active_energy_kcal": 480.0,
+      "basal_energy_kcal": 1500.0,
+      "distance_walking_running_m": 3200.0,
+      "distance_cycling_m": null,
+      "flights_climbed": 8,
+      "exercise_minutes": 35,
+      "stand_minutes": 120,
+      "heart_rate_variability_ms": 42.0,
+      "walking_heart_rate_average_bpm": 98.0,
+      "vo2_max_ml_kg_min": 38.5,
+      "oxygen_saturation_percent": 97.5,
+      "respiratory_rate_bpm": 15.2,
+      "body_temperature_c": null,
+      "body_mass_kg": 72.4,
+      "body_fat_percentage": null,
+      "lean_body_mass_kg": null,
+      "body_mass_index": null,
       "workout_minutes": 45,
       "workouts": []
     }

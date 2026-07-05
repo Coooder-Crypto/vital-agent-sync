@@ -18,6 +18,22 @@ type HealthDailyRow = {
   avg_heart_rate_bpm: number | null;
   max_heart_rate_bpm: number | null;
   active_energy_kcal: number | null;
+  basal_energy_kcal: number | null;
+  distance_walking_running_m: number | null;
+  distance_cycling_m: number | null;
+  flights_climbed: number | null;
+  exercise_minutes: number | null;
+  stand_minutes: number | null;
+  heart_rate_variability_ms: number | null;
+  walking_heart_rate_average_bpm: number | null;
+  vo2_max_ml_kg_min: number | null;
+  oxygen_saturation_percent: number | null;
+  respiratory_rate_bpm: number | null;
+  body_temperature_c: number | null;
+  body_mass_kg: number | null;
+  body_fat_percentage: number | null;
+  lean_body_mass_kg: number | null;
+  body_mass_index: number | null;
   workout_minutes: number | null;
   updated_at: string;
 };
@@ -97,6 +113,22 @@ export function getDailyHealthSummary(database: HealthLinkDatabase, options: Que
       avg_heart_rate_bpm: health.avg_heart_rate_bpm,
       max_heart_rate_bpm: health.max_heart_rate_bpm,
       active_energy_kcal: health.active_energy_kcal,
+      basal_energy_kcal: health.basal_energy_kcal,
+      distance_walking_running_m: health.distance_walking_running_m,
+      distance_cycling_m: health.distance_cycling_m,
+      flights_climbed: health.flights_climbed,
+      exercise_minutes: health.exercise_minutes,
+      stand_minutes: health.stand_minutes,
+      heart_rate_variability_ms: health.heart_rate_variability_ms,
+      walking_heart_rate_average_bpm: health.walking_heart_rate_average_bpm,
+      vo2_max_ml_kg_min: health.vo2_max_ml_kg_min,
+      oxygen_saturation_percent: health.oxygen_saturation_percent,
+      respiratory_rate_bpm: health.respiratory_rate_bpm,
+      body_temperature_c: health.body_temperature_c,
+      body_mass_kg: health.body_mass_kg,
+      body_fat_percentage: health.body_fat_percentage,
+      lean_body_mass_kg: health.lean_body_mass_kg,
+      body_mass_index: health.body_mass_index,
       workout_minutes: health.workout_minutes
     },
     workouts
@@ -111,6 +143,10 @@ export function getSleepTrend(database: HealthLinkDatabase, options: QueryOption
       sleep_minutes,
       resting_heart_rate_bpm,
       active_energy_kcal,
+      basal_energy_kcal,
+      heart_rate_variability_ms,
+      oxygen_saturation_percent,
+      respiratory_rate_bpm,
       workout_minutes
     from (
       select
@@ -126,7 +162,15 @@ export function getSleepTrend(database: HealthLinkDatabase, options: QueryOption
     limit ?
   `).all(days) as Pick<
     HealthDailyRow,
-    "date" | "sleep_minutes" | "resting_heart_rate_bpm" | "active_energy_kcal" | "workout_minutes"
+    | "date"
+    | "sleep_minutes"
+    | "resting_heart_rate_bpm"
+    | "active_energy_kcal"
+    | "basal_energy_kcal"
+    | "heart_rate_variability_ms"
+    | "oxygen_saturation_percent"
+    | "respiratory_rate_bpm"
+    | "workout_minutes"
   >[];
 
   return {
@@ -142,9 +186,15 @@ export function getWorkoutLoad(database: HealthLinkDatabase, options: QueryOptio
     select
       date,
       workout_minutes,
+      exercise_minutes,
+      stand_minutes,
+      distance_walking_running_m,
+      distance_cycling_m,
+      flights_climbed,
       active_energy_kcal,
       avg_heart_rate_bpm,
-      max_heart_rate_bpm
+      max_heart_rate_bpm,
+      vo2_max_ml_kg_min
     from (
       select
         *,
@@ -159,7 +209,17 @@ export function getWorkoutLoad(database: HealthLinkDatabase, options: QueryOptio
     limit ?
   `).all(days) as Pick<
     HealthDailyRow,
-    "date" | "workout_minutes" | "active_energy_kcal" | "avg_heart_rate_bpm" | "max_heart_rate_bpm"
+    | "date"
+    | "workout_minutes"
+    | "exercise_minutes"
+    | "stand_minutes"
+    | "distance_walking_running_m"
+    | "distance_cycling_m"
+    | "flights_climbed"
+    | "active_energy_kcal"
+    | "avg_heart_rate_bpm"
+    | "max_heart_rate_bpm"
+    | "vo2_max_ml_kg_min"
   >[];
 
   const workouts = database.sqlite.prepare(`
@@ -191,7 +251,15 @@ export function getRecoverySignals(database: HealthLinkDatabase, options: QueryO
       sleep_minutes,
       resting_heart_rate_bpm,
       avg_heart_rate_bpm,
+      max_heart_rate_bpm,
+      heart_rate_variability_ms,
+      walking_heart_rate_average_bpm,
+      vo2_max_ml_kg_min,
+      oxygen_saturation_percent,
+      respiratory_rate_bpm,
+      body_temperature_c,
       active_energy_kcal,
+      basal_energy_kcal,
       workout_minutes
     from (
       select
@@ -211,7 +279,15 @@ export function getRecoverySignals(database: HealthLinkDatabase, options: QueryO
     | "sleep_minutes"
     | "resting_heart_rate_bpm"
     | "avg_heart_rate_bpm"
+    | "max_heart_rate_bpm"
+    | "heart_rate_variability_ms"
+    | "walking_heart_rate_average_bpm"
+    | "vo2_max_ml_kg_min"
+    | "oxygen_saturation_percent"
+    | "respiratory_rate_bpm"
+    | "body_temperature_c"
     | "active_energy_kcal"
+    | "basal_energy_kcal"
     | "workout_minutes"
   >[];
 
@@ -235,6 +311,15 @@ export function getWeeklySummary(database: HealthLinkDatabase, options: QueryOpt
   const activeEnergyValues = healthRows
     .map((row) => row.active_energy_kcal)
     .filter((value): value is number => typeof value === "number");
+  const exerciseMinutesValues = healthRows
+    .map((row) => row.exercise_minutes)
+    .filter((value): value is number => typeof value === "number");
+  const standMinutesValues = healthRows
+    .map((row) => row.stand_minutes)
+    .filter((value): value is number => typeof value === "number");
+  const walkingRunningDistanceValues = healthRows
+    .map((row) => row.distance_walking_running_m)
+    .filter((value): value is number => typeof value === "number");
   const workoutMinutesValues = healthRows
     .map((row) => row.workout_minutes)
     .filter((value): value is number => typeof value === "number");
@@ -256,7 +341,10 @@ export function getWeeklySummary(database: HealthLinkDatabase, options: QueryOpt
     activity: {
       average_steps: average(stepsValues),
       total_steps: sum(stepsValues),
-      total_active_energy_kcal: sum(activeEnergyValues)
+      total_active_energy_kcal: sum(activeEnergyValues),
+      total_exercise_minutes: sum(exerciseMinutesValues),
+      total_stand_minutes: sum(standMinutesValues),
+      total_walking_running_distance_m: sum(walkingRunningDistanceValues)
     },
     workouts: {
       total_minutes: sum(workoutMinutesValues),
