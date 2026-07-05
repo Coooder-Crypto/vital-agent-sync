@@ -70,14 +70,22 @@ npm run build:local
 node packages/local/dist/cli.js mcp --db ~/.healthlink/healthlink.sqlite
 ```
 
-One-command local pairing loop:
+Background local pairing loop:
 
 ```bash
 npm run build:local
+node packages/local/dist/cli.js setup --agent hermes --service
+```
+
+`setup --agent hermes --service` backs up and writes `~/.hermes/config.yaml`, installs and starts the macOS background receiver, prints the iPhone pairing QR, and points Hermes at the same HealthLink database. After pairing and syncing, restart Hermes or run `/reload-mcp`.
+
+Foreground compatibility/debug command:
+
+```bash
 node packages/local/dist/cli.js init --hermes
 ```
 
-`init --hermes` starts the local receiver, prints the iPhone pairing QR, backs up and writes `~/.hermes/config.yaml`, and points Hermes at the same HealthLink database. After pairing and syncing, restart Hermes or run `/reload-mcp`.
+`init --hermes` keeps the receiver attached to the terminal. Closing the terminal stops new iOS syncs, but already-synced data remains in SQLite for MCP tools.
 
 After that first setup, Hermes does not need to reconnect for every sync. iOS writes new summaries to the same local database, and Hermes MCP tools read the latest rows when the user asks a question.
 
@@ -95,6 +103,10 @@ Published package shape:
 ```bash
 npx -y @healthlink/local init
 npx -y @healthlink/local init --hermes
+npx -y @healthlink/local setup --agent hermes --service
+npx -y @healthlink/local setup --agent openclaw --service
+npx -y @healthlink/local service status
+npx -y @healthlink/local pair
 npx -y @healthlink/local mcp
 npx -y @healthlink/local print-mcp-config
 npx -y @healthlink/local install-hermes
@@ -110,7 +122,7 @@ HealthKit requires a real iPhone for meaningful testing. In Xcode:
 2. Set your Apple Developer Team.
 3. Keep the HealthKit capability enabled.
 4. Run on a physical iPhone.
-5. Run `node packages/local/dist/cli.js init --hermes` on the Agent machine.
+5. Run `node packages/local/dist/cli.js setup --agent hermes --service` on the Agent machine.
 6. Scan the pairing QR in the app Settings tab.
 7. Confirm the server/scopes, then grant Health and Calendar permissions.
 8. Sync once, then restart Hermes or run `/reload-mcp`.
