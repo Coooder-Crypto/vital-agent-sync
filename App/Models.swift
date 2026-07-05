@@ -162,16 +162,25 @@ struct DeviceRevokeResponse: Codable {
 
 enum GatewayError: LocalizedError {
     case healthKitUnavailable
+    case healthPermissionRequired
+    case calendarPermissionRequired
     case missingServerURL
     case missingAPIToken
     case missingPairedDevice
     case invalidPairingURL
     case invalidServerResponse(Int)
+    case receiverUnreachable
+    case networkUnavailable
+    case requestTimedOut
 
     var errorDescription: String? {
         switch self {
         case .healthKitUnavailable:
             return "HealthKit is not available on this device."
+        case .healthPermissionRequired:
+            return "Health permission is missing or denied. Open iOS Settings and allow HealthLink to read selected Health data."
+        case .calendarPermissionRequired:
+            return "Calendar permission is missing or denied. Open iOS Settings and allow HealthLink to read Calendar data."
         case .missingServerURL:
             return "Server URL is not configured."
         case .missingAPIToken:
@@ -182,12 +191,31 @@ enum GatewayError: LocalizedError {
             return "Pairing URL is invalid."
         case .invalidServerResponse(let statusCode):
             if statusCode == 401 {
-                return "Server rejected this device token. Pair again."
+                return "Receiver rejected this device token. The token may be revoked; pair again."
             }
             if statusCode == 403 {
                 return "Server rejected this request. Check device pairing and scopes."
             }
             return "Server returned HTTP \(statusCode)."
+        case .receiverUnreachable:
+            return "Receiver is not reachable. Make sure HealthLink Local is running and this iPhone can reach the server URL."
+        case .networkUnavailable:
+            return "Network is unavailable. Check Wi-Fi or cellular connectivity."
+        case .requestTimedOut:
+            return "Sync timed out. Check that the receiver is online and reachable from this iPhone."
+        }
+    }
+
+    static func fromURL(_ error: URLError) -> GatewayError {
+        switch error.code {
+        case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed, .internationalRoamingOff, .callIsActive:
+            return .networkUnavailable
+        case .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed, .badServerResponse, .secureConnectionFailed, .appTransportSecurityRequiresSecureConnection:
+            return .receiverUnreachable
+        case .timedOut:
+            return .requestTimedOut
+        default:
+            return .receiverUnreachable
         }
     }
 }

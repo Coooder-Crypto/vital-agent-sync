@@ -33,7 +33,9 @@ final class CalendarService {
         }
     }
 
-    func buildDailySummary(for date: Date) -> DailyCalendarSummary {
+    func buildDailySummary(for date: Date) throws -> DailyCalendarSummary {
+        try ensureAuthorized()
+
         let interval = dayInterval(for: date)
         let predicate = store.predicateForEvents(withStart: interval.start, end: interval.end, calendars: nil)
         let events = store.events(matching: predicate)
@@ -74,6 +76,19 @@ final class CalendarService {
             free_windows: freeWindows,
             next_event: nextEvent
         )
+    }
+
+    private func ensureAuthorized() throws {
+        let status = EKEventStore.authorizationStatus(for: .event)
+        if #available(iOS 17.0, *) {
+            guard status == .fullAccess else {
+                throw EKError(.eventStoreNotAuthorized)
+            }
+        } else {
+            guard status == .authorized else {
+                throw EKError(.eventStoreNotAuthorized)
+            }
+        }
     }
 
     private func dayInterval(for date: Date) -> DateInterval {

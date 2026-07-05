@@ -351,6 +351,9 @@ struct AutoSyncStatusRow: View {
     }
 
     private var detail: String {
+        if let lastBackgroundScheduleError = settings.lastBackgroundScheduleError {
+            return "Background scheduling issue: \(lastBackgroundScheduleError)"
+        }
         if let lastAutoSyncAt = settings.lastAutoSyncAt {
             return "Last \(lastAutoSyncAt.formatted(date: .omitted, time: .shortened))"
         }
@@ -559,6 +562,7 @@ struct SettingsView: View {
                     }
                     .onChange(of: settings.autoSyncEnabled) { _, _ in
                         settings.saveAutoSyncSettings()
+                        BackgroundSyncManager.scheduleAppRefresh(settings: settings)
                     }
 
                     Stepper(value: $settings.autoSyncMinimumIntervalMinutes, in: 5...240, step: 5) {
@@ -567,15 +571,34 @@ struct SettingsView: View {
                     .disabled(!settings.autoSyncEnabled)
                     .onChange(of: settings.autoSyncMinimumIntervalMinutes) { _, _ in
                         settings.saveAutoSyncSettings()
+                        BackgroundSyncManager.scheduleAppRefresh(settings: settings)
                     }
 
                     if let lastAutoSyncAt = settings.lastAutoSyncAt {
                         LabeledContent("Last auto sync", value: lastAutoSyncAt.formatted(date: .omitted, time: .shortened))
                     }
 
+                    if let lastSyncAttemptAt = settings.lastSyncAttemptAt {
+                        LabeledContent("Last attempt", value: lastSyncAttemptAt.formatted(date: .omitted, time: .shortened))
+                    }
+
                     if let nextEligibleAutoSyncAt = settings.nextEligibleAutoSyncAt {
                         LabeledContent("Next eligible", value: nextEligibleAutoSyncAt.formatted(date: .omitted, time: .shortened))
                     }
+
+                    if let lastSyncError = settings.lastSyncError {
+                        Label(lastSyncError, systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(GatewayStyle.warning)
+                    }
+
+                    if let lastBackgroundScheduleError = settings.lastBackgroundScheduleError {
+                        Label(lastBackgroundScheduleError, systemImage: "calendar.badge.exclamationmark")
+                            .foregroundStyle(GatewayStyle.warning)
+                    }
+
+                    Text("Auto Sync runs when the app opens, when it enters background, and during iOS background refresh opportunities. It is not strict real-time syncing.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
 
                 Section {

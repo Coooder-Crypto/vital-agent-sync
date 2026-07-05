@@ -22,7 +22,7 @@ final class HealthKitService {
                 } else if success {
                     continuation.resume()
                 } else {
-                    continuation.resume(throwing: GatewayError.healthKitUnavailable)
+                    continuation.resume(throwing: GatewayError.healthPermissionRequired)
                 }
             }
         }

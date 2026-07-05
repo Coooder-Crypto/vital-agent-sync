@@ -29,7 +29,11 @@ targets:
         NSLocalNetworkUsageDescription: HealthLink connects to your local Agent server on your network after you approve pairing.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+        BGTaskSchedulerPermittedIdentifiers:
+          - app.healthlink.ios.autosync
         UILaunchScreen: {}
+        UIBackgroundModes:
+          - fetch
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
     entitlements:
