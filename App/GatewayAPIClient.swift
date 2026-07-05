@@ -85,6 +85,26 @@ final class GatewayAPIClient {
         return try JSONDecoder().decode(PairingStatusResponse.self, from: data)
     }
 
+    static func checkReceiver(serverURL: URL) async throws -> ReceiverHealthStatus {
+        let url = endpoint(baseURL: serverURL, path: "/health/status")
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(from: url)
+        } catch let error as URLError {
+            throw GatewayError.fromURL(error)
+        }
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw GatewayError.invalidServerResponse(-1)
+        }
+        guard 200..<300 ~= httpResponse.statusCode else {
+            throw GatewayError.invalidServerResponse(httpResponse.statusCode)
+        }
+
+        return try JSONDecoder().decode(ReceiverHealthStatus.self, from: data)
+    }
+
     private func post<T: Encodable>(_ payload: T, path: String) async throws {
         let _: EmptyResponse = try await post(payload, path: path)
     }

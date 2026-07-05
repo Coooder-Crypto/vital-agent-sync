@@ -6,6 +6,7 @@ final class GatewaySettings: ObservableObject {
     @Published var apiTokenText: String
     @Published var pairingURLText: String = ""
     @Published private(set) var pairedDeviceID: String?
+    @Published private(set) var pairedAgentName: String?
     @Published private(set) var acceptedScopes: [String]
     @Published private(set) var isPairing = false
     @Published var pendingPairing: PairingPreview?
@@ -30,6 +31,7 @@ final class GatewaySettings: ObservableObject {
         static let uploadCalendarEnabled = "gateway.uploadCalendarEnabled"
         static let apiToken = "gateway.apiToken"
         static let pairedDeviceID = "gateway.pairedDeviceID"
+        static let pairedAgentName = "gateway.pairedAgentName"
         static let acceptedScopes = "gateway.acceptedScopes"
         static let autoSyncEnabled = "gateway.autoSyncEnabled"
         static let autoSyncMinimumIntervalMinutes = "gateway.autoSyncMinimumIntervalMinutes"
@@ -49,6 +51,7 @@ final class GatewaySettings: ObservableObject {
         self.serverURLText = defaults.string(forKey: Keys.serverURL) ?? ""
         self.apiTokenText = (try? keychain.get(account: Keys.apiToken)) ?? ""
         self.pairedDeviceID = defaults.string(forKey: Keys.pairedDeviceID)
+        self.pairedAgentName = defaults.string(forKey: Keys.pairedAgentName)
         self.acceptedScopes = defaults.stringArray(forKey: Keys.acceptedScopes) ?? Self.defaultAcceptedScopes
         self.uploadHealthEnabled = defaults.object(forKey: Keys.uploadHealthEnabled) as? Bool ?? true
         self.uploadCalendarEnabled = defaults.object(forKey: Keys.uploadCalendarEnabled) as? Bool ?? true
@@ -120,6 +123,7 @@ final class GatewaySettings: ObservableObject {
 
             savePairing(
                 serverURL: preview.link.serverURL,
+                agentName: preview.status.agent_name,
                 deviceID: response.device_id,
                 deviceToken: response.device_token,
                 acceptedScopes: preview.status.requested_scopes
@@ -236,14 +240,16 @@ final class GatewaySettings: ObservableObject {
         }
     }
 
-    private func savePairing(serverURL: URL, deviceID: String, deviceToken: String, acceptedScopes: [String]) {
+    private func savePairing(serverURL: URL, agentName: String, deviceID: String, deviceToken: String, acceptedScopes: [String]) {
         serverURLText = serverURL.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         apiTokenText = deviceToken
         pairedDeviceID = deviceID
+        pairedAgentName = agentName
         self.acceptedScopes = acceptedScopes
 
         defaults.set(serverURLText, forKey: Keys.serverURL)
         defaults.set(deviceID, forKey: Keys.pairedDeviceID)
+        defaults.set(agentName, forKey: Keys.pairedAgentName)
         defaults.set(acceptedScopes, forKey: Keys.acceptedScopes)
 
         do {
@@ -261,8 +267,10 @@ final class GatewaySettings: ObservableObject {
     private func clearPairing() throws {
         apiTokenText = ""
         pairedDeviceID = nil
+        pairedAgentName = nil
         acceptedScopes = Self.defaultAcceptedScopes
         defaults.removeObject(forKey: Keys.pairedDeviceID)
+        defaults.removeObject(forKey: Keys.pairedAgentName)
         defaults.removeObject(forKey: Keys.acceptedScopes)
         try keychain.delete(account: Keys.apiToken)
     }

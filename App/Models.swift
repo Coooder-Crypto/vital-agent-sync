@@ -144,6 +144,13 @@ struct HealthSyncResponse: Codable {
     let idempotent: Bool
 }
 
+struct ReceiverHealthStatus: Codable {
+    let status: String
+    let device_count: Int
+    let sync_count: Int
+    let last_sync_at: String?
+}
+
 struct DeviceSummaryResponse: Codable {
     let device_id: String
     let device_name: String
