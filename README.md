@@ -29,7 +29,7 @@ For the broader product plan covering local daemon, MCP, tunnel mode, self-hosti
 - Upload endpoint:
   - `POST /health/sync`
 - Agent access:
-  - MCP stdio tools from `@healthlink/local`
+  - MCP stdio tools from `healthlink-local`
 
 ## Generate The Xcode Project
 
@@ -49,7 +49,7 @@ npm install
 npm run dev:local
 ```
 
-The local package lives in `packages/local` and is named `@healthlink/local`. It is private in this repository until the package is ready to publish.
+The local package lives in `packages/local` and is named `healthlink-local`. The package is prepared for public npm publishing and exposes the `healthlink-local` CLI.
 
 The current local development loop is:
 
@@ -57,7 +57,7 @@ The current local development loop is:
 iPhone app
   -> HealthKit / Calendar summaries
   -> POST /health/sync on manual or automatic sync
-  -> @healthlink/local
+  -> healthlink-local
   -> SQLite
   -> MCP tools
   -> Hermes or another agent
@@ -70,14 +70,20 @@ npm run build:local
 node packages/local/dist/cli.js mcp --db ~/.healthlink/healthlink.sqlite
 ```
 
-Background local pairing loop:
+Published-package pairing loop:
+
+```bash
+npx -y healthlink-local setup --agent hermes --service
+```
+
+Development pairing loop:
 
 ```bash
 npm run build:local
 node packages/local/dist/cli.js setup --agent hermes --service
 ```
 
-`setup --agent hermes --service` backs up and writes `~/.hermes/config.yaml`, installs and starts the macOS background receiver, prints the iPhone pairing QR, and points Hermes at the same HealthLink database. After pairing and syncing, restart Hermes or run `/reload-mcp`.
+`setup --agent hermes --service` backs up and writes `~/.hermes/config.yaml`, installs and starts the macOS background receiver, prints the iPhone pairing QR, and points Hermes at the same HealthLink database. After pairing and syncing, restart Hermes or run `/reload-mcp`. If the QR expires, run `healthlink-local pair` or `npx -y healthlink-local pair`.
 
 Foreground compatibility/debug command:
 
@@ -101,17 +107,33 @@ node packages/local/dist/cli.js doctor
 Published package shape:
 
 ```bash
-npx -y @healthlink/local init
-npx -y @healthlink/local init --hermes
-npx -y @healthlink/local setup --agent hermes --service
-npx -y @healthlink/local setup --agent openclaw --service
-npx -y @healthlink/local service status
-npx -y @healthlink/local pair
-npx -y @healthlink/local mcp
-npx -y @healthlink/local print-mcp-config
-npx -y @healthlink/local install-hermes
-npx -y @healthlink/local status
-npx -y @healthlink/local doctor
+npx -y healthlink-local init
+npx -y healthlink-local init --hermes
+npx -y healthlink-local setup --agent hermes --service
+npx -y healthlink-local setup --agent openclaw --service
+npx -y healthlink-local service status
+npx -y healthlink-local pair
+npx -y healthlink-local mcp
+npx -y healthlink-local print-mcp-config
+npx -y healthlink-local install-hermes
+npx -y healthlink-local status
+npx -y healthlink-local doctor
+```
+
+Release check for the local package:
+
+```bash
+npm run typecheck --workspace healthlink-local
+npm run test --workspace healthlink-local
+npm run pack:check --workspace healthlink-local
+```
+
+Useful background-service diagnostics:
+
+```bash
+npx -y healthlink-local service status
+tail -n 100 ~/.healthlink/logs/daemon.err.log
+lsof -nP -iTCP:8787 -sTCP:LISTEN
 ```
 
 ## Device Setup

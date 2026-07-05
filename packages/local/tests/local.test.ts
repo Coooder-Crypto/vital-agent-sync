@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import {
   ensureDefaultMcpAgentClient,
   listAgentAuditLog,
@@ -44,6 +45,8 @@ import {
 } from "../src/skill.js";
 import { renderTerminalQr } from "../src/terminal-qr.js";
 import { createTransportProvider } from "../src/transports.js";
+
+const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 test("pairing creates a scoped device that can sync and be queried", () => {
   withTempDatabase((databasePath) => {
@@ -514,6 +517,27 @@ test("launchd service plist uses daemon command and expected keepalive settings"
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
+});
+
+test("local package manifest is ready for public npm packing", () => {
+  const manifest = JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8")) as {
+    name?: string;
+    private?: boolean;
+    license?: string;
+    bin?: Record<string, string>;
+    files?: string[];
+    publishConfig?: { access?: string };
+    scripts?: Record<string, string>;
+  };
+
+  assert.equal(manifest.name, "healthlink-local");
+  assert.equal(manifest.private, undefined);
+  assert.equal(manifest.license, "MIT");
+  assert.equal(manifest.bin?.["healthlink-local"], "./dist/cli.js");
+  assert.deepEqual(manifest.files, ["dist", "README.md"]);
+  assert.equal(manifest.publishConfig?.access, "public");
+  assert.equal(manifest.scripts?.prepack, "npm run build");
+  assert.equal(manifest.scripts?.["pack:check"], "npm pack --dry-run");
 });
 
 test("pairing client reports unreachable daemon and parses pair/start responses", async () => {

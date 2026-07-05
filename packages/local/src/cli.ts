@@ -325,9 +325,11 @@ async function runSetup(options: CliOptions): Promise<void> {
   }
 
   const agent = getAgentAdapter(options.agentId);
+  console.log(`Setting up HealthLink for ${agent.displayName}`);
   await runServiceSetupWorkflow({
     installAgent: () => {
       if (options.agentId === "generic") {
+        console.log("Agent config: generic MCP config will be printed on request.");
         return;
       }
       const agentInstall = agent.installMcp({
@@ -336,9 +338,9 @@ async function runSetup(options: CliOptions): Promise<void> {
         hermesConfigPath: options.hermesConfigPath,
         openclawConfigPath: options.openclawConfigPath
       });
-      console.log(agentInstall.message);
+      console.log(`Agent config: ${agentInstall.message}`);
       if (agentInstall.backupPath) {
-        console.log(`Backup: ${agentInstall.backupPath}`);
+        console.log(`Agent backup: ${agentInstall.backupPath}`);
       }
     },
     installSkill: () => {
@@ -346,20 +348,23 @@ async function runSetup(options: CliOptions): Promise<void> {
         hermesSkillPath: options.hermesSkillPath
       });
       if (skillInstall) {
-        console.log(`HealthLink skill installed: ${skillInstall.skillPath}`);
+        console.log(`Agent skill: HealthLink skill installed at ${skillInstall.skillPath}`);
       }
     },
     installService: () => {
-      installLaunchdService(toServiceOptions(options));
+      const status = installLaunchdService(toServiceOptions(options));
+      console.log(`Service installed: ${status.plistPath}`);
+      console.log(`Service logs:      ${status.stdoutPath}`);
+      console.log(`Service errors:    ${status.stderrPath}`);
     },
     startService: () => {
       startLaunchdService(toServiceOptions(options));
+      console.log("Service start requested.");
     },
     waitForReady: () => waitForLocalReceiver(options),
     pair: () => printPairingSession(options),
     printReloadHint: () => {
-      console.log("");
-      console.log(agent.reloadHint());
+      printSetupNextSteps(agent);
     }
   }, {
     installSkill: options.installSkill
@@ -383,6 +388,11 @@ async function printPairingSession(options: CliOptions): Promise<void> {
     console.log(`Scan QR: terminal is too narrow (${qr.requiredColumns} columns needed).`);
     console.log(`Open ${loopback}/pair to scan the browser QR, or paste the Pairing URL in the app.`);
   }
+  console.log("");
+  console.log("Next:");
+  console.log("  1. Scan with HealthLink iOS Settings -> Pairing -> Scan QR.");
+  console.log("  2. Confirm pairing in the app, grant Health/Calendar access, then Sync.");
+  console.log("  3. If this code expires, run healthlink-local pair to print a fresh QR.");
   console.log("");
 }
 
@@ -434,15 +444,42 @@ function printServiceStatusDetails(status: ReturnType<typeof getLaunchdServiceSt
   try {
     const health = getHealthStatus(database);
     console.log("HealthLink service");
+    console.log(`Label:     ${status.label}`);
     console.log(`Installed: ${status.installed ? "yes" : "no"}`);
     console.log(`Running:   ${status.running ? "yes" : "no"}`);
     console.log(`Plist:     ${status.plistPath}`);
     console.log(`Local API: http://127.0.0.1:${options.port}`);
     console.log(`Database:  ${database.path}`);
+    console.log(`Stdout:    ${status.stdoutPath}`);
+    console.log(`Stderr:    ${status.stderrPath}`);
     console.log(`Last sync: ${health.last_sync_at ?? "never"}`);
+    console.log("");
+    if (!status.installed) {
+      console.log("Next: run healthlink-local setup --agent hermes --service to install and start the receiver.");
+    } else if (!status.running) {
+      console.log("Next: run healthlink-local service start, then healthlink-local pair.");
+    } else {
+      console.log("Next: run healthlink-local pair to print a new QR, or scan the browser QR at the Local API /pair page.");
+    }
   } finally {
     database.close();
   }
+}
+
+function printSetupNextSteps(agent: ReturnType<typeof getAgentAdapter>): void {
+  console.log("");
+  console.log("Setup complete");
+  console.log("");
+  console.log("Next:");
+  console.log("  1. Scan the QR with HealthLink iOS.");
+  console.log("  2. Confirm pairing, grant Health/Calendar access, then run Sync in the app.");
+  console.log(`  3. ${agent.reloadHint()}`);
+  console.log("");
+  console.log("After the first sync, this terminal can close. The macOS background receiver keeps accepting iOS syncs.");
+  console.log("Useful commands:");
+  console.log("  healthlink-local service status");
+  console.log("  healthlink-local pair");
+  console.log("  healthlink-local service stop");
 }
 
 function defaultAgentName(agentId: AgentAdapterId): string {
@@ -578,7 +615,32 @@ async function printDoctor(options: CliOptions): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
-  console.error(`HealthLink Local failed: ${message}`);
+  console.error(formatCliError(error));
   process.exitCode = 1;
 });
+
+function formatCliError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes("EADDRINUSE")) {
+    const portMatch = message.match(/:(\d+)\b/);
+    const port = portMatch?.[1] ?? "8787";
+    return [
+      `HealthLink Local failed: ${message}`,
+      "",
+      `Port ${port} is already in use.`,
+      `Check the process with: lsof -nP -iTCP:${port} -sTCP:LISTEN`,
+      "If it is an old foreground receiver, stop it with Ctrl-C and retry.",
+      "If the background service is already running, use: healthlink-local pair"
+    ].join("\n");
+  }
+  if (message.includes("did not become ready")) {
+    return [
+      `HealthLink Local failed: ${message}`,
+      "",
+      "Check service status with: healthlink-local service status",
+      "Check daemon logs under: ~/.healthlink/logs/daemon.err.log",
+      "If port 8787 is occupied, stop the old receiver or rerun with --port <free-port>."
+    ].join("\n");
+  }
+  return `HealthLink Local failed: ${message}`;
+}
