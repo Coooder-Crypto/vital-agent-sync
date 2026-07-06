@@ -108,7 +108,7 @@ enum SyncFailureCategory: String, Codable {
     }
 }
 
-struct LastSyncDetail: Codable {
+struct LastSyncDetail: Codable, Identifiable {
     let attemptedAt: Date
     let completedAt: Date?
     let trigger: String
@@ -123,6 +123,11 @@ struct LastSyncDetail: Codable {
 
     var succeeded: Bool {
         acceptedSyncID != nil && failureCategory == nil
+    }
+
+    var id: String {
+        let stablePart = acceptedSyncID ?? failureMessage ?? requestedDateRange ?? trigger
+        return "\(attemptedAt.timeIntervalSince1970)-\(stablePart)"
     }
 }
 
