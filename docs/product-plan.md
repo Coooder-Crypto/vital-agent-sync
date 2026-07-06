@@ -19,7 +19,7 @@ Agent queries the latest authorized personal context.
 
 The user should not need to manually export files after setup. The iOS app syncs compact summaries to a user-controlled gateway endpoint. Agents query the latest available context through MCP or an SDK. The intended steady state is "pair once, authorize once, keep syncing, ask the Agent anytime."
 
-For the detailed Agent connection UX, see [agent-connection.md](agent-connection.md). For the multi-source, multi-agent, multi-transport upgrade checklist, see [architecture-upgrade-todo.md](architecture-upgrade-todo.md).
+For the detailed Agent connection UX, see [agent-connection.md](agent-connection.md). For common deployment methods, see [deployment-methods.md](deployment-methods.md). For the multi-source, multi-agent, multi-transport upgrade checklist, see [architecture-upgrade-todo.md](architecture-upgrade-todo.md).
 
 ## Principles
 
@@ -65,123 +65,86 @@ healthlink-local
 
 The first implementation can combine `local`, `mcp`, and `sdk` into one npm package, then split them when the API stabilizes.
 
-## Deployment Modes
+## Common Deployment Methods
 
-### 1. Local Mode
+HealthLink deployment is about where the receiver, database, and MCP process run. Agent runtime choice is a separate adapter concern.
 
-Best for local MCP-compatible agents, desktop assistants, and developer machines.
+The first supported methods are documented in [deployment-methods.md](deployment-methods.md):
 
-```text
-iPhone
-  -> Wi-Fi / Tailscale
-  -> local daemon on Mac/PC/NAS
-  -> SQLite
-  -> local MCP
-  -> agent
-```
+### 1. Mac Local Mode
 
-User command:
-
-```bash
-npx -y healthlink-local init --hermes
-```
-
-The daemon prints:
-
-```text
-Local API: http://127.0.0.1:8787
-LAN API:   http://192.168.31.25:8787
-Pairing:   healthlink://pair?server=http://192.168.31.25:8787&code=8K2F-J91Q
-```
-
-The iOS app syncs summaries to the LAN or Tailscale endpoint. The agent talks to the local MCP stdio server. New syncs update SQLite; the agent reads fresh data on the next MCP tool call and does not need to reconnect after every sync.
-
-Current development commands:
-
-```bash
-npm run dev:local
-npm run build:local
-node packages/local/dist/cli.js mcp
-```
-
-### 2. Tunnel Mode
-
-Best for cloud-hosted agents where the user cannot run npm on the agent machine, but can run a local daemon on their own computer.
+Best for first-time setup, local MCP-compatible agents, and developer machines.
 
 ```text
 iPhone
-  -> public tunnel URL
-  -> user computer local daemon
-  -> SQLite
-
-cloud agent
-  -> remote MCP URL
-  -> public tunnel URL
-  -> user computer local daemon
+  -> same Wi-Fi / LAN
+  -> macOS HealthLink receiver
+  -> ~/.healthlink/healthlink.sqlite
+  -> MCP stdio
+  -> MCP-compatible Agent
 ```
 
-User command:
+Recommended command:
 
 ```bash
-npx -y healthlink-local --tunnel cloudflare
+npx -y healthlink-local setup --agent hermes --service
 ```
 
-The daemon prints:
+The iOS app syncs summaries to the Mac receiver. The Agent reads the same SQLite database through MCP and does not need to reconnect after every iOS sync.
 
-```text
-Remote Pairing: healthlink://pair?server=https://abc.trycloudflare.com&code=8K2F-J91Q
-Remote MCP:     https://abc.trycloudflare.com/mcp
-```
+### 2. Home Server / NAS / N100 Mode
 
-The cloud agent should connect through a remote MCP endpoint or a tunnel-aware adapter. The tunnel only transports requests; the local daemon still enforces scopes and tokens.
-
-Supported tunnel providers can be added progressively:
-
-- Cloudflare Tunnel
-- Tailscale Funnel
-- ngrok
-- user-provided reverse proxy
-
-### 3. Self-Hosted Server Mode
-
-Best for power users, teams, and users who already operate a VPS or home server.
+Best for users with an always-on machine at home.
 
 ```text
 iPhone
-  -> https://gateway.userdomain.com
-  -> self-hosted HealthLink Server
-  -> SQLite/Postgres
-
-agents
-  -> https://gateway.userdomain.com/mcp
+  -> LAN or Tailscale
+  -> home server receiver
+  -> server-local SQLite
+  -> MCP stdio on the server or LAN
+  -> MCP-compatible Agent
 ```
 
-Install options:
+Recommended receiver command on Linux home servers:
 
 ```bash
-docker run personalgateway/server
+healthlink-local setup --agent generic --service --manager systemd
 ```
 
-or:
+Tailscale is the preferred private remote-access option for this mode:
 
 ```bash
-npx -y @healthlink/server
+healthlink-local daemon --host 0.0.0.0 --port 8787 --transport tailscale --tailscale-name healthlink.tailnet.ts.net
 ```
 
-This mode gives stable URLs without the product owner hosting user data.
+This installs a user-level systemd service for the receiver, waits until it is reachable, and prints a pairing QR. If systemd is not available on the NAS, use PM2, Docker Compose, or the NAS vendor's process manager to keep the daemon running. Windows hosts are detected as manual until Task Scheduler or Windows Service support is added.
 
-### 4. Optional Cloud Mode
+### 3. User-Owned VPS / Public HTTPS Mode
 
-This can be added later as a hosted convenience product.
+Best for users whose receiver and Agent already run on a user-controlled VPS.
 
 ```text
 iPhone
-  -> HealthLink Cloud
-  -> hosted remote MCP
-  -> agent
+  -> HTTPS
+  -> user-owned VPS receiver
+  -> VPS-local SQLite
+  -> MCP stdio on the VPS
+  -> MCP-compatible Agent
 ```
 
-Cloud mode has the easiest UX but the highest privacy and compliance burden. It should not be required for the base product.
+Recommended receiver command behind a user-managed reverse proxy:
+
+```bash
+healthlink-local daemon \
+  --host 0.0.0.0 \
+  --port 8787 \
+  --transport public_https \
+  --server-url https://healthlink.example.com
+```
+
+This mode requires the user to provide HTTPS, DNS, persistence, and server hardening. Health summaries leave the phone and home network, but remain on infrastructure controlled by the user.
+
+Future deployment work can add tunnel managers, an official Docker image, remote MCP over HTTPS, and a HealthLink-hosted relay. Those are intentionally not part of the first deployment pass.
 
 ## Pairing Flow
 
@@ -441,12 +404,14 @@ Exit criteria:
 - An agent can query HealthLink without hand-authoring MCP JSON.
 - After the first reload/restart, new iOS syncs are visible to the agent without reconnecting.
 
-### Milestone 4: Remote Agent Support
+### Milestone 4: Common Deployment Methods
 
-- `--tunnel cloudflare`
-- remote MCP endpoint
-- token enforcement over tunnel
-- audit log UI
+- Mac local deployment guide
+- home server / NAS / N100 deployment guide
+- Linux systemd user service installer
+- Tailscale pairing guidance
+- user-owned VPS / public HTTPS deployment guide
+- clear privacy boundary for each method
 
 ### Milestone 5: SDK And Packaging
 

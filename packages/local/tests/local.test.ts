@@ -25,12 +25,17 @@ import {
 import { getHermesMcpInstallStatus, installHermesMcpConfig } from "../src/mcp-config.js";
 import { requestPairingSession } from "../src/pairing-client.js";
 import { PairingStore } from "../src/pairing.js";
+import { parseLsofListenOutput } from "../src/port-diagnostics.js";
 import {
   buildLaunchdPlist,
+  buildSystemdUnit,
   getLaunchdServicePaths,
+  getManualServiceStatus,
+  getSystemdServicePaths,
   installLaunchdService,
   readLaunchdServiceLog,
-  readLaunchdPlist
+  readLaunchdPlist,
+  resolveServiceManagerId
 } from "../src/service.js";
 import { runServiceSetupWorkflow } from "../src/setup.js";
 import {
@@ -484,9 +489,16 @@ test("launchd service plist uses daemon command and expected keepalive settings"
     assert.match(plist, /<string>com\.healthlink\.local<\/string>/);
     assert.match(plist, /<string>\/tmp\/healthlink-local<\/string>/);
     assert.match(plist, /<string>daemon<\/string>/);
+    assert.match(plist, /<string>--host<\/string>/);
+    assert.match(plist, /<string>0\.0\.0\.0<\/string>/);
+    assert.match(plist, /<string>--port<\/string>/);
+    assert.match(plist, /<string>8787<\/string>/);
     assert.match(plist, /<string>--db<\/string>/);
+    assert.match(plist, new RegExp(`<string>${escapeRegExp(join(tempDir, "healthlink.sqlite"))}</string>`));
     assert.match(plist, /<string>--transport<\/string>/);
     assert.match(plist, /<string>lan<\/string>/);
+    assert.match(plist, /daemon\.out\.log/);
+    assert.match(plist, /daemon\.err\.log/);
     assert.match(plist, /<key>RunAtLoad<\/key>\s*<true\/>/);
     assert.match(plist, /<key>KeepAlive<\/key>\s*<true\/>/);
 
@@ -510,6 +522,74 @@ test("launchd service plist uses daemon command and expected keepalive settings"
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
+});
+
+test("systemd service unit uses daemon command and restart policy", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-systemd-test-"));
+  try {
+    const databasePath = join(tempDir, "healthlink.sqlite");
+    const unit = buildSystemdUnit({
+      homeDir: tempDir,
+      cliCommand: "/tmp/healthlink-local",
+      databasePath,
+      host: "0.0.0.0",
+      port: 8787,
+      transport: "tailscale",
+      tailscaleName: "healthlink.tailnet.ts.net"
+    });
+    const paths = getSystemdServicePaths({
+      homeDir: tempDir,
+      databasePath
+    });
+
+    assert.equal(paths.manager, "systemd");
+    assert.match(paths.configPath, /healthlink-local\.service$/);
+    assert.match(unit, /\[Unit\]/);
+    assert.match(unit, /Description=HealthLink Local Receiver/);
+    assert.match(unit, /ExecStart=\/tmp\/healthlink-local daemon --host 0\.0\.0\.0 --port 8787 --db /);
+    assert.match(unit, /--transport tailscale --tailscale-name healthlink\.tailnet\.ts\.net/);
+    assert.match(unit, /Restart=on-failure/);
+    assert.match(unit, /WantedBy=default\.target/);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("service manager selection distinguishes macOS, Linux, Windows, and overrides", () => {
+  assert.equal(resolveServiceManagerId({ platform: "darwin" }), "launchd");
+  assert.equal(resolveServiceManagerId({ platform: "linux" }), "systemd");
+  assert.equal(resolveServiceManagerId({ platform: "win32" }), "manual");
+  assert.equal(resolveServiceManagerId({ manager: "systemd", platform: "darwin" }), "systemd");
+
+  const windowsStatus = getManualServiceStatus({
+    platform: "win32",
+    homeDir: "/tmp/healthlink-win"
+  });
+  assert.equal(windowsStatus.manager, "manual");
+  assert.match(windowsStatus.detail ?? "", /Windows background service installation is not implemented yet/);
+});
+
+test("port diagnostics parse lsof listener output", () => {
+  const listeners = parseLsofListenOutput([
+    "COMMAND   PID    USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME",
+    "node    91165 coooder   22u  IPv4 0x123456789      0t0  TCP *:8787 (LISTEN)",
+    "launchd     1    root   10u  IPv6 0x987654321      0t0  TCP [::1]:8787 (LISTEN)"
+  ].join("\n"));
+
+  assert.deepEqual(listeners, [
+    {
+      command: "node",
+      pid: "91165",
+      user: "coooder",
+      name: "*:8787 (LISTEN)"
+    },
+    {
+      command: "launchd",
+      pid: "1",
+      user: "root",
+      name: "[::1]:8787 (LISTEN)"
+    }
+  ]);
 });
 
 test("launchd service log reader tails stdout and stderr logs", () => {
@@ -685,4 +765,8 @@ function withTempDatabase(callback: (databasePath: string) => void): void {
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

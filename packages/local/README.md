@@ -29,7 +29,7 @@ For the published package, the intended user path is one command:
 npx -y healthlink-local setup --agent hermes --service
 ```
 
-This installs the macOS background receiver, writes the Agent MCP config, installs the HealthLink Hermes skill for Hermes users, starts the receiver, and prints a 10-minute iPhone pairing QR. After the first successful pair and sync, the terminal can close.
+This installs the background receiver with the current platform's service manager, writes the Agent MCP config, installs the HealthLink Hermes skill for Hermes users, starts the receiver, and prints a 10-minute iPhone pairing QR. After the first successful pair and sync, the terminal can close.
 
 For a global install:
 
@@ -60,6 +60,7 @@ npx -y healthlink-local init --hermes
 npx -y healthlink-local daemon
 npx -y healthlink-local pair
 npx -y healthlink-local service install
+npx -y healthlink-local service install --manager systemd
 npx -y healthlink-local service start
 npx -y healthlink-local service status
 npx -y healthlink-local logs
@@ -87,7 +88,7 @@ Recommended background pairing command:
 npx -y healthlink-local setup --agent hermes --service
 ```
 
-This writes the Agent MCP config, installs the HealthLink Hermes skill when `--agent hermes` is selected, installs and starts the macOS launchd receiver, waits for it to become reachable, and prints a 10-minute pairing QR. After pairing, the terminal can close while the background receiver keeps accepting iOS syncs.
+This writes the Agent MCP config, installs the HealthLink Hermes skill when `--agent hermes` is selected, installs and starts the receiver with the current platform's service manager, waits for it to become reachable, and prints a 10-minute pairing QR. macOS uses `launchd`; Linux uses a user-level `systemd` unit. After pairing, the terminal can close while the background receiver keeps accepting iOS syncs.
 
 If the QR expires, do not reinstall the service. Print a fresh pairing code:
 
@@ -99,6 +100,12 @@ If setup reports that port `8787` is already in use, check the process and stop 
 
 ```bash
 lsof -nP -iTCP:8787 -sTCP:LISTEN
+```
+
+The CLI also tries to identify the listener automatically. If the listener is an old foreground `healthlink-local init` process, stop that terminal with `Ctrl-C`. If the background receiver is already running, do not run setup again; print a fresh QR instead:
+
+```bash
+npx -y healthlink-local pair
 ```
 
 Foreground compatibility command:
@@ -138,7 +145,7 @@ npx -y healthlink-local logs
 npx -y healthlink-local pair
 ```
 
-`service status` prints the launchd plist, database path, stdout log, stderr log, and last sync timestamp. `logs` tails the daemon stdout and stderr logs without requiring the user to remember the log paths. Use `logs --lines 200` when debugging longer startup or sync sessions. The daemon logs live under:
+`service status` prints the selected service manager, config path, database path, receiver reachability, logs, and last sync timestamp. `logs` tails launchd log files on macOS and `journalctl --user -u healthlink-local.service` on systemd hosts. Use `logs --lines 200` when debugging longer startup or sync sessions. macOS daemon logs live under:
 
 ```text
 ~/.healthlink/logs/daemon.out.log
@@ -146,6 +153,16 @@ npx -y healthlink-local pair
 ```
 
 The iPhone must use the LAN, Tailscale, tunnel, or public HTTPS address. `127.0.0.1` only works from the same machine as the receiver.
+
+If the service manager says the service is running but `Receiver` is not reachable, use:
+
+```bash
+npx -y healthlink-local logs
+npx -y healthlink-local doctor --agent hermes
+lsof -nP -iTCP:8787 -sTCP:LISTEN
+```
+
+This usually means the daemon failed during startup, Node.js is not available from the service environment, or another process owns the configured port.
 
 Pairing is persistent. After the first setup, the iOS app keeps the server URL, device ID, and device token, while `healthlink-local` stores synced summaries in the same SQLite database used by MCP. The Agent does not need to reload MCP after every sync; it reads the latest database rows the next time a tool is called.
 
@@ -249,7 +266,7 @@ npx -y healthlink-local doctor --transport lan
 
 `print-skill` prints the portable HealthLink skill Markdown. `install-hermes-skill` writes it to `~/.hermes/skills/health/healthlink-personal-context/SKILL.md` with a timestamped backup when replacing an existing file. `setup --agent hermes --service` installs the Hermes MCP config and the Hermes skill by default. Use `init --hermes --install-skill` when you want the same skill install behavior in the foreground compatibility flow.
 
-Use `status` to inspect the local database and paired source devices. Use `doctor` to check Node.js, the SQLite database, MCP command generation, the selected Agent adapter, the selected transport provider, the macOS service, and local receiver reachability.
+Use `status` to inspect the local database and paired source devices. Use `doctor` to check Node.js, the SQLite database, MCP command generation, the selected Agent adapter, the selected transport provider, the platform service manager, and local receiver reachability.
 
 Transport providers are selected with `--transport`. `lan` is the default provider. `tailscale` can advertise the local 100.64.0.0/10 IPv4 address when Tailscale is active. Future transports such as `cloudflare`, `ngrok`, and `public_https` can be selected for diagnostics and can advertise an explicit endpoint with `--server-url` until their native provider implementations land.
 
@@ -257,7 +274,24 @@ For Tailscale MagicDNS, pass `--tailscale-name <host.tailnet.ts.net>` or set `HE
 
 The source-device API is available at `/source-devices` and `/source-devices/:source_device_id/revoke`. The older `/devices` endpoints and MCP tools remain for compatibility with the current iOS app and older agent configs.
 
-## Background Service And Remote Agents
+## Background Service And Deployment Methods
+
+HealthLink deployment is about where the receiver, SQLite database, and MCP process run. The Agent type is configured separately through `--agent` or `print-agent-config`.
+
+`setup --service` and `service` choose a manager automatically:
+
+- macOS: `launchd`
+- Linux: user-level `systemd`
+- Windows and other platforms: `manual` guidance for now
+
+Override the manager when needed:
+
+```bash
+healthlink-local setup --agent hermes --service --manager systemd
+healthlink-local service status --manager systemd
+```
+
+### Mac local mode
 
 On macOS, `service install` writes `~/Library/LaunchAgents/com.healthlink.local.plist` and runs:
 
@@ -267,7 +301,46 @@ healthlink-local daemon --host 0.0.0.0 --port 8787 --db ~/.healthlink/healthlink
 
 Use `healthlink-local logs` to inspect the service logs. The raw files are `~/.healthlink/logs/daemon.out.log` and `~/.healthlink/logs/daemon.err.log`.
 
-For remote or self-hosted Agents, run `daemon` under the server's own process manager, such as systemd, Docker, or PM2:
+### Home server / NAS / N100 mode
+
+For an always-on Linux home server, `setup --service --manager systemd` writes `~/.config/systemd/user/healthlink-local.service`, enables it, starts it, waits for the receiver, and prints a QR:
+
+```bash
+healthlink-local setup --agent generic --service --manager systemd
+```
+
+The systemd unit runs:
+
+```bash
+healthlink-local daemon \
+  --host 0.0.0.0 \
+  --port 8787 \
+  --db ~/.healthlink/healthlink.sqlite \
+  --transport lan
+```
+
+For boot-time startup when the user is not logged in, the host may also need user lingering enabled by an administrator:
+
+```bash
+loginctl enable-linger "$USER"
+```
+
+If the iPhone reaches the server through Tailscale, advertise the Tailscale name or address:
+
+```bash
+healthlink-local daemon \
+  --host 0.0.0.0 \
+  --port 8787 \
+  --db ~/.healthlink/healthlink.sqlite \
+  --transport tailscale \
+  --tailscale-name healthlink.tailnet.ts.net
+```
+
+Windows hosts are detected as `manual` in the first implementation. Run `healthlink-local daemon` manually, or use Docker/PM2 until Task Scheduler or Windows Service support lands.
+
+### User-owned VPS / public HTTPS mode
+
+For a VPS, run the receiver behind user-managed HTTPS and pass the public URL:
 
 ```bash
 healthlink-local daemon \
@@ -277,4 +350,8 @@ healthlink-local daemon \
   --server-url https://agent.example.com/healthlink
 ```
 
-The `pair` command still talks to the receiver through `http://127.0.0.1:<port>/pair/start`; for remote deployments, run `pair` on the Agent host or generate the pairing URL through the receiver's trusted admin surface.
+This mode requires the user to manage DNS, TLS, reverse proxying, persistence, and server security. Health summaries leave the home network, but remain on the user's own infrastructure.
+
+The `pair` command still talks to the receiver through `http://127.0.0.1:<port>/pair/start`; for server deployments, run `pair` on the receiver host or generate the pairing URL through the receiver's trusted admin surface.
+
+See `docs/deployment-methods.md` in the repository for the full matrix.
