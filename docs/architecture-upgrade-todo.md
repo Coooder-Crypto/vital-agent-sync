@@ -2,7 +2,7 @@
 
 This document tracks the architecture upgrade from the current local iOS + Hermes MVP to a multi-source, multi-agent, multi-transport personal data gateway.
 
-Implementation guidance for the remaining adapter work lives in [architecture-adapter-design.md](architecture-adapter-design.md).
+Implementation guidance for the remaining adapter work lives in [architecture-adapter-design.md](architecture-adapter-design.md). Common deployment methods are tracked separately in [deployment-methods.md](deployment-methods.md), so deployment choices and Agent runtime choices can evolve independently.
 
 ## Target
 
@@ -23,6 +23,8 @@ HealthLink should support:
   - Tailscale
   - tunnel providers such as Cloudflare Tunnel or ngrok
   - public HTTPS / self-hosted server
+
+The first deployment pass should stay focused on Mac local mode, home server / NAS / N100 mode, and user-owned VPS / public HTTPS mode. Agent-specific setup belongs to the Agent adapter work.
 
 The product promise remains:
 

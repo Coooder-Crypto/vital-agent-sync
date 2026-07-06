@@ -273,7 +273,11 @@ For Tailscale MagicDNS, pass `--tailscale-name <host.tailnet.ts.net>` or set `HE
 
 The source-device API is available at `/source-devices` and `/source-devices/:source_device_id/revoke`. The older `/devices` endpoints and MCP tools remain for compatibility with the current iOS app and older agent configs.
 
-## Background Service And Remote Agents
+## Background Service And Deployment Methods
+
+HealthLink deployment is about where the receiver, SQLite database, and MCP process run. The Agent type is configured separately through `--agent` or `print-agent-config`.
+
+### Mac local mode
 
 On macOS, `service install` writes `~/Library/LaunchAgents/com.healthlink.local.plist` and runs:
 
@@ -283,7 +287,32 @@ healthlink-local daemon --host 0.0.0.0 --port 8787 --db ~/.healthlink/healthlink
 
 Use `healthlink-local logs` to inspect the service logs. The raw files are `~/.healthlink/logs/daemon.out.log` and `~/.healthlink/logs/daemon.err.log`.
 
-For remote or self-hosted Agents, run `daemon` under the server's own process manager, such as systemd, Docker, or PM2:
+### Home server / NAS / N100 mode
+
+For an always-on home server, run `daemon` under the server's own process manager, such as systemd, Docker Compose, PM2, or the NAS vendor's service manager:
+
+```bash
+healthlink-local daemon \
+  --host 0.0.0.0 \
+  --port 8787 \
+  --db ~/.healthlink/healthlink.sqlite \
+  --transport lan
+```
+
+If the iPhone reaches the server through Tailscale, advertise the Tailscale name or address:
+
+```bash
+healthlink-local daemon \
+  --host 0.0.0.0 \
+  --port 8787 \
+  --db ~/.healthlink/healthlink.sqlite \
+  --transport tailscale \
+  --tailscale-name healthlink.tailnet.ts.net
+```
+
+### User-owned VPS / public HTTPS mode
+
+For a VPS, run the receiver behind user-managed HTTPS and pass the public URL:
 
 ```bash
 healthlink-local daemon \
@@ -293,4 +322,8 @@ healthlink-local daemon \
   --server-url https://agent.example.com/healthlink
 ```
 
-The `pair` command still talks to the receiver through `http://127.0.0.1:<port>/pair/start`; for remote deployments, run `pair` on the Agent host or generate the pairing URL through the receiver's trusted admin surface.
+This mode requires the user to manage DNS, TLS, reverse proxying, persistence, and server security. Health summaries leave the home network, but remain on the user's own infrastructure.
+
+The `pair` command still talks to the receiver through `http://127.0.0.1:<port>/pair/start`; for server deployments, run `pair` on the receiver host or generate the pairing URL through the receiver's trusted admin surface.
+
+See `docs/deployment-methods.md` in the repository for the full matrix.

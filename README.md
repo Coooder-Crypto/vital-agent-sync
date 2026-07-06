@@ -4,7 +4,7 @@ HealthLink is a private iOS data gateway for agent systems. The MVP reads user-a
 
 It is intentionally not an agent. It is a user-controlled data connector.
 
-For the broader product plan covering local daemon, MCP, tunnel mode, self-hosting, pairing, scopes, and packaging, see [docs/product-plan.md](docs/product-plan.md). For the target "install, scan QR, sync, agent reads data" UX, see [docs/agent-connection.md](docs/agent-connection.md). For the multi-source, multi-agent, multi-transport upgrade TODO, see [docs/architecture-upgrade-todo.md](docs/architecture-upgrade-todo.md).
+For the broader product plan covering local daemon, MCP, pairing, scopes, and packaging, see [docs/product-plan.md](docs/product-plan.md). For common deployment methods, see [docs/deployment-methods.md](docs/deployment-methods.md). For the target "install, scan QR, sync, agent reads data" UX, see [docs/agent-connection.md](docs/agent-connection.md). For the multi-source, multi-agent, multi-transport upgrade TODO, see [docs/architecture-upgrade-todo.md](docs/architecture-upgrade-todo.md).
 
 ## Scope
 
@@ -86,6 +86,12 @@ node packages/local/dist/cli.js setup --agent hermes --service
 ```
 
 `setup --agent hermes --service` backs up and writes `~/.hermes/config.yaml`, installs the HealthLink Hermes skill, installs and starts the macOS background receiver, prints the iPhone pairing QR, and points Hermes at the same HealthLink database. After pairing and syncing, restart Hermes or run `/reload-mcp`. If the QR expires, run `healthlink-local pair` or `npx -y healthlink-local pair`.
+
+Common deployment choices are documented separately:
+
+- Mac local mode: receiver, SQLite, and MCP run on the user's Mac.
+- Home server / NAS / N100 mode: receiver and SQLite run on an always-on home machine.
+- User-owned VPS / public HTTPS mode: receiver and SQLite run on the user's server with user-managed HTTPS.
 
 Foreground compatibility/debug command:
 
