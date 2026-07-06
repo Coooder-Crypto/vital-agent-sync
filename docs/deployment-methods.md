@@ -51,6 +51,14 @@ If the QR expires:
 npx -y healthlink-local pair
 ```
 
+If the local Agent has a startup hook, it can keep the receiver available without rerunning setup:
+
+```bash
+npx -y healthlink-local ensure --service
+```
+
+This is safe to run repeatedly. It ensures the background receiver service is installed and running, but does not rewrite Agent config or create a new pairing QR.
+
 Diagnostics:
 
 ```bash
@@ -102,6 +110,14 @@ For boot-time startup when the SSH user is not logged in, the host may also need
 ```bash
 loginctl enable-linger "$USER"
 ```
+
+If the Agent starts on the same Linux user account, add this to the Agent startup hook:
+
+```bash
+healthlink-local ensure --service --manager systemd
+```
+
+That command can repair a stopped receiver before the Agent loads MCP. If the host uses Docker, PM2, Task Scheduler, or a NAS vendor process manager instead of systemd, configure that process manager to run `healthlink-local daemon`; `ensure --service` only manages built-in launchd/systemd services.
 
 For Tailscale:
 

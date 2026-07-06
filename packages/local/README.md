@@ -54,6 +54,7 @@ Current package commands:
 npx -y healthlink-local
 npx -y healthlink-local setup --agent hermes --service
 npx -y healthlink-local setup --agent openclaw --service
+npx -y healthlink-local ensure --service
 npx -y healthlink-local init
 npx -y healthlink-local init --agent hermes
 npx -y healthlink-local init --hermes
@@ -90,6 +91,14 @@ npx -y healthlink-local setup --agent hermes --service
 ```
 
 This writes the Agent MCP config, installs the HealthLink Hermes skill when `--agent hermes` is selected, installs and starts the receiver with the current platform's service manager, waits for it to become reachable, and prints a 10-minute pairing QR. macOS uses `launchd`; Linux uses a user-level `systemd` unit. After pairing, the terminal can close while the background receiver keeps accepting iOS syncs.
+
+For Agent startup hooks, use the idempotent receiver check:
+
+```bash
+npx -y healthlink-local ensure --service
+```
+
+`ensure --service` installs the platform service if missing, starts it if stopped, waits for `/health/status`, and then prints service status. It does not rewrite Agent config, install skills, or print a pairing QR. Use it when an Agent wants to make sure HealthLink is available before loading MCP tools.
 
 If the QR expires, do not reinstall the service. Print a fresh pairing code:
 
