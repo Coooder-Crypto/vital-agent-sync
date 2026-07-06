@@ -28,10 +28,14 @@ import { PairingStore } from "../src/pairing.js";
 import { parseLsofListenOutput } from "../src/port-diagnostics.js";
 import {
   buildLaunchdPlist,
+  buildSystemdUnit,
   getLaunchdServicePaths,
+  getManualServiceStatus,
+  getSystemdServicePaths,
   installLaunchdService,
   readLaunchdServiceLog,
-  readLaunchdPlist
+  readLaunchdPlist,
+  resolveServiceManagerId
 } from "../src/service.js";
 import { runServiceSetupWorkflow } from "../src/setup.js";
 import {
@@ -518,6 +522,51 @@ test("launchd service plist uses daemon command and expected keepalive settings"
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
+});
+
+test("systemd service unit uses daemon command and restart policy", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-systemd-test-"));
+  try {
+    const databasePath = join(tempDir, "healthlink.sqlite");
+    const unit = buildSystemdUnit({
+      homeDir: tempDir,
+      cliCommand: "/tmp/healthlink-local",
+      databasePath,
+      host: "0.0.0.0",
+      port: 8787,
+      transport: "tailscale",
+      tailscaleName: "healthlink.tailnet.ts.net"
+    });
+    const paths = getSystemdServicePaths({
+      homeDir: tempDir,
+      databasePath
+    });
+
+    assert.equal(paths.manager, "systemd");
+    assert.match(paths.configPath, /healthlink-local\.service$/);
+    assert.match(unit, /\[Unit\]/);
+    assert.match(unit, /Description=HealthLink Local Receiver/);
+    assert.match(unit, /ExecStart=\/tmp\/healthlink-local daemon --host 0\.0\.0\.0 --port 8787 --db /);
+    assert.match(unit, /--transport tailscale --tailscale-name healthlink\.tailnet\.ts\.net/);
+    assert.match(unit, /Restart=on-failure/);
+    assert.match(unit, /WantedBy=default\.target/);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("service manager selection distinguishes macOS, Linux, Windows, and overrides", () => {
+  assert.equal(resolveServiceManagerId({ platform: "darwin" }), "launchd");
+  assert.equal(resolveServiceManagerId({ platform: "linux" }), "systemd");
+  assert.equal(resolveServiceManagerId({ platform: "win32" }), "manual");
+  assert.equal(resolveServiceManagerId({ manager: "systemd", platform: "darwin" }), "systemd");
+
+  const windowsStatus = getManualServiceStatus({
+    platform: "win32",
+    homeDir: "/tmp/healthlink-win"
+  });
+  assert.equal(windowsStatus.manager, "manual");
+  assert.match(windowsStatus.detail ?? "", /Windows background service installation is not implemented yet/);
 });
 
 test("port diagnostics parse lsof listener output", () => {

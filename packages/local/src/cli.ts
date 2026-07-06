@@ -9,13 +9,16 @@ import { getHealthStatus } from "./health-ingest.js";
 import { startLocalServer } from "./server.js";
 import { startMcpServer } from "./mcp.js";
 import {
-  getLaunchdServiceStatus,
-  installLaunchdService,
-  readLaunchdServiceLog,
-  startLaunchdService,
-  stopLaunchdService,
-  uninstallLaunchdService,
-  type LaunchdServiceOptions
+  getHealthLinkServiceStatus,
+  installHealthLinkService,
+  isServiceManagerId,
+  readHealthLinkServiceLog,
+  startHealthLinkService,
+  stopHealthLinkService,
+  uninstallHealthLinkService,
+  type HealthLinkServiceStatus,
+  type LaunchdServiceOptions,
+  type ServiceManagerId
 } from "./service.js";
 import { requestPairingSession } from "./pairing-client.js";
 import { describePortListeners } from "./port-diagnostics.js";
@@ -36,6 +39,7 @@ type CliOptions = {
   logLines: number;
   agentId: AgentAdapterId;
   transportId: TransportProviderId;
+  serviceManager: ServiceManagerId;
   databasePath?: string;
   serverUrl?: string;
   tailscaleName?: string;
@@ -55,7 +59,8 @@ function parseArgs(argv: string[]): CliOptions {
     installSkill: false,
     logLines: 80,
     agentId: "generic",
-    transportId: "lan"
+    transportId: "lan",
+    serviceManager: "auto"
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -106,6 +111,13 @@ function parseArgs(argv: string[]): CliOptions {
         throw new Error("Expected --transport to be one of: lan, tailscale, cloudflare, ngrok, public_https.");
       }
       options.transportId = value;
+      index += 1;
+    } else if (arg === "--manager") {
+      const value = argv[index + 1];
+      if (!value || !isServiceManagerId(value)) {
+        throw new Error("Expected --manager to be one of: auto, launchd, systemd, manual.");
+      }
+      options.serviceManager = value;
       index += 1;
     } else if (arg === "--hermes-config") {
       options.hermesConfigPath = argv[index + 1];
@@ -304,32 +316,30 @@ async function runServiceCommand(options: CliOptions): Promise<void> {
   const action = options.serviceAction ?? "status";
   const serviceOptions = toServiceOptions(options);
   if (action === "install") {
-    const status = installLaunchdService(serviceOptions);
+    const status = installHealthLinkService(serviceOptions);
     console.log("HealthLink service installed");
     await printServiceStatusDetails(status, options);
     return;
   }
   if (action === "start") {
-    const status = startLaunchdService(serviceOptions);
+    const status = startHealthLinkService(serviceOptions);
     console.log("HealthLink service start requested");
     await printServiceStatusDetails(status, options);
     return;
   }
   if (action === "stop") {
-    const status = stopLaunchdService(serviceOptions);
+    const status = stopHealthLinkService(serviceOptions);
     console.log("HealthLink service stop requested");
     await printServiceStatusDetails(status, options);
     return;
   }
   if (action === "uninstall") {
-    const status = uninstallLaunchdService(serviceOptions);
+    const status = uninstallHealthLinkService(serviceOptions);
     console.log("HealthLink service uninstalled");
     await printServiceStatusDetails(status, options);
     return;
   }
-  await printServiceStatusDetails(getLaunchdServiceStatus({
-    databasePath: options.databasePath
-  }), options);
+  await printServiceStatusDetails(getHealthLinkServiceStatus(serviceOptions), options);
 }
 
 async function runSetup(options: CliOptions): Promise<void> {
@@ -369,19 +379,20 @@ async function runSetup(options: CliOptions): Promise<void> {
       }
     },
     installService: () => {
-      const status = installLaunchdService(toServiceOptions(options));
-      console.log(`Service installed: ${status.plistPath}`);
+      const status = installHealthLinkService(toServiceOptions(options));
+      console.log(`Service manager:   ${status.manager}`);
+      console.log(`Service installed: ${status.configPath}`);
       console.log(`Service logs:      ${status.stdoutPath}`);
       console.log(`Service errors:    ${status.stderrPath}`);
     },
     startService: () => {
-      startLaunchdService(toServiceOptions(options));
+      startHealthLinkService(toServiceOptions(options));
       console.log("Service start requested.");
     },
     waitForReady: () => waitForLocalReceiver(options),
     pair: () => printPairingSession(options),
     printReloadHint: () => {
-      printSetupNextSteps(agent);
+      printSetupNextSteps(agent, resolveServiceManagerIdForCli(options));
     }
   }, {
     installSkill: shouldInstallSkill
@@ -442,6 +453,7 @@ async function waitForLocalReceiver(options: CliOptions): Promise<void> {
 
 function toServiceOptions(options: CliOptions): LaunchdServiceOptions {
   return {
+    manager: options.serviceManager,
     databasePath: options.databasePath,
     host: options.host,
     port: options.port,
@@ -451,17 +463,18 @@ function toServiceOptions(options: CliOptions): LaunchdServiceOptions {
   };
 }
 
-async function printServiceStatusDetails(status: ReturnType<typeof getLaunchdServiceStatus>, options: CliOptions): Promise<void> {
+async function printServiceStatusDetails(status: HealthLinkServiceStatus, options: CliOptions): Promise<void> {
   const database = openHealthLinkDatabase({ path: options.databasePath });
   try {
     const health = getHealthStatus(database);
     const receiver = await probeLocalReceiver(options);
     console.log("HealthLink service");
+    console.log(`Manager:   ${status.manager}`);
     console.log(`Label:     ${status.label}`);
     console.log(`Installed: ${status.installed ? "yes" : "no"}`);
     console.log(`Running:   ${status.running ? "yes" : "no"}`);
     console.log(`Receiver:  ${receiver.reachable ? "reachable" : "not reachable"} (${receiver.detail})`);
-    console.log(`Plist:     ${status.plistPath}`);
+    console.log(`Config:    ${status.configPath}`);
     console.log(`Local API: http://127.0.0.1:${options.port}`);
     console.log(`Database:  ${database.path}`);
     console.log(`Stdout:    ${status.stdoutPath}`);
@@ -483,12 +496,14 @@ async function printServiceStatusDetails(status: ReturnType<typeof getLaunchdSer
 }
 
 function printServiceLogs(options: CliOptions): void {
-  const stdout = readLaunchdServiceLog({
+  const stdout = readHealthLinkServiceLog({
+    manager: options.serviceManager,
     databasePath: options.databasePath,
     stream: "stdout",
     lines: options.logLines
   });
-  const stderr = readLaunchdServiceLog({
+  const stderr = readHealthLinkServiceLog({
+    manager: options.serviceManager,
     databasePath: options.databasePath,
     stream: "stderr",
     lines: options.logLines
@@ -499,7 +514,7 @@ function printServiceLogs(options: CliOptions): void {
   printLogSection("stderr", stderr);
 }
 
-function printLogSection(label: string, log: ReturnType<typeof readLaunchdServiceLog>): void {
+function printLogSection(label: string, log: ReturnType<typeof readHealthLinkServiceLog>): void {
   console.log("");
   console.log(`[${label}] ${log.path}`);
   if (!log.exists) {
@@ -509,7 +524,7 @@ function printLogSection(label: string, log: ReturnType<typeof readLaunchdServic
   console.log(log.content.length > 0 ? log.content : "(empty)");
 }
 
-function printSetupNextSteps(agent: ReturnType<typeof getAgentAdapter>): void {
+function printSetupNextSteps(agent: ReturnType<typeof getAgentAdapter>, manager: Exclude<ServiceManagerId, "auto">): void {
   console.log("");
   console.log("Setup complete");
   console.log("");
@@ -518,13 +533,26 @@ function printSetupNextSteps(agent: ReturnType<typeof getAgentAdapter>): void {
   console.log("  2. Confirm pairing, grant Health access, then run Sync in the app.");
   console.log(`  3. ${agent.reloadHint()}`);
   console.log("");
-  console.log("After the first sync, this terminal can close. The macOS background receiver keeps accepting iOS syncs.");
+  console.log(`After the first sync, this terminal can close. The ${manager} background receiver keeps accepting iOS syncs.`);
   console.log("Useful commands:");
   console.log("  healthlink-local service status");
   console.log("  healthlink-local doctor --agent hermes");
   console.log("  healthlink-local logs");
   console.log("  healthlink-local pair");
   console.log("  healthlink-local service stop");
+}
+
+function resolveServiceManagerIdForCli(options: Pick<CliOptions, "serviceManager">): Exclude<ServiceManagerId, "auto"> {
+  if (options.serviceManager === "auto") {
+    if (process.platform === "darwin") {
+      return "launchd";
+    }
+    if (process.platform === "linux") {
+      return "systemd";
+    }
+    return "manual";
+  }
+  return options.serviceManager;
 }
 
 function defaultAgentName(agentId: AgentAdapterId): string {
@@ -624,15 +652,13 @@ async function printDoctor(options: CliOptions): Promise<void> {
     detail: agentStatus.detail
   });
 
-  const serviceStatus = getLaunchdServiceStatus({
-    databasePath: options.databasePath
-  });
+  const serviceStatus = getHealthLinkServiceStatus(toServiceOptions(options));
   results.push({
     status: serviceStatus.running ? "OK" : serviceStatus.installed ? "WARN" : "WARN",
-    label: "macOS service",
+    label: `${serviceStatus.manager} service`,
     detail: serviceStatus.installed
-      ? `${serviceStatus.running ? "running" : "installed but not running"} (${serviceStatus.plistPath})`
-      : `not installed (${serviceStatus.plistPath})`
+      ? `${serviceStatus.running ? "running" : "installed but not running"} (${serviceStatus.configPath})`
+      : serviceStatus.detail ?? `not installed (${serviceStatus.configPath})`
   });
 
   const receiverStatus = await checkLocalReceiver(options);

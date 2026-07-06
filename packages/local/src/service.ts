@@ -7,10 +7,15 @@ import { getDefaultDatabasePath } from "./database.js";
 import type { TransportProviderId } from "./transports.js";
 
 export const HEALTHLINK_LAUNCHD_LABEL = "com.healthlink.local";
+export const HEALTHLINK_SYSTEMD_UNIT = "healthlink-local.service";
+
+export type ServiceManagerId = "auto" | "launchd" | "systemd" | "manual";
 
 export type LaunchdServiceOptions = {
   homeDir?: string;
   cliCommand?: string;
+  manager?: ServiceManagerId;
+  platform?: NodeJS.Platform;
   databasePath?: string;
   host: string;
   port: number;
@@ -20,6 +25,8 @@ export type LaunchdServiceOptions = {
 };
 
 export type HealthLinkServicePaths = {
+  manager: Exclude<ServiceManagerId, "auto">;
+  configPath: string;
   plistPath: string;
   logDir: string;
   stdoutPath: string;
@@ -31,6 +38,7 @@ export type HealthLinkServiceStatus = HealthLinkServicePaths & {
   label: string;
   installed: boolean;
   running: boolean;
+  detail?: string;
 };
 
 export type HealthLinkServiceLog = {
@@ -39,15 +47,51 @@ export type HealthLinkServiceLog = {
   content: string;
 };
 
+export function isServiceManagerId(value: string): value is ServiceManagerId {
+  return value === "auto" || value === "launchd" || value === "systemd" || value === "manual";
+}
+
+export function resolveServiceManagerId(options: Pick<LaunchdServiceOptions, "manager" | "platform"> = {}): Exclude<ServiceManagerId, "auto"> {
+  if (options.manager && options.manager !== "auto") {
+    return options.manager;
+  }
+  const platform = options.platform ?? process.platform;
+  if (platform === "darwin") {
+    return "launchd";
+  }
+  if (platform === "linux") {
+    return "systemd";
+  }
+  return "manual";
+}
+
 export function getLaunchdServicePaths(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath"> = {}): HealthLinkServicePaths {
   const home = options.homeDir ?? homedir();
   const healthlinkDir = join(home, ".healthlink");
   const logDir = join(healthlinkDir, "logs");
   return {
+    manager: "launchd",
+    configPath: join(home, "Library", "LaunchAgents", `${HEALTHLINK_LAUNCHD_LABEL}.plist`),
     plistPath: join(home, "Library", "LaunchAgents", `${HEALTHLINK_LAUNCHD_LABEL}.plist`),
     logDir,
     stdoutPath: join(logDir, "daemon.out.log"),
     stderrPath: join(logDir, "daemon.err.log"),
+    databasePath: resolveHomePath(options.databasePath ?? getDefaultDatabasePath(), home)
+  };
+}
+
+export function getSystemdServicePaths(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath"> = {}): HealthLinkServicePaths {
+  const home = options.homeDir ?? homedir();
+  const healthlinkDir = join(home, ".healthlink");
+  const logDir = join(healthlinkDir, "logs");
+  const unitPath = join(home, ".config", "systemd", "user", HEALTHLINK_SYSTEMD_UNIT);
+  return {
+    manager: "systemd",
+    configPath: unitPath,
+    plistPath: unitPath,
+    logDir,
+    stdoutPath: `journalctl --user -u ${HEALTHLINK_SYSTEMD_UNIT}`,
+    stderrPath: `journalctl --user -u ${HEALTHLINK_SYSTEMD_UNIT}`,
     databasePath: resolveHomePath(options.databasePath ?? getDefaultDatabasePath(), home)
   };
 }
@@ -77,6 +121,28 @@ ${argumentXml}
   <string>${escapeXml(paths.stderrPath)}</string>
 </dict>
 </plist>
+`;
+}
+
+export function buildSystemdUnit(options: LaunchdServiceOptions): string {
+  const paths = getSystemdServicePaths(options);
+  const command = buildDaemonProgramArguments(options, paths.databasePath)
+    .map(quoteSystemdArg)
+    .join(" ");
+
+  return `[Unit]
+Description=HealthLink Local Receiver
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=${command}
+Restart=on-failure
+RestartSec=3
+WorkingDirectory=${quoteSystemdArg(options.homeDir ?? homedir())}
+
+[Install]
+WantedBy=default.target
 `;
 }
 
@@ -138,6 +204,46 @@ export function uninstallLaunchdService(options: LaunchdServiceOptions): HealthL
   return getLaunchdServiceStatus(options);
 }
 
+export function installSystemdService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
+  assertLinuxSystemd();
+  const paths = getSystemdServicePaths(options);
+  mkdirSync(dirname(paths.configPath), { recursive: true });
+  mkdirSync(paths.logDir, { recursive: true });
+  writeFileSync(paths.configPath, buildSystemdUnit(options), "utf8");
+  runSystemctl(["--user", "daemon-reload"]);
+  runSystemctl(["--user", "enable", HEALTHLINK_SYSTEMD_UNIT]);
+  return getSystemdServiceStatus(options);
+}
+
+export function startSystemdService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
+  assertLinuxSystemd();
+  const paths = getSystemdServicePaths(options);
+  if (!existsSync(paths.configPath)) {
+    throw new Error(`HealthLink systemd service is not installed: ${paths.configPath}`);
+  }
+  runSystemctl(["--user", "daemon-reload"], { allowFailure: true });
+  runSystemctl(["--user", "start", HEALTHLINK_SYSTEMD_UNIT]);
+  return getSystemdServiceStatus(options);
+}
+
+export function stopSystemdService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
+  assertLinuxSystemd();
+  runSystemctl(["--user", "stop", HEALTHLINK_SYSTEMD_UNIT], { allowFailure: true });
+  return getSystemdServiceStatus(options);
+}
+
+export function uninstallSystemdService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
+  assertLinuxSystemd();
+  const paths = getSystemdServicePaths(options);
+  stopSystemdService(options);
+  runSystemctl(["--user", "disable", HEALTHLINK_SYSTEMD_UNIT], { allowFailure: true });
+  if (existsSync(paths.configPath)) {
+    unlinkSync(paths.configPath);
+  }
+  runSystemctl(["--user", "daemon-reload"], { allowFailure: true });
+  return getSystemdServiceStatus(options);
+}
+
 export function getLaunchdServiceStatus(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath"> = {}): HealthLinkServiceStatus {
   const paths = getLaunchdServicePaths(options);
   return {
@@ -148,9 +254,98 @@ export function getLaunchdServiceStatus(options: Pick<LaunchdServiceOptions, "ho
   };
 }
 
+export function getSystemdServiceStatus(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath"> = {}): HealthLinkServiceStatus {
+  const paths = getSystemdServicePaths(options);
+  return {
+    label: HEALTHLINK_SYSTEMD_UNIT,
+    installed: existsSync(paths.configPath),
+    running: isSystemdServiceRunning(),
+    ...paths
+  };
+}
+
+export function getManualServiceStatus(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "platform"> = {}): HealthLinkServiceStatus {
+  const home = options.homeDir ?? homedir();
+  const healthlinkDir = join(home, ".healthlink");
+  const logDir = join(healthlinkDir, "logs");
+  return {
+    manager: "manual",
+    label: "manual",
+    installed: false,
+    running: false,
+    configPath: "manual",
+    plistPath: "manual",
+    logDir,
+    stdoutPath: "manual daemon stdout",
+    stderrPath: "manual daemon stderr",
+    databasePath: resolveHomePath(options.databasePath ?? getDefaultDatabasePath(), home),
+    detail: manualServiceMessage(options.platform)
+  };
+}
+
+export function getHealthLinkServiceStatus(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "manager" | "platform"> = {}): HealthLinkServiceStatus {
+  const manager = resolveServiceManagerId(options);
+  if (manager === "launchd") {
+    return getLaunchdServiceStatus(options);
+  }
+  if (manager === "systemd") {
+    return getSystemdServiceStatus(options);
+  }
+  return getManualServiceStatus(options);
+}
+
+export function installHealthLinkService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
+  const manager = resolveServiceManagerId(options);
+  if (manager === "launchd") {
+    return installLaunchdService(options);
+  }
+  if (manager === "systemd") {
+    return installSystemdService(options);
+  }
+  throw new Error(manualServiceMessage(options.platform));
+}
+
+export function startHealthLinkService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
+  const manager = resolveServiceManagerId(options);
+  if (manager === "launchd") {
+    return startLaunchdService(options);
+  }
+  if (manager === "systemd") {
+    return startSystemdService(options);
+  }
+  throw new Error(manualServiceMessage(options.platform));
+}
+
+export function stopHealthLinkService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
+  const manager = resolveServiceManagerId(options);
+  if (manager === "launchd") {
+    return stopLaunchdService(options);
+  }
+  if (manager === "systemd") {
+    return stopSystemdService(options);
+  }
+  throw new Error(manualServiceMessage(options.platform));
+}
+
+export function uninstallHealthLinkService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
+  const manager = resolveServiceManagerId(options);
+  if (manager === "launchd") {
+    return uninstallLaunchdService(options);
+  }
+  if (manager === "systemd") {
+    return uninstallSystemdService(options);
+  }
+  throw new Error(manualServiceMessage(options.platform));
+}
+
 export function readLaunchdPlist(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath"> = {}): string | undefined {
   const plistPath = getLaunchdServicePaths(options).plistPath;
   return existsSync(plistPath) ? readFileSync(plistPath, "utf8") : undefined;
+}
+
+export function readSystemdUnit(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath"> = {}): string | undefined {
+  const unitPath = getSystemdServicePaths(options).configPath;
+  return existsSync(unitPath) ? readFileSync(unitPath, "utf8") : undefined;
 }
 
 export function readLaunchdServiceLog(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath"> & {
@@ -174,6 +369,24 @@ export function readLaunchdServiceLog(options: Pick<LaunchdServiceOptions, "home
   };
 }
 
+export function readHealthLinkServiceLog(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "manager" | "platform"> & {
+  stream: "stdout" | "stderr";
+  lines?: number;
+}): HealthLinkServiceLog {
+  const manager = resolveServiceManagerId(options);
+  if (manager === "launchd") {
+    return readLaunchdServiceLog(options);
+  }
+  if (manager === "systemd") {
+    return readSystemdServiceLog(options);
+  }
+  return {
+    path: "manual daemon stdout/stderr",
+    exists: false,
+    content: manualServiceMessage(options.platform)
+  };
+}
+
 function isLaunchdServiceRunning(): boolean {
   if (process.platform !== "darwin") {
     return false;
@@ -188,9 +401,29 @@ function isLaunchdServiceRunning(): boolean {
   }
 }
 
+function isSystemdServiceRunning(): boolean {
+  if (process.platform !== "linux") {
+    return false;
+  }
+  try {
+    execFileSync("systemctl", ["--user", "is-active", "--quiet", HEALTHLINK_SYSTEMD_UNIT], {
+      stdio: ["ignore", "ignore", "ignore"]
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function assertMacOSLaunchd(): void {
   if (process.platform !== "darwin") {
     throw new Error("HealthLink service install/start/stop/uninstall currently supports macOS launchd only. Use healthlink-local daemon with systemd, Docker, PM2, or another process manager on remote hosts.");
+  }
+}
+
+function assertLinuxSystemd(): void {
+  if (process.platform !== "linux") {
+    throw new Error("HealthLink systemd service management is only available on Linux. Use --manager launchd on macOS, or run healthlink-local daemon under your own process manager.");
   }
 }
 
@@ -203,6 +436,39 @@ function runLaunchctl(args: string[], options: { allowFailure?: boolean } = {}):
     if (!options.allowFailure) {
       throw error;
     }
+  }
+}
+
+function runSystemctl(args: string[], options: { allowFailure?: boolean } = {}): void {
+  try {
+    execFileSync("systemctl", args, {
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+  } catch (error) {
+    if (!options.allowFailure) {
+      throw error;
+    }
+  }
+}
+
+function readSystemdServiceLog(options: { lines?: number }): HealthLinkServiceLog {
+  const path = `journalctl --user -u ${HEALTHLINK_SYSTEMD_UNIT}`;
+  try {
+    const output = execFileSync("journalctl", ["--user", "-u", HEALTHLINK_SYSTEMD_UNIT, "-n", String(options.lines ?? 80), "--no-pager"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    return {
+      path,
+      exists: true,
+      content: output.trimEnd()
+    };
+  } catch (error) {
+    return {
+      path,
+      exists: false,
+      content: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -234,6 +500,20 @@ function resolveHomePath(path: string, home: string): string {
     return join(home, path.slice(2));
   }
   return path;
+}
+
+function manualServiceMessage(platform = process.platform): string {
+  if (platform === "win32") {
+    return "Windows background service installation is not implemented yet. Run healthlink-local daemon manually, use Docker/PM2, or wait for Task Scheduler/Windows Service support.";
+  }
+  return "No native background service manager is available for this platform. Run healthlink-local daemon manually or use systemd, Docker, PM2, or another process manager.";
+}
+
+function quoteSystemdArg(value: string): string {
+  if (/^[A-Za-z0-9_@%+=:,./~-]+$/.test(value)) {
+    return value;
+  }
+  return `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
 }
 
 function tailLines(value: string, lines: number): string {

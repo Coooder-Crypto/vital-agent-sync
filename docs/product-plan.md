@@ -105,10 +105,10 @@ iPhone
   -> MCP-compatible Agent
 ```
 
-Recommended receiver command:
+Recommended receiver command on Linux home servers:
 
 ```bash
-healthlink-local daemon --host 0.0.0.0 --port 8787 --transport lan
+healthlink-local setup --agent generic --service --manager systemd
 ```
 
 Tailscale is the preferred private remote-access option for this mode:
@@ -117,7 +117,7 @@ Tailscale is the preferred private remote-access option for this mode:
 healthlink-local daemon --host 0.0.0.0 --port 8787 --transport tailscale --tailscale-name healthlink.tailnet.ts.net
 ```
 
-Use systemd, PM2, Docker Compose, or the NAS vendor's process manager to keep the daemon running. HealthLink does not install those managers in the first version.
+This installs a user-level systemd service for the receiver, waits until it is reachable, and prints a pairing QR. If systemd is not available on the NAS, use PM2, Docker Compose, or the NAS vendor's process manager to keep the daemon running. Windows hosts are detected as manual until Task Scheduler or Windows Service support is added.
 
 ### 3. User-Owned VPS / Public HTTPS Mode
 
@@ -408,6 +408,7 @@ Exit criteria:
 
 - Mac local deployment guide
 - home server / NAS / N100 deployment guide
+- Linux systemd user service installer
 - Tailscale pairing guidance
 - user-owned VPS / public HTTPS deployment guide
 - clear privacy boundary for each method

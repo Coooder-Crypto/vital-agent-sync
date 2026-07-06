@@ -85,12 +85,12 @@ npm run build:local
 node packages/local/dist/cli.js setup --agent hermes --service
 ```
 
-`setup --agent hermes --service` backs up and writes `~/.hermes/config.yaml`, installs the HealthLink Hermes skill, installs and starts the macOS background receiver, prints the iPhone pairing QR, and points Hermes at the same HealthLink database. After pairing and syncing, restart Hermes or run `/reload-mcp`. If the QR expires, run `healthlink-local pair` or `npx -y healthlink-local pair`.
+`setup --agent hermes --service` backs up and writes `~/.hermes/config.yaml`, installs the HealthLink Hermes skill, installs and starts the background receiver through the current platform's service manager, prints the iPhone pairing QR, and points Hermes at the same HealthLink database. macOS uses `launchd`; Linux servers use a user-level `systemd` service. After pairing and syncing, restart Hermes or run `/reload-mcp`. If the QR expires, run `healthlink-local pair` or `npx -y healthlink-local pair`.
 
 Common deployment choices are documented separately:
 
 - Mac local mode: receiver, SQLite, and MCP run on the user's Mac.
-- Home server / NAS / N100 mode: receiver and SQLite run on an always-on home machine.
+- Home server / NAS / N100 mode: receiver and SQLite run on an always-on home machine, usually via `systemd`.
 - User-owned VPS / public HTTPS mode: receiver and SQLite run on the user's server with user-managed HTTPS.
 
 Foreground compatibility/debug command:
