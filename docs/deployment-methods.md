@@ -13,7 +13,7 @@ The three deployment methods to support first are:
 | Method | Receiver | Database | MCP | iPhone path | Support |
 | --- | --- | --- | --- | --- | --- |
 | Mac local | User's Mac | `~/.healthlink/healthlink.sqlite` on Mac | Same Mac | LAN QR URL | Supported, default path |
-| Home server / NAS / N100 | Always-on home server | Server-local SQLite | Same server or LAN host | LAN or Tailscale URL | Supported by `daemon`; process manager is user-managed |
+| Home server / NAS / N100 | Always-on home server | Server-local SQLite | Same server or LAN host | LAN or Tailscale URL | Supported by `daemon` and Linux user-level `systemd` service |
 | User-owned VPS / HTTPS | User's VPS | VPS-local SQLite | Same VPS or adjacent host | HTTPS URL | Power-user path; requires user-managed HTTPS |
 
 ## 1. Mac Local Mode
@@ -76,11 +76,29 @@ iPhone
 Recommended receiver command:
 
 ```bash
+healthlink-local setup --agent generic --service --manager systemd
+```
+
+This writes and starts a user-level systemd unit at:
+
+```text
+~/.config/systemd/user/healthlink-local.service
+```
+
+The service runs:
+
+```bash
 healthlink-local daemon \
   --host 0.0.0.0 \
   --port 8787 \
   --db ~/.healthlink/healthlink.sqlite \
   --transport lan
+```
+
+For boot-time startup when the SSH user is not logged in, the host may also need user lingering enabled by an administrator:
+
+```bash
+loginctl enable-linger "$USER"
 ```
 
 For Tailscale:
@@ -94,7 +112,7 @@ healthlink-local daemon \
   --tailscale-name healthlink.tailnet.ts.net
 ```
 
-Run the command under the server's process manager, such as systemd, PM2, Docker Compose, or the NAS vendor's service manager. HealthLink does not install those managers in the first version.
+If systemd is not available on the NAS, run the daemon under PM2, Docker Compose, or the NAS vendor's service manager.
 
 Pairing:
 
@@ -105,11 +123,15 @@ Diagnostics:
 
 ```bash
 healthlink-local status --db ~/.healthlink/healthlink.sqlite
+healthlink-local service status --manager systemd
+healthlink-local logs --manager systemd
 healthlink-local doctor --transport lan
 healthlink-local doctor --transport tailscale --tailscale-name healthlink.tailnet.ts.net
 ```
 
 Privacy boundary: data stays on the user's home server or private mesh network. Tailscale keeps the receiver off the public internet.
+
+Windows hosts are currently treated as `manual`: run `healthlink-local daemon` manually or use Docker/PM2 until Task Scheduler or Windows Service support is added.
 
 ## 3. User-Owned VPS / Public HTTPS Mode
 
