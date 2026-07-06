@@ -57,6 +57,7 @@ final class GatewaySettings: ObservableObject {
     @Published private(set) var lastSyncAttemptAt: Date?
     @Published private(set) var lastSyncError: String?
     @Published private(set) var lastBackgroundScheduleError: String?
+    @Published private(set) var syncHistory: [LastSyncDetail]
     @Published var appTheme: AppTheme
     @Published var appLanguage: AppLanguage
     @Published var lastSavedMessage: String?
@@ -78,9 +79,12 @@ final class GatewaySettings: ObservableObject {
         static let lastSyncAttemptAt = "gateway.lastSyncAttemptAt"
         static let lastSyncError = "gateway.lastSyncError"
         static let lastBackgroundScheduleError = "gateway.lastBackgroundScheduleError"
+        static let syncHistory = "gateway.syncHistory"
         static let appTheme = "gateway.appTheme"
         static let appLanguage = "gateway.appLanguage"
     }
+
+    private static let maxSyncHistoryCount = 20
 
     static let defaultAcceptedScopes = [
         "health.daily_summary.write"
@@ -101,6 +105,7 @@ final class GatewaySettings: ObservableObject {
         self.lastSyncAttemptAt = defaults.object(forKey: Keys.lastSyncAttemptAt) as? Date
         self.lastSyncError = defaults.string(forKey: Keys.lastSyncError)
         self.lastBackgroundScheduleError = defaults.string(forKey: Keys.lastBackgroundScheduleError)
+        self.syncHistory = Self.loadSyncHistory(from: defaults)
         self.appTheme = AppTheme(rawValue: defaults.string(forKey: Keys.appTheme) ?? "") ?? .system
         self.appLanguage = AppLanguage(rawValue: defaults.string(forKey: Keys.appLanguage) ?? "") ?? .system
     }
@@ -301,6 +306,21 @@ final class GatewaySettings: ObservableObject {
         }
     }
 
+    func recordSyncDetail(_ detail: LastSyncDetail) {
+        var nextHistory = syncHistory
+        nextHistory.insert(detail, at: 0)
+        if nextHistory.count > Self.maxSyncHistoryCount {
+            nextHistory = Array(nextHistory.prefix(Self.maxSyncHistoryCount))
+        }
+        syncHistory = nextHistory
+        saveSyncHistory()
+    }
+
+    func clearSyncHistory() {
+        syncHistory = []
+        defaults.removeObject(forKey: Keys.syncHistory)
+    }
+
     private func savePairing(serverURL: URL, agentName: String, deviceID: String, deviceToken: String, acceptedScopes: [String]) {
         serverURLText = serverURL.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         apiTokenText = deviceToken
@@ -325,11 +345,27 @@ final class GatewaySettings: ObservableObject {
         max(5, min(autoSyncMinimumIntervalMinutes, 240))
     }
 
+    private func saveSyncHistory() {
+        guard let data = try? JSONEncoder().encode(syncHistory) else {
+            return
+        }
+        defaults.set(data, forKey: Keys.syncHistory)
+    }
+
+    private static func loadSyncHistory(from defaults: UserDefaults) -> [LastSyncDetail] {
+        guard let data = defaults.data(forKey: Keys.syncHistory),
+              let history = try? JSONDecoder().decode([LastSyncDetail].self, from: data) else {
+            return []
+        }
+        return Array(history.prefix(maxSyncHistoryCount))
+    }
+
     private func clearPairing() throws {
         apiTokenText = ""
         pairedDeviceID = nil
         pairedAgentName = nil
         acceptedScopes = Self.defaultAcceptedScopes
+        clearSyncHistory()
         defaults.removeObject(forKey: Keys.pairedDeviceID)
         defaults.removeObject(forKey: Keys.pairedAgentName)
         defaults.removeObject(forKey: Keys.acceptedScopes)

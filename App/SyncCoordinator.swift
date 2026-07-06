@@ -46,15 +46,30 @@ final class SyncCoordinator: ObservableObject {
     func sync(settings: GatewaySettings, daysBack: Int = 1, trigger: SyncTrigger = .manual) async -> Bool {
         settings.recordSyncAttempt()
         let syncError: String?
+        let attemptedAt = Date()
 
         do {
             let context = try SyncRequestContext(settings: settings, daysBack: daysBack)
             beginOperation()
 
             let healthSummaries = try await buildHealthSummaries(context: context)
-            let response = try await uploadHealthSummaries(healthSummaries, context: context)
+            let request = makeHealthSyncRequest(healthSummaries, context: context)
+            let response = try await uploadHealthSyncRequest(request)
             let latestSummary = healthSummaries.last
             let syncedAt = Date()
+            let detail = LastSyncDetail(
+                attemptedAt: attemptedAt,
+                completedAt: syncedAt,
+                trigger: trigger.displayName,
+                serverURL: context.serverURL.absoluteString,
+                agentName: context.agentName,
+                requestedDateRange: context.dateRangeDescription,
+                uploadedDayCount: response.health_daily_count,
+                acceptedSyncID: response.accepted_sync_id,
+                isIdempotent: response.idempotent,
+                failureCategory: nil,
+                failureMessage: nil
+            )
 
             finishOperation { state in
                 if let latestSummary {
@@ -62,12 +77,31 @@ final class SyncCoordinator: ObservableObject {
                     state.status.lastHealthSyncAt = syncedAt
                 }
                 state.status.lastSuccessMessage = self.successMessage(response: response, trigger: trigger)
+                state.status.lastSyncDetail = detail
             }
+            settings.recordSyncDetail(detail)
             syncError = nil
         } catch {
+            let category = Self.failureCategory(for: error)
+            let message = error.localizedDescription
+            let detail = LastSyncDetail(
+                attemptedAt: attemptedAt,
+                completedAt: nil,
+                trigger: trigger.displayName,
+                serverURL: settings.serverURL?.absoluteString,
+                agentName: settings.pairedAgentName,
+                requestedDateRange: nil,
+                uploadedDayCount: 0,
+                acceptedSyncID: nil,
+                isIdempotent: nil,
+                failureCategory: category,
+                failureMessage: message
+            )
             finishOperation { state in
-                state.status.lastError = error.localizedDescription
+                state.status.lastError = message
+                state.status.lastSyncDetail = detail
             }
+            settings.recordSyncDetail(detail)
             syncError = self.status.lastError
         }
 
@@ -123,8 +157,7 @@ final class SyncCoordinator: ObservableObject {
         return healthSummaries
     }
 
-    private func uploadHealthSummaries(_ healthSummaries: [DailyHealthSummary], context: SyncRequestContext) async throws -> HealthSyncResponse {
-        let client = GatewayAPIClient(serverURL: context.serverURL, apiToken: context.apiToken)
+    private func makeHealthSyncRequest(_ healthSummaries: [DailyHealthSummary], context: SyncRequestContext) -> HealthSyncRequest {
         let payload = HealthSyncPayload(
             device_id: context.deviceID,
             sync_id: makeSyncID(),
@@ -132,7 +165,11 @@ final class SyncCoordinator: ObservableObject {
             timezone: TimeZone.current.identifier,
             health_daily_summaries: healthSummaries
         )
-        return try await client.uploadHealthSync(payload)
+        return HealthSyncRequest(client: GatewayAPIClient(serverURL: context.serverURL, apiToken: context.apiToken), payload: payload)
+    }
+
+    private func uploadHealthSyncRequest(_ request: HealthSyncRequest) async throws -> HealthSyncResponse {
+        try await request.client.uploadHealthSync(request.payload)
     }
 
     private func successMessage(response: HealthSyncResponse, trigger: SyncTrigger) -> String {
@@ -161,6 +198,13 @@ final class SyncCoordinator: ObservableObject {
         state = next
     }
 
+    private static func failureCategory(for error: Error) -> SyncFailureCategory {
+        if let gatewayError = error as? GatewayError {
+            return gatewayError.syncFailureCategory
+        }
+        return .unknown
+    }
+
     private struct SyncCoordinatorState {
         var isSyncing = false
         var status: SyncStatus = .empty
@@ -171,6 +215,7 @@ final class SyncCoordinator: ObservableObject {
         let serverURL: URL
         let apiToken: String
         let deviceID: String
+        let agentName: String?
         let uploadHealthEnabled: Bool
         let dates: [Date]
 
@@ -192,8 +237,19 @@ final class SyncCoordinator: ObservableObject {
             self.serverURL = serverURL
             self.apiToken = token
             self.deviceID = deviceID
+            self.agentName = settings.pairedAgentName
             self.uploadHealthEnabled = settings.uploadHealthEnabled
             self.dates = Self.datesToSync(daysBack: daysBack)
+        }
+
+        var dateRangeDescription: String? {
+            guard let first = dates.first,
+                  let last = dates.last else {
+                return nil
+            }
+            let start = DateFormatter.gatewayDate.string(from: first)
+            let end = DateFormatter.gatewayDate.string(from: last)
+            return start == end ? start : "\(start) - \(end)"
         }
 
         private static func datesToSync(daysBack: Int) -> [Date] {
@@ -203,6 +259,22 @@ final class SyncCoordinator: ObservableObject {
             return stride(from: clamped, through: 0, by: -1).compactMap {
                 calendar.date(byAdding: .day, value: -$0, to: today)
             }
+        }
+    }
+
+    private struct HealthSyncRequest {
+        let client: GatewayAPIClient
+        let payload: HealthSyncPayload
+    }
+}
+
+private extension SyncCoordinator.SyncTrigger {
+    var displayName: String {
+        switch self {
+        case .manual:
+            return "Manual"
+        case .automatic(let reason):
+            return "Auto: \(reason)"
         }
     }
 }
