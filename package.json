@@ -4,10 +4,14 @@
   "private": true,
   "description": "Private HealthKit bridge between HealthLink iOS and a user's local Agent runtime.",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "apps/*"
   ],
   "scripts": {
     "build": "npm run build --workspaces",
+    "dev:www": "npm run dev --workspace @healthlink/www",
+    "build:www": "npm run build --workspace @healthlink/www",
+    "typecheck:www": "npm run typecheck --workspace @healthlink/www",
     "dev:local": "npm run dev --workspace healthlink-local",
     "build:local": "npm run build --workspace healthlink-local",
     "test:local": "npm run test --workspace healthlink-local",
