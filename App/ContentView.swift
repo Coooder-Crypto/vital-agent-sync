@@ -22,6 +22,11 @@ struct ContentView: View {
                 .tabItem {
                     Label("Connection", systemImage: "link")
                 }
+
+            SettingsView()
+                .tabItem {
+                    Label("Settings", systemImage: "gearshape")
+                }
         }
         .tint(GatewayStyle.primary)
         .sheet(isPresented: $isShowingScanner) {
@@ -61,10 +66,14 @@ struct HomeView: View {
                 GatewayStyle.background.ignoresSafeArea()
 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
+                    LazyVStack(alignment: .leading, spacing: 16) {
                         HomeHeroPanel(
-                            settings: settings,
-                            sync: sync,
+                            isPaired: settings.isPaired,
+                            agentName: agentName,
+                            isSyncing: sync.isSyncing,
+                            isPairing: settings.isPairing,
+                            latestSyncDate: latestSyncDate,
+                            lastError: sync.status.lastError ?? settings.lastSyncError,
                             onScan: { isShowingScanner = true },
                             onSync: {
                                 Task { await sync.sync(settings: settings, trigger: .manual) }
@@ -73,15 +82,19 @@ struct HomeView: View {
 
                         if settings.isPaired {
                             if sync.latestHealthSummary != nil {
-                                SummaryPanel(
+                                TodaySnapshotPanel(
                                     health: sync.latestHealthSummary
                                 )
                             } else {
-                                EmptySummaryPanel()
+                                EmptySnapshotPanel()
                             }
 
                             AgentPromptPanel(agentName: agentName)
-                            HomeSyncDetails(settings: settings, sync: sync)
+                            HomeSyncDetails(
+                                lastHealthSyncAt: sync.status.lastHealthSyncAt,
+                                autoSyncDetail: autoSyncDetail,
+                                lastSuccessMessage: sync.status.lastSuccessMessage
+                            )
                         } else {
                             PairingCommandPanel(onScan: { isShowingScanner = true })
                         }
@@ -100,6 +113,28 @@ struct HomeView: View {
         settings.pairedAgentName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
             ? settings.pairedAgentName!
             : "your agent"
+    }
+
+    private var latestSyncDate: Date? {
+        [sync.status.lastHealthSyncAt, settings.lastManualSyncAt, settings.lastAutoSyncAt]
+            .compactMap { $0 }
+            .max()
+    }
+
+    private var autoSyncDetail: LocalizedStringKey {
+        if !settings.autoSyncEnabled {
+            return "Off"
+        }
+        if let lastBackgroundScheduleError = settings.lastBackgroundScheduleError {
+            return "Background scheduling issue: \(lastBackgroundScheduleError)"
+        }
+        if let lastAutoSyncAt = settings.lastAutoSyncAt {
+            return "Last \(lastAutoSyncAt.formatted(date: .omitted, time: .shortened))"
+        }
+        if let nextEligibleAutoSyncAt = settings.nextEligibleAutoSyncAt {
+            return "Next eligible \(nextEligibleAutoSyncAt.formatted(date: .omitted, time: .shortened))"
+        }
+        return "Ready when the app is active"
     }
 }
 
@@ -132,7 +167,74 @@ struct SourcesView: View {
                         Label("Health summaries", systemImage: "heart")
                     }
                     .onChange(of: settings.uploadHealthEnabled) { _, _ in
-                        settings.save()
+                        settings.saveUploadSettings()
+                    }
+                }
+
+                Section("Today Details") {
+                    if let health = sync.latestHealthSummary {
+                        HealthDetailRows(health: health)
+                    } else {
+                        ContentUnavailableView(
+                            "No Health Summary",
+                            systemImage: "tray",
+                            description: Text("Run a sync to load the latest source details.")
+                        )
+                    }
+                }
+
+                Section("Sync History") {
+                    LabeledContent("Health", value: sync.status.lastHealthSyncAt.map(Self.formatDate) ?? "Never")
+
+                    if let lastSyncError = settings.lastSyncError ?? sync.status.lastError {
+                        Label(lastSyncError, systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(GatewayStyle.warning)
+                    }
+
+                    if let lastBackgroundScheduleError = settings.lastBackgroundScheduleError {
+                        Label(lastBackgroundScheduleError, systemImage: "arrow.triangle.2.circlepath.circle")
+                            .foregroundStyle(GatewayStyle.warning)
+                    }
+                }
+
+                Section("Privacy") {
+                    Label("Health samples are summarized", systemImage: "chart.bar.doc.horizontal")
+                }
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            }
+            .navigationTitle("Sources")
+        }
+    }
+
+    private static func formatDate(_ date: Date) -> String {
+        date.formatted(date: .abbreviated, time: .shortened)
+    }
+}
+
+struct SettingsView: View {
+    @EnvironmentObject private var settings: GatewaySettings
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Appearance") {
+                    Picker("Theme", selection: $settings.appTheme) {
+                        ForEach(AppTheme.allCases) { theme in
+                            Text(LocalizedStringKey(theme.title)).tag(theme)
+                        }
+                    }
+                    .onChange(of: settings.appTheme) { _, _ in
+                        settings.saveAppearanceSettings()
+                    }
+
+                    Picker("Language", selection: $settings.appLanguage) {
+                        ForEach(AppLanguage.allCases) { language in
+                            Text(LocalizedStringKey(language.title)).tag(language)
+                        }
+                    }
+                    .onChange(of: settings.appLanguage) { _, _ in
+                        settings.saveAppearanceSettings()
                     }
                 }
 
@@ -167,32 +269,13 @@ struct SourcesView: View {
                     }
                 }
 
-                Section("Sync History") {
-                    LabeledContent("Health", value: sync.status.lastHealthSyncAt.map(Self.formatDate) ?? "Never")
-
-                    if let lastSyncError = settings.lastSyncError ?? sync.status.lastError {
-                        Label(lastSyncError, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(GatewayStyle.warning)
-                    }
-
-                    if let lastBackgroundScheduleError = settings.lastBackgroundScheduleError {
-                        Label(lastBackgroundScheduleError, systemImage: "arrow.triangle.2.circlepath.circle")
-                            .foregroundStyle(GatewayStyle.warning)
-                    }
+                Section("About") {
+                    LabeledContent("App", value: "HealthLink")
+                    LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "-")
                 }
-
-                Section("Privacy") {
-                    Label("Health samples are summarized", systemImage: "chart.bar.doc.horizontal")
-                }
-                .font(.footnote)
-                .foregroundStyle(.secondary)
             }
-            .navigationTitle("Sources")
+            .navigationTitle("Settings")
         }
-    }
-
-    private static func formatDate(_ date: Date) -> String {
-        date.formatted(date: .abbreviated, time: .shortened)
     }
 }
 
@@ -203,6 +286,7 @@ struct ConnectionView: View {
 
     @State private var receiverStatus: ReceiverCheckState = .idle
     @State private var isAdvancedExpanded = false
+    @State private var isConfirmingAgentRemoval = false
     @State private var receiverCheckTask: Task<Void, Never>?
 
     var body: some View {
@@ -211,7 +295,7 @@ struct ConnectionView: View {
                 GatewayStyle.background.ignoresSafeArea()
 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
+                    LazyVStack(alignment: .leading, spacing: 16) {
                         ConnectionStatusPanel(
                             settings: settings,
                             receiverStatus: receiverStatus,
@@ -232,9 +316,9 @@ struct ConnectionView: View {
 
                         if settings.isPaired {
                             Button(role: .destructive) {
-                                Task { await settings.disconnect() }
+                                isConfirmingAgentRemoval = true
                             } label: {
-                                Label("Disconnect Agent", systemImage: "iphone.slash")
+                                Label("Remove Paired Agent", systemImage: "trash")
                                     .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.bordered)
@@ -244,8 +328,8 @@ struct ConnectionView: View {
                         if let message = settings.pairingMessage {
                             StatusMessage(
                                 message: message,
-                                systemImage: settings.isPaired ? "checkmark.circle" : "exclamationmark.triangle",
-                                color: settings.isPaired ? GatewayStyle.success : GatewayStyle.warning
+                                systemImage: messageIcon(message),
+                                color: messageColor(message)
                             )
                             .padding(.horizontal, 2)
                         }
@@ -257,6 +341,21 @@ struct ConnectionView: View {
             }
             .navigationTitle("Connection")
             .navigationBarTitleDisplayMode(.inline)
+            .confirmationDialog(
+                "Remove paired agent?",
+                isPresented: $isConfirmingAgentRemoval,
+                titleVisibility: .visible
+            ) {
+                Button("Remove Agent", role: .destructive) {
+                    Task {
+                        await settings.disconnect()
+                        BackgroundSyncManager.scheduleAppRefresh(settings: settings)
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("HealthLink will remove this pairing from the iPhone. If the receiver is reachable, it will also revoke the device token on the agent side.")
+            }
             .onAppear {
                 scheduleDeferredReceiverCheck()
             }
@@ -299,11 +398,32 @@ struct ConnectionView: View {
             receiverStatus = .offline(error.localizedDescription)
         }
     }
+
+    private func messageIcon(_ message: String) -> String {
+        isWarningMessage(message) ? "exclamationmark.triangle" : "checkmark.circle"
+    }
+
+    private func messageColor(_ message: String) -> Color {
+        isWarningMessage(message) ? GatewayStyle.warning : GatewayStyle.success
+    }
+
+    private func isWarningMessage(_ message: String) -> Bool {
+        let lowercased = message.lowercased()
+        return lowercased.contains("failed")
+            || lowercased.contains("invalid")
+            || lowercased.contains("rejected")
+            || lowercased.contains("not reachable")
+            || lowercased.contains("error")
+    }
 }
 
 struct HomeHeroPanel: View {
-    @ObservedObject var settings: GatewaySettings
-    @ObservedObject var sync: SyncCoordinator
+    let isPaired: Bool
+    let agentName: String
+    let isSyncing: Bool
+    let isPairing: Bool
+    let latestSyncDate: Date?
+    let lastError: String?
     let onScan: () -> Void
     let onSync: () -> Void
 
@@ -330,7 +450,7 @@ struct HomeHeroPanel: View {
                 )
             }
 
-            if let lastError = sync.status.lastError ?? settings.lastSyncError {
+            if let lastError {
                 ErrorBanner(message: lastError)
             }
 
@@ -344,7 +464,7 @@ struct HomeHeroPanel: View {
 
                     Spacer()
 
-                    if sync.isSyncing || settings.isPairing {
+                    if isSyncing || isPairing {
                         ProgressView()
                     } else {
                         Image(systemName: "chevron.right")
@@ -359,7 +479,7 @@ struct HomeHeroPanel: View {
             .foregroundStyle(.white)
             .background(GatewayStyle.primary)
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .disabled(sync.isSyncing || settings.isPairing)
+            .disabled(isSyncing || isPairing)
         }
         .padding(18)
         .background(GatewayStyle.surface)
@@ -370,21 +490,21 @@ struct HomeHeroPanel: View {
         )
     }
 
-    private var title: String {
-        if !settings.isPaired {
+    private var title: LocalizedStringKey {
+        if !isPaired {
             return "Connect your agent"
         }
-        if sync.status.lastError != nil || settings.lastSyncError != nil {
+        if lastError != nil {
             return "Sync needs attention"
         }
         return "Ready for \(agentName)"
     }
 
-    private var subtitle: String {
-        if !settings.isPaired {
+    private var subtitle: LocalizedStringKey {
+        if !isPaired {
             return "Pair HealthLink with your local Agent receiver."
         }
-        if sync.isSyncing {
+        if isSyncing {
             return "Uploading your latest daily summaries."
         }
         if let latestSyncDate {
@@ -393,58 +513,46 @@ struct HomeHeroPanel: View {
         return "Connected. Run the first sync when you are ready."
     }
 
-    private var primaryTitle: String {
-        if !settings.isPaired {
+    private var primaryTitle: LocalizedStringKey {
+        if !isPaired {
             return "Scan QR Code"
         }
-        if sync.isSyncing {
+        if isSyncing {
             return "Syncing"
         }
-        if sync.status.lastError != nil || settings.lastSyncError != nil {
+        if lastError != nil {
             return "Retry Sync"
         }
         return "Sync Now"
     }
 
     private var primaryIcon: String {
-        settings.isPaired ? "icloud.and.arrow.up" : "qrcode.viewfinder"
+        isPaired ? "icloud.and.arrow.up" : "qrcode.viewfinder"
     }
 
-    private var badgeTitle: String {
-        if sync.isSyncing { return "Syncing" }
-        if !settings.isPaired { return "Setup" }
-        if sync.status.lastError != nil || settings.lastSyncError != nil { return "Check" }
+    private var badgeTitle: LocalizedStringKey {
+        if isSyncing { return "Syncing" }
+        if !isPaired { return "Setup" }
+        if lastError != nil { return "Check" }
         return "Connected"
     }
 
     private var badgeIcon: String {
-        if sync.isSyncing { return "arrow.triangle.2.circlepath" }
-        if !settings.isPaired { return "link.badge.plus" }
-        if sync.status.lastError != nil || settings.lastSyncError != nil { return "exclamationmark.triangle" }
+        if isSyncing { return "arrow.triangle.2.circlepath" }
+        if !isPaired { return "link.badge.plus" }
+        if lastError != nil { return "exclamationmark.triangle" }
         return "checkmark.seal"
     }
 
     private var badgeTone: StatusTone {
-        if sync.isSyncing { return .neutral }
-        if !settings.isPaired { return .neutral }
-        if sync.status.lastError != nil || settings.lastSyncError != nil { return .warning }
+        if isSyncing { return .neutral }
+        if !isPaired { return .neutral }
+        if lastError != nil { return .warning }
         return .success
     }
 
-    private var agentName: String {
-        settings.pairedAgentName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-            ? settings.pairedAgentName!
-            : "your agent"
-    }
-
-    private var latestSyncDate: Date? {
-        [sync.status.lastHealthSyncAt, settings.lastManualSyncAt, settings.lastAutoSyncAt]
-            .compactMap { $0 }
-            .max()
-    }
-
     private func primaryAction() {
-        if settings.isPaired {
+        if isPaired {
             onSync()
         } else {
             onScan()
@@ -514,7 +622,7 @@ struct AgentPromptPanel: View {
 }
 
 struct PromptRow: View {
-    let text: String
+    let text: LocalizedStringKey
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -534,8 +642,9 @@ struct PromptRow: View {
 }
 
 struct HomeSyncDetails: View {
-    @ObservedObject var settings: GatewaySettings
-    @ObservedObject var sync: SyncCoordinator
+    let lastHealthSyncAt: Date?
+    let autoSyncDetail: LocalizedStringKey
+    let lastSuccessMessage: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -546,14 +655,14 @@ struct HomeSyncDetails: View {
                     LastSyncTile(
                         title: "Health",
                         systemImage: "heart",
-                        date: sync.status.lastHealthSyncAt
+                        date: lastHealthSyncAt
                     )
 
                 }
 
-                AutoSyncStatusRow(settings: settings)
+                AutoSyncStatusRow(detail: autoSyncDetail)
 
-                if let message = sync.status.lastSuccessMessage {
+                if let message = lastSuccessMessage {
                     StatusMessage(
                         message: message,
                         systemImage: "checkmark.circle",
@@ -581,9 +690,15 @@ struct ConnectionStatusPanel: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(settings.isPaired ? agentName : "No agent connected")
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(GatewayStyle.text)
+                    if settings.isPaired {
+                        Text(agentName)
+                            .font(.title2.weight(.bold))
+                            .foregroundStyle(GatewayStyle.text)
+                    } else {
+                        Text("No agent connected")
+                            .font(.title2.weight(.bold))
+                            .foregroundStyle(GatewayStyle.text)
+                    }
 
                     Text(detail)
                         .font(.callout)
@@ -653,7 +768,7 @@ struct ConnectionStatusPanel: View {
         return "Scan a HealthLink pairing QR to connect this iPhone."
     }
 
-    private var badgeTitle: String {
+    private var badgeTitle: LocalizedStringKey {
         settings.isPaired ? "Paired" : "Setup"
     }
 
@@ -678,8 +793,13 @@ struct PairingPanel: View {
                 Button {
                     isShowingScanner = true
                 } label: {
-                    Label(settings.isPaired ? "Scan New QR Code" : "Scan QR Code", systemImage: "qrcode.viewfinder")
-                        .frame(maxWidth: .infinity)
+                    if settings.isPaired {
+                        Label("Scan New QR Code", systemImage: "qrcode.viewfinder")
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        Label("Scan QR Code", systemImage: "qrcode.viewfinder")
+                            .frame(maxWidth: .infinity)
+                    }
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(GatewayStyle.primary)
@@ -850,7 +970,7 @@ struct StatusMessage: View {
 }
 
 struct AutoSyncStatusRow: View {
-    @ObservedObject var settings: GatewaySettings
+    let detail: LocalizedStringKey
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -874,21 +994,213 @@ struct AutoSyncStatusRow: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+}
 
-    private var detail: String {
-        if !settings.autoSyncEnabled {
-            return "Off"
+struct TodaySnapshotPanel: View {
+    let health: DailyHealthSummary?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionTitle("Today Snapshot")
+
+            HStack(spacing: 10) {
+                SnapshotMetric(
+                    title: "Steps",
+                    value: health?.steps.map(String.init) ?? "-",
+                    systemImage: "figure.walk"
+                )
+
+                SnapshotMetric(
+                    title: "Sleep",
+                    value: HealthMetricFormat.minutes(health?.sleep_minutes),
+                    systemImage: "bed.double"
+                )
+
+                SnapshotMetric(
+                    title: "Resting HR",
+                    value: HealthMetricFormat.bpm(health?.resting_heart_rate_bpm),
+                    systemImage: "heart"
+                )
+            }
         }
-        if let lastBackgroundScheduleError = settings.lastBackgroundScheduleError {
-            return "Background scheduling issue: \(lastBackgroundScheduleError)"
+    }
+}
+
+struct EmptySnapshotPanel: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionTitle("Today Snapshot")
+
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "tray")
+                    .font(.headline)
+                    .foregroundStyle(GatewayStyle.mutedText)
+                    .frame(width: 22)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("No summary yet")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(GatewayStyle.text)
+
+                    Text("Run a sync to refresh your latest source data.")
+                        .font(.caption)
+                        .foregroundStyle(GatewayStyle.mutedText)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(14)
+            .background(GatewayStyle.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(GatewayStyle.border, lineWidth: 1)
+            )
         }
-        if let lastAutoSyncAt = settings.lastAutoSyncAt {
-            return "Last \(lastAutoSyncAt.formatted(date: .omitted, time: .shortened))"
+    }
+}
+
+struct SnapshotMetric: View {
+    let title: LocalizedStringKey
+    let value: String
+    let systemImage: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: systemImage)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(GatewayStyle.primary)
+
+            Text(value)
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundStyle(GatewayStyle.text)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(GatewayStyle.mutedText)
+                .lineLimit(1)
         }
-        if let nextEligibleAutoSyncAt = settings.nextEligibleAutoSyncAt {
-            return "Next eligible \(nextEligibleAutoSyncAt.formatted(date: .omitted, time: .shortened))"
+        .frame(maxWidth: .infinity, minHeight: 86, alignment: .leading)
+        .padding(12)
+        .background(GatewayStyle.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(GatewayStyle.border, lineWidth: 1)
+        )
+    }
+}
+
+struct HealthDetailRows: View {
+    let health: DailyHealthSummary
+
+    var body: some View {
+        LabeledContent("Date", value: health.date)
+        LabeledContent("Provider", value: health.provider)
+        LabeledContent("Steps", value: health.steps.map(String.init) ?? "-")
+        LabeledContent("Sleep", value: HealthMetricFormat.minutes(health.sleep_minutes))
+        LabeledContent("Resting HR", value: HealthMetricFormat.bpm(health.resting_heart_rate_bpm))
+        LabeledContent("Average HR", value: HealthMetricFormat.bpm(health.avg_heart_rate_bpm))
+        LabeledContent("Max HR", value: HealthMetricFormat.bpm(health.max_heart_rate_bpm))
+        LabeledContent("HRV", value: HealthMetricFormat.milliseconds(health.heart_rate_variability_ms))
+        LabeledContent("VO2 Max", value: HealthMetricFormat.decimal(health.vo2_max_ml_kg_min))
+        LabeledContent("Active Energy", value: HealthMetricFormat.kilocalories(health.active_energy_kcal))
+        LabeledContent("Basal Energy", value: HealthMetricFormat.kilocalories(health.basal_energy_kcal))
+        LabeledContent("Exercise", value: HealthMetricFormat.minutes(health.exercise_minutes))
+        LabeledContent("Stand", value: HealthMetricFormat.minutes(health.stand_minutes))
+        LabeledContent("Workout", value: HealthMetricFormat.minutes(health.workout_minutes))
+        LabeledContent("Walk/Run Distance", value: HealthMetricFormat.meters(health.distance_walking_running_m))
+        LabeledContent("Cycling Distance", value: HealthMetricFormat.meters(health.distance_cycling_m))
+        LabeledContent("Flights Climbed", value: health.flights_climbed.map(String.init) ?? "-")
+        LabeledContent("Walking HR", value: HealthMetricFormat.bpm(health.walking_heart_rate_average_bpm))
+        LabeledContent("Oxygen Saturation", value: HealthMetricFormat.percent(health.oxygen_saturation_percent))
+        LabeledContent("Respiratory Rate", value: HealthMetricFormat.breathsPerMinute(health.respiratory_rate_bpm))
+        LabeledContent("Body Temperature", value: HealthMetricFormat.celsius(health.body_temperature_c))
+        LabeledContent("Body Mass", value: HealthMetricFormat.kilograms(health.body_mass_kg))
+        LabeledContent("Body Fat", value: HealthMetricFormat.percent(health.body_fat_percentage))
+        LabeledContent("Lean Body Mass", value: HealthMetricFormat.kilograms(health.lean_body_mass_kg))
+        LabeledContent("BMI", value: HealthMetricFormat.decimal(health.body_mass_index))
+
+        if health.workouts.isEmpty {
+            LabeledContent("Workouts", value: "None")
+        } else {
+            ForEach(health.workouts) { workout in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(workout.type)
+                        .font(.subheadline.weight(.semibold))
+
+                    Text("\(HealthMetricFormat.minutes(workout.duration_minutes)) · \(workout.started_at)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
-        return "Ready when the app is active"
+    }
+}
+
+enum HealthMetricFormat {
+    static func minutes(_ value: Int?) -> String {
+        guard let value else { return "-" }
+        return minutes(value)
+    }
+
+    static func minutes(_ value: Int) -> String {
+        if value >= 60 {
+            let hours = value / 60
+            let minutes = value % 60
+            return minutes == 0 ? "\(hours)h" : "\(hours)h \(minutes)m"
+        }
+        return "\(value)m"
+    }
+
+    static func bpm(_ value: Double?) -> String {
+        guard let value else { return "-" }
+        return "\(Int(value.rounded())) bpm"
+    }
+
+    static func meters(_ value: Double?) -> String {
+        guard let value else { return "-" }
+        if value >= 1000 {
+            return "\(String(format: "%.1f", value / 1000)) km"
+        }
+        return "\(Int(value.rounded())) m"
+    }
+
+    static func milliseconds(_ value: Double?) -> String {
+        guard let value else { return "-" }
+        return "\(Int(value.rounded())) ms"
+    }
+
+    static func decimal(_ value: Double?) -> String {
+        guard let value else { return "-" }
+        return String(format: "%.1f", value)
+    }
+
+    static func kilocalories(_ value: Double?) -> String {
+        guard let value else { return "-" }
+        return "\(Int(value.rounded())) kcal"
+    }
+
+    static func percent(_ value: Double?) -> String {
+        guard let value else { return "-" }
+        return "\(String(format: "%.1f", value))%"
+    }
+
+    static func breathsPerMinute(_ value: Double?) -> String {
+        guard let value else { return "-" }
+        return "\(String(format: "%.1f", value)) br/min"
+    }
+
+    static func celsius(_ value: Double?) -> String {
+        guard let value else { return "-" }
+        return "\(String(format: "%.1f", value)) C"
+    }
+
+    static func kilograms(_ value: Double?) -> String {
+        guard let value else { return "-" }
+        return "\(String(format: "%.1f", value)) kg"
     }
 }
 
@@ -1049,7 +1361,7 @@ struct LastSyncTile: View {
 }
 
 struct MetricTile: View {
-    let title: String
+    let title: LocalizedStringKey
     let value: String
     let systemImage: String
 
@@ -1088,7 +1400,7 @@ struct MetricTile: View {
 }
 
 struct StatusBadge: View {
-    let title: String
+    let title: LocalizedStringKey
     let systemImage: String
     let tone: StatusTone
 
@@ -1129,9 +1441,9 @@ struct ErrorBanner: View {
 }
 
 struct SectionTitle: View {
-    let title: String
+    let title: LocalizedStringKey
 
-    init(_ title: String) {
+    init(_ title: LocalizedStringKey) {
         self.title = title
     }
 
@@ -1151,7 +1463,7 @@ enum ReceiverCheckState {
     case online(ReceiverHealthStatus)
     case offline(String)
 
-    var title: String {
+    var title: LocalizedStringKey {
         switch self {
         case .idle:
             return "Receiver not checked"
