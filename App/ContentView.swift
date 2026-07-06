@@ -121,7 +121,7 @@ struct HomeView: View {
             .max()
     }
 
-    private var autoSyncDetail: String {
+    private var autoSyncDetail: LocalizedStringKey {
         if !settings.autoSyncEnabled {
             return "Off"
         }
@@ -221,7 +221,7 @@ struct SettingsView: View {
                 Section("Appearance") {
                     Picker("Theme", selection: $settings.appTheme) {
                         ForEach(AppTheme.allCases) { theme in
-                            Text(theme.title).tag(theme)
+                            Text(LocalizedStringKey(theme.title)).tag(theme)
                         }
                     }
                     .onChange(of: settings.appTheme) { _, _ in
@@ -230,7 +230,7 @@ struct SettingsView: View {
 
                     Picker("Language", selection: $settings.appLanguage) {
                         ForEach(AppLanguage.allCases) { language in
-                            Text(language.title).tag(language)
+                            Text(LocalizedStringKey(language.title)).tag(language)
                         }
                     }
                     .onChange(of: settings.appLanguage) { _, _ in
@@ -490,7 +490,7 @@ struct HomeHeroPanel: View {
         )
     }
 
-    private var title: String {
+    private var title: LocalizedStringKey {
         if !isPaired {
             return "Connect your agent"
         }
@@ -500,7 +500,7 @@ struct HomeHeroPanel: View {
         return "Ready for \(agentName)"
     }
 
-    private var subtitle: String {
+    private var subtitle: LocalizedStringKey {
         if !isPaired {
             return "Pair HealthLink with your local Agent receiver."
         }
@@ -513,7 +513,7 @@ struct HomeHeroPanel: View {
         return "Connected. Run the first sync when you are ready."
     }
 
-    private var primaryTitle: String {
+    private var primaryTitle: LocalizedStringKey {
         if !isPaired {
             return "Scan QR Code"
         }
@@ -530,7 +530,7 @@ struct HomeHeroPanel: View {
         isPaired ? "icloud.and.arrow.up" : "qrcode.viewfinder"
     }
 
-    private var badgeTitle: String {
+    private var badgeTitle: LocalizedStringKey {
         if isSyncing { return "Syncing" }
         if !isPaired { return "Setup" }
         if lastError != nil { return "Check" }
@@ -622,7 +622,7 @@ struct AgentPromptPanel: View {
 }
 
 struct PromptRow: View {
-    let text: String
+    let text: LocalizedStringKey
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -643,7 +643,7 @@ struct PromptRow: View {
 
 struct HomeSyncDetails: View {
     let lastHealthSyncAt: Date?
-    let autoSyncDetail: String
+    let autoSyncDetail: LocalizedStringKey
     let lastSuccessMessage: String?
 
     var body: some View {
@@ -690,9 +690,15 @@ struct ConnectionStatusPanel: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(settings.isPaired ? agentName : "No agent connected")
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(GatewayStyle.text)
+                    if settings.isPaired {
+                        Text(agentName)
+                            .font(.title2.weight(.bold))
+                            .foregroundStyle(GatewayStyle.text)
+                    } else {
+                        Text("No agent connected")
+                            .font(.title2.weight(.bold))
+                            .foregroundStyle(GatewayStyle.text)
+                    }
 
                     Text(detail)
                         .font(.callout)
@@ -762,7 +768,7 @@ struct ConnectionStatusPanel: View {
         return "Scan a HealthLink pairing QR to connect this iPhone."
     }
 
-    private var badgeTitle: String {
+    private var badgeTitle: LocalizedStringKey {
         settings.isPaired ? "Paired" : "Setup"
     }
 
@@ -787,8 +793,13 @@ struct PairingPanel: View {
                 Button {
                     isShowingScanner = true
                 } label: {
-                    Label(settings.isPaired ? "Scan New QR Code" : "Scan QR Code", systemImage: "qrcode.viewfinder")
-                        .frame(maxWidth: .infinity)
+                    if settings.isPaired {
+                        Label("Scan New QR Code", systemImage: "qrcode.viewfinder")
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        Label("Scan QR Code", systemImage: "qrcode.viewfinder")
+                            .frame(maxWidth: .infinity)
+                    }
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(GatewayStyle.primary)
@@ -959,7 +970,7 @@ struct StatusMessage: View {
 }
 
 struct AutoSyncStatusRow: View {
-    let detail: String
+    let detail: LocalizedStringKey
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -1050,7 +1061,7 @@ struct EmptySnapshotPanel: View {
 }
 
 struct SnapshotMetric: View {
-    let title: String
+    let title: LocalizedStringKey
     let value: String
     let systemImage: String
 
@@ -1350,7 +1361,7 @@ struct LastSyncTile: View {
 }
 
 struct MetricTile: View {
-    let title: String
+    let title: LocalizedStringKey
     let value: String
     let systemImage: String
 
@@ -1389,7 +1400,7 @@ struct MetricTile: View {
 }
 
 struct StatusBadge: View {
-    let title: String
+    let title: LocalizedStringKey
     let systemImage: String
     let tone: StatusTone
 
@@ -1430,9 +1441,9 @@ struct ErrorBanner: View {
 }
 
 struct SectionTitle: View {
-    let title: String
+    let title: LocalizedStringKey
 
-    init(_ title: String) {
+    init(_ title: LocalizedStringKey) {
         self.title = title
     }
 
@@ -1452,7 +1463,7 @@ enum ReceiverCheckState {
     case online(ReceiverHealthStatus)
     case offline(String)
 
-    var title: String {
+    var title: LocalizedStringKey {
         switch self {
         case .idle:
             return "Receiver not checked"
