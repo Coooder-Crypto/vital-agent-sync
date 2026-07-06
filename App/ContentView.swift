@@ -214,6 +214,25 @@ struct SourcesView: View {
                     }
                 }
 
+                Section("Recent Sync Attempts") {
+                    if settings.syncHistory.isEmpty {
+                        ContentUnavailableView(
+                            "No sync attempts yet",
+                            systemImage: "clock.arrow.circlepath",
+                            description: Text("Sync history appears here after the first attempt.")
+                        )
+                    } else {
+                        ForEach(settings.syncHistory) { detail in
+                            DisclosureGroup {
+                                SyncDetailRows(detail: detail)
+                                    .padding(.top, 6)
+                            } label: {
+                                SyncHistoryRowLabel(detail: detail)
+                            }
+                        }
+                    }
+                }
+
                 Section("Privacy") {
                     Label("Health samples are summarized", systemImage: "chart.bar.doc.horizontal")
                 }
@@ -1188,6 +1207,49 @@ struct SyncDetailRows: View {
 
     private static func formatDate(_ date: Date) -> String {
         date.formatted(date: .abbreviated, time: .shortened)
+    }
+}
+
+struct SyncHistoryRowLabel: View {
+    let detail: LastSyncDetail
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: detail.succeeded ? "checkmark.circle" : "exclamationmark.triangle")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(detail.succeeded ? GatewayStyle.success : GatewayStyle.warning)
+                .frame(width: 22)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(GatewayStyle.text)
+
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(GatewayStyle.mutedText)
+                    .lineLimit(2)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private var title: String {
+        if detail.succeeded {
+            return "Sync succeeded"
+        }
+        return detail.failureCategory?.title ?? "Sync failed"
+    }
+
+    private var subtitle: String {
+        let time = detail.attemptedAt.formatted(date: .abbreviated, time: .shortened)
+        if let requestedDateRange = detail.requestedDateRange {
+            return "\(time) · \(requestedDateRange) · \(detail.uploadedDayCount) days"
+        }
+        if let failureMessage = detail.failureMessage {
+            return "\(time) · \(failureMessage)"
+        }
+        return time
     }
 }
 

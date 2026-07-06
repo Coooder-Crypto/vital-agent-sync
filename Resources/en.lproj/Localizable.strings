@@ -189,3 +189,7 @@
 "Check the Agent receiver logs, then retry sync." = "Check the Agent receiver logs, then retry sync.";
 "Scan a pairing QR or complete the saved server and token settings." = "Scan a pairing QR or complete the saved server and token settings.";
 "Retry sync. If it keeps failing, check the Agent receiver status." = "Retry sync. If it keeps failing, check the Agent receiver status.";
+"Recent Sync Attempts" = "Recent Sync Attempts";
+"No sync attempts yet" = "No sync attempts yet";
+"Sync history appears here after the first attempt." = "Sync history appears here after the first attempt.";
+"Sync succeeded" = "Sync succeeded";

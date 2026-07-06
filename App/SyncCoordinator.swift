@@ -57,6 +57,19 @@ final class SyncCoordinator: ObservableObject {
             let response = try await uploadHealthSyncRequest(request)
             let latestSummary = healthSummaries.last
             let syncedAt = Date()
+            let detail = LastSyncDetail(
+                attemptedAt: attemptedAt,
+                completedAt: syncedAt,
+                trigger: trigger.displayName,
+                serverURL: context.serverURL.absoluteString,
+                agentName: context.agentName,
+                requestedDateRange: context.dateRangeDescription,
+                uploadedDayCount: response.health_daily_count,
+                acceptedSyncID: response.accepted_sync_id,
+                isIdempotent: response.idempotent,
+                failureCategory: nil,
+                failureMessage: nil
+            )
 
             finishOperation { state in
                 if let latestSummary {
@@ -64,40 +77,31 @@ final class SyncCoordinator: ObservableObject {
                     state.status.lastHealthSyncAt = syncedAt
                 }
                 state.status.lastSuccessMessage = self.successMessage(response: response, trigger: trigger)
-                state.status.lastSyncDetail = LastSyncDetail(
-                    attemptedAt: attemptedAt,
-                    completedAt: syncedAt,
-                    trigger: trigger.displayName,
-                    serverURL: context.serverURL.absoluteString,
-                    agentName: context.agentName,
-                    requestedDateRange: context.dateRangeDescription,
-                    uploadedDayCount: response.health_daily_count,
-                    acceptedSyncID: response.accepted_sync_id,
-                    isIdempotent: response.idempotent,
-                    failureCategory: nil,
-                    failureMessage: nil
-                )
+                state.status.lastSyncDetail = detail
             }
+            settings.recordSyncDetail(detail)
             syncError = nil
         } catch {
             let category = Self.failureCategory(for: error)
             let message = error.localizedDescription
+            let detail = LastSyncDetail(
+                attemptedAt: attemptedAt,
+                completedAt: nil,
+                trigger: trigger.displayName,
+                serverURL: settings.serverURL?.absoluteString,
+                agentName: settings.pairedAgentName,
+                requestedDateRange: nil,
+                uploadedDayCount: 0,
+                acceptedSyncID: nil,
+                isIdempotent: nil,
+                failureCategory: category,
+                failureMessage: message
+            )
             finishOperation { state in
                 state.status.lastError = message
-                state.status.lastSyncDetail = LastSyncDetail(
-                    attemptedAt: attemptedAt,
-                    completedAt: nil,
-                    trigger: trigger.displayName,
-                    serverURL: settings.serverURL?.absoluteString,
-                    agentName: settings.pairedAgentName,
-                    requestedDateRange: nil,
-                    uploadedDayCount: 0,
-                    acceptedSyncID: nil,
-                    isIdempotent: nil,
-                    failureCategory: category,
-                    failureMessage: message
-                )
+                state.status.lastSyncDetail = detail
             }
+            settings.recordSyncDetail(detail)
             syncError = self.status.lastError
         }
 

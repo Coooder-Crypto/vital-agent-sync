@@ -189,3 +189,7 @@
 "Check the Agent receiver logs, then retry sync." = "检查 Agent 接收器日志，然后重试同步。";
 "Scan a pairing QR or complete the saved server and token settings." = "扫描配对二维码，或补全已保存的服务器和令牌设置。";
 "Retry sync. If it keeps failing, check the Agent receiver status." = "重试同步。如果持续失败，请检查 Agent 接收器状态。";
+"Recent Sync Attempts" = "最近同步尝试";
+"No sync attempts yet" = "暂无同步尝试";
+"Sync history appears here after the first attempt." = "首次尝试同步后，历史记录会显示在这里。";
+"Sync succeeded" = "同步成功";
