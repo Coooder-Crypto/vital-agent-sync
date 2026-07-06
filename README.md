@@ -104,6 +104,14 @@ node packages/local/dist/cli.js init --hermes
 
 After that first setup, Hermes does not need to reconnect for every sync. iOS writes new summaries to the same local database, and Hermes MCP tools read the latest rows when the user asks a question.
 
+If an Agent supports a startup hook, it can run this idempotent command before loading MCP tools:
+
+```bash
+npx -y healthlink-local ensure --service
+```
+
+`ensure --service` makes sure the background receiver service exists and is running. It is intentionally separate from `setup`: it does not print a QR, rewrite Agent config, or install skills, so it is safe to call repeatedly when an Agent starts.
+
 Agent integration helpers:
 
 ```bash
@@ -120,6 +128,7 @@ npx -y healthlink-local init
 npx -y healthlink-local init --hermes
 npx -y healthlink-local setup --agent hermes --service
 npx -y healthlink-local setup --agent openclaw --service
+npx -y healthlink-local ensure --service
 npx -y healthlink-local service status
 npx -y healthlink-local logs
 npx -y healthlink-local pair

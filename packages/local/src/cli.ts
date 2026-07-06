@@ -23,14 +23,14 @@ import {
 } from "./service.js";
 import { requestPairingSession } from "./pairing-client.js";
 import { describePortListeners } from "./port-diagnostics.js";
-import { runServiceSetupWorkflow } from "./setup.js";
+import { runServiceEnsureWorkflow, runServiceSetupWorkflow } from "./setup.js";
 import { buildHealthLinkSkillMarkdown } from "./skill.js";
 import { listSourceDevices } from "./source-devices.js";
 import { renderTerminalQr } from "./terminal-qr.js";
 import { createTransportProvider, getServerUrlDiagnostics, isContainerRuntime, isTransportProviderId, type TransportProviderId } from "./transports.js";
 
 type CliOptions = {
-  command: "server" | "init" | "daemon" | "pair" | "setup" | "service" | "logs" | "mcp" | "print-mcp-config" | "print-agent-config" | "print-docker-compose" | "print-skill" | "install-hermes" | "install-hermes-skill" | "status" | "doctor";
+  command: "server" | "init" | "daemon" | "pair" | "setup" | "ensure" | "service" | "logs" | "mcp" | "print-mcp-config" | "print-agent-config" | "print-docker-compose" | "print-skill" | "install-hermes" | "install-hermes-skill" | "status" | "doctor";
   serviceAction?: "install" | "start" | "stop" | "status" | "uninstall";
   port: number;
   host: string;
@@ -76,7 +76,7 @@ function parseArgs(argv: string[]): CliOptions {
         options.serviceAction = action;
         index += 1;
       }
-    } else if (arg === "server" || arg === "init" || arg === "daemon" || arg === "pair" || arg === "setup" || arg === "service" || arg === "logs" || arg === "mcp" || arg === "print-mcp-config" || arg === "print-agent-config" || arg === "print-docker-compose" || arg === "print-skill" || arg === "install-hermes" || arg === "install-hermes-skill" || arg === "status" || arg === "doctor") {
+    } else if (arg === "server" || arg === "init" || arg === "daemon" || arg === "pair" || arg === "setup" || arg === "ensure" || arg === "service" || arg === "logs" || arg === "mcp" || arg === "print-mcp-config" || arg === "print-agent-config" || arg === "print-docker-compose" || arg === "print-skill" || arg === "install-hermes" || arg === "install-hermes-skill" || arg === "status" || arg === "doctor") {
       options.command = arg;
     } else if (arg === "--port") {
       options.port = Number(argv[index + 1]);
@@ -266,6 +266,11 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (options.command === "ensure") {
+    await runEnsure(options);
+    return;
+  }
+
   const agent = getAgentAdapter(options.agentId);
   const shouldInstallAgent = options.command === "init" && (options.installHermes || options.agentId !== "generic");
   const shouldInstallSkill = options.installSkill || options.agentId === "hermes";
@@ -408,6 +413,41 @@ async function runSetup(options: CliOptions): Promise<void> {
     }
   }, {
     installSkill: shouldInstallSkill
+  });
+}
+
+async function runEnsure(options: CliOptions): Promise<void> {
+  if (!options.useService) {
+    throw new Error("ensure currently requires --service. Use setup --agent hermes --service for first-time onboarding, or init for the foreground receiver.");
+  }
+  const serviceOptions = toServiceOptions(options);
+  let lastStatus: HealthLinkServiceStatus | undefined;
+  console.log("Ensuring HealthLink receiver service");
+  await runServiceEnsureWorkflow({
+    getStatus: () => {
+      lastStatus = getHealthLinkServiceStatus(serviceOptions);
+      return lastStatus;
+    },
+    installService: () => {
+      if (lastStatus?.manager === "manual") {
+        throw new Error(`${lastStatus.detail ?? "This platform does not have a supported service manager."} Run healthlink-local daemon under Docker, PM2, Task Scheduler, or another process manager.`);
+      }
+      console.log(`Service not installed for ${lastStatus?.manager ?? resolveServiceManagerIdForCli(options)}; installing...`);
+      lastStatus = installHealthLinkService(serviceOptions);
+    },
+    startService: () => {
+      if (lastStatus?.manager === "manual") {
+        throw new Error(`${lastStatus.detail ?? "This platform does not have a supported service manager."} Run healthlink-local daemon under Docker, PM2, Task Scheduler, or another process manager.`);
+      }
+      console.log("Service not running; starting...");
+      lastStatus = startHealthLinkService(serviceOptions);
+    },
+    waitForReady: () => waitForLocalReceiver(options),
+    printStatus: async () => {
+      const status = getHealthLinkServiceStatus(serviceOptions);
+      console.log("HealthLink receiver is ready.");
+      await printServiceStatusDetails(status, options);
+    }
   });
 }
 

@@ -38,7 +38,7 @@ import {
   readLaunchdPlist,
   resolveServiceManagerId
 } from "../src/service.js";
-import { runServiceSetupWorkflow } from "../src/setup.js";
+import { runServiceEnsureWorkflow, runServiceSetupWorkflow } from "../src/setup.js";
 import {
   SOURCE_PLATFORM_CAPABILITIES,
   listSourceDevices,
@@ -755,6 +755,45 @@ test("service setup workflow installs agent, starts service, waits, pairs, then 
     "wait-ready",
     "pair",
     "reload-hint"
+  ]);
+});
+
+test("service ensure workflow installs missing service, starts it, waits, then prints status", async () => {
+  const calls: string[] = [];
+  let installed = false;
+  let running = false;
+
+  await runServiceEnsureWorkflow({
+    getStatus: () => {
+      calls.push(`status:${installed ? "installed" : "missing"}:${running ? "running" : "stopped"}`);
+      return {
+        installed,
+        running
+      };
+    },
+    installService: () => {
+      calls.push("install-service");
+      installed = true;
+    },
+    startService: () => {
+      calls.push("start-service");
+      running = true;
+    },
+    waitForReady: async () => {
+      calls.push("wait-ready");
+    },
+    printStatus: () => {
+      calls.push("print-status");
+    }
+  });
+
+  assert.deepEqual(calls, [
+    "status:missing:stopped",
+    "install-service",
+    "status:installed:stopped",
+    "start-service",
+    "wait-ready",
+    "print-status"
   ]);
 });
 

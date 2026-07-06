@@ -208,6 +208,7 @@ The background service commands are:
 
 ```bash
 npx -y healthlink-local daemon
+npx -y healthlink-local ensure --service
 npx -y healthlink-local pair
 npx -y healthlink-local service install
 npx -y healthlink-local service start
@@ -216,6 +217,10 @@ npx -y healthlink-local logs
 npx -y healthlink-local service stop
 npx -y healthlink-local service uninstall
 ```
+
+Agents that provide lifecycle hooks should call `healthlink-local ensure --service` during startup. This command is an idempotent receiver check: it installs the supported platform service if missing, starts it if stopped, waits for the local receiver to answer `/health/status`, and prints service status. It intentionally does not create a pairing QR, rewrite Agent config, or reinstall skills.
+
+First-time user onboarding should still use `setup --agent <agent> --service`, because setup writes the Agent MCP config and creates the initial pairing QR. Long-running non-service deployments, such as Docker, PM2, Task Scheduler, or custom cloud process managers, should run `healthlink-local daemon` under their own supervisor instead of relying on `ensure --service`.
 
 Expected output:
 
