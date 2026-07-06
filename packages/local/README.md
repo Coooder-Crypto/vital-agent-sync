@@ -75,6 +75,7 @@ npx -y healthlink-local mcp
 npx -y healthlink-local print-mcp-config
 npx -y healthlink-local print-agent-config --agent generic
 npx -y healthlink-local print-agent-config --agent openclaw
+npx -y healthlink-local print-docker-compose --server-url http://192.168.31.53:8787
 npx -y healthlink-local print-skill
 npx -y healthlink-local install-hermes
 npx -y healthlink-local install-hermes-skill
@@ -274,6 +275,8 @@ For Tailscale MagicDNS, pass `--tailscale-name <host.tailnet.ts.net>` or set `HE
 
 The source-device API is available at `/source-devices` and `/source-devices/:source_device_id/revoke`. The older `/devices` endpoints and MCP tools remain for compatibility with the current iOS app and older agent configs.
 
+`print-docker-compose` prints a Docker Compose file for container deployments. Always pass an iPhone-reachable `--server-url`, such as the host LAN IP, Tailscale URL, or public HTTPS URL. Do not use `127.0.0.1`, `localhost`, a container hostname, or a WSL-only address for iPhone pairing.
+
 ## Background Service And Deployment Methods
 
 HealthLink deployment is about where the receiver, SQLite database, and MCP process run. The Agent type is configured separately through `--agent` or `print-agent-config`.
@@ -337,6 +340,35 @@ healthlink-local daemon \
 ```
 
 Windows hosts are detected as `manual` in the first implementation. Run `healthlink-local daemon` manually, or use Docker/PM2 until Task Scheduler or Windows Service support lands.
+
+### WSL mode
+
+WSL is treated as a Linux deployment variant. If systemd is enabled inside WSL, this command can use the same user-level systemd path as Linux:
+
+```bash
+healthlink-local setup --agent generic --service
+```
+
+The hard part is networking. The iPhone must reach the receiver through a Windows host LAN IP, Tailscale address, or public HTTPS URL. `127.0.0.1`, `localhost`, container names, and WSL-only IPs are not valid iPhone pairing URLs. If LAN access to WSL is unreliable, prefer Docker Desktop with explicit port publishing or Tailscale.
+
+### Docker Compose mode
+
+Docker is a separate deployment method. It works on Linux, NAS/N100 machines, WSL, and Windows Docker Desktop when the host publishes port `8787` and stores SQLite in a mounted volume.
+
+Generate a standalone compose file that runs the published npm package in `node:22-bookworm-slim`:
+
+```bash
+healthlink-local print-docker-compose --server-url http://192.168.31.53:8787 > docker-compose.yml
+```
+
+Or use the source-build template in `deploy/docker/docker-compose.yml` from this repository:
+
+```bash
+export HEALTHLINK_SERVER_URL=http://192.168.31.53:8787
+docker compose -f deploy/docker/docker-compose.yml up --build
+```
+
+The container stores data at `/data/healthlink.sqlite`, backed by `./healthlink-data` on the Docker host. If the Agent runs outside the container, point MCP at the host copy of that SQLite file or mount the same volume into the Agent runtime.
 
 ### User-owned VPS / public HTTPS mode
 

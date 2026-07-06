@@ -5,6 +5,7 @@ import {
 } from "./mcp-config.js";
 import { getAgentAdapter, isAgentAdapterId, type AgentAdapterId } from "./agents.js";
 import { openHealthLinkDatabase } from "./database.js";
+import { buildDockerComposeYaml } from "./docker-compose.js";
 import { getHealthStatus } from "./health-ingest.js";
 import { startLocalServer } from "./server.js";
 import { startMcpServer } from "./mcp.js";
@@ -26,10 +27,10 @@ import { runServiceSetupWorkflow } from "./setup.js";
 import { buildHealthLinkSkillMarkdown } from "./skill.js";
 import { listSourceDevices } from "./source-devices.js";
 import { renderTerminalQr } from "./terminal-qr.js";
-import { createTransportProvider, isTransportProviderId, type TransportProviderId } from "./transports.js";
+import { createTransportProvider, getServerUrlDiagnostics, isContainerRuntime, isTransportProviderId, type TransportProviderId } from "./transports.js";
 
 type CliOptions = {
-  command: "server" | "init" | "daemon" | "pair" | "setup" | "service" | "logs" | "mcp" | "print-mcp-config" | "print-agent-config" | "print-skill" | "install-hermes" | "install-hermes-skill" | "status" | "doctor";
+  command: "server" | "init" | "daemon" | "pair" | "setup" | "service" | "logs" | "mcp" | "print-mcp-config" | "print-agent-config" | "print-docker-compose" | "print-skill" | "install-hermes" | "install-hermes-skill" | "status" | "doctor";
   serviceAction?: "install" | "start" | "stop" | "status" | "uninstall";
   port: number;
   host: string;
@@ -75,7 +76,7 @@ function parseArgs(argv: string[]): CliOptions {
         options.serviceAction = action;
         index += 1;
       }
-    } else if (arg === "server" || arg === "init" || arg === "daemon" || arg === "pair" || arg === "setup" || arg === "service" || arg === "logs" || arg === "mcp" || arg === "print-mcp-config" || arg === "print-agent-config" || arg === "print-skill" || arg === "install-hermes" || arg === "install-hermes-skill" || arg === "status" || arg === "doctor") {
+    } else if (arg === "server" || arg === "init" || arg === "daemon" || arg === "pair" || arg === "setup" || arg === "service" || arg === "logs" || arg === "mcp" || arg === "print-mcp-config" || arg === "print-agent-config" || arg === "print-docker-compose" || arg === "print-skill" || arg === "install-hermes" || arg === "install-hermes-skill" || arg === "status" || arg === "doctor") {
       options.command = arg;
     } else if (arg === "--port") {
       options.port = Number(argv[index + 1]);
@@ -179,6 +180,17 @@ async function main(): Promise<void> {
     const adapter = getAgentAdapter(options.agentId);
     process.stdout.write(adapter.formatMcpConfig({
       databasePath: options.databasePath
+    }));
+    return;
+  }
+
+  if (options.command === "print-docker-compose") {
+    if (!options.serverUrl) {
+      throw new Error("print-docker-compose requires --server-url with an iPhone-reachable host URL, for example http://192.168.31.53:8787.");
+    }
+    process.stdout.write(buildDockerComposeYaml({
+      serverUrl: options.serverUrl,
+      port: options.port
     }));
     return;
   }
@@ -685,6 +697,17 @@ async function printDoctor(options: CliOptions): Promise<void> {
       status: "FAIL",
       label: "Transport",
       detail: error instanceof Error ? error.message : String(error)
+    });
+  }
+
+  for (const diagnostic of getServerUrlDiagnostics({
+    serverUrl: options.serverUrl,
+    runningInContainer: isContainerRuntime()
+  })) {
+    results.push({
+      status: diagnostic.status.toUpperCase() as "OK" | "WARN" | "FAIL",
+      label: "Advertised server URL",
+      detail: diagnostic.detail
     });
   }
 

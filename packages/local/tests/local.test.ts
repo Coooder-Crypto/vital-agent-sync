@@ -12,6 +12,7 @@ import {
 import { getAgentAdapter } from "../src/agents.js";
 import { openHealthLinkDatabase } from "../src/database.js";
 import { listDevices, revokeDevice } from "../src/devices.js";
+import { buildDockerComposeYaml } from "../src/docker-compose.js";
 import { listFeedbackEvents, recordFeedback } from "../src/feedback.js";
 import { authenticateDevice, ingestHealthSync } from "../src/health-ingest.js";
 import {
@@ -49,7 +50,7 @@ import {
   readInstalledHermesSkill
 } from "../src/skill.js";
 import { renderTerminalQr } from "../src/terminal-qr.js";
-import { createTransportProvider } from "../src/transports.js";
+import { createTransportProvider, getServerUrlDiagnostics } from "../src/transports.js";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -472,6 +473,40 @@ test("Transport providers keep LAN default and allow explicit future URLs", asyn
     port: 8787
   });
   await assert.rejects(() => cloudflare.getAdvertisedUrl(), /not implemented/);
+});
+
+test("Docker Compose output uses persistent SQLite volume and explicit server URL", () => {
+  const yaml = buildDockerComposeYaml({
+    serverUrl: "http://192.168.31.53:8787",
+    port: 8787
+  });
+
+  assert.match(yaml, /8787:8787/);
+  assert.match(yaml, /\.\/healthlink-data:\/data/);
+  assert.match(yaml, /HEALTHLINK_DB: \/data\/healthlink\.sqlite/);
+  assert.match(yaml, /HEALTHLINK_SERVER_URL: "http:\/\/192\.168\.31\.53:8787"/);
+  assert.match(yaml, /image: node:22-bookworm-slim/);
+  assert.match(yaml, /npx -y healthlink-local daemon/);
+});
+
+test("server URL diagnostics warn for loopback and container deployment URLs", () => {
+  const loopback = getServerUrlDiagnostics({
+    serverUrl: "http://127.0.0.1:8787"
+  });
+  assert.equal(loopback[0]?.status, "warn");
+  assert.match(loopback[0]?.detail ?? "", /only works from the same machine/);
+
+  const lan = getServerUrlDiagnostics({
+    serverUrl: "http://192.168.31.53:8787"
+  });
+  assert.equal(lan.length, 0);
+
+  const container = getServerUrlDiagnostics({
+    serverUrl: "http://192.168.31.53:8787",
+    runningInContainer: true
+  });
+  assert.equal(container[0]?.status, "warn");
+  assert.match(container[0]?.detail ?? "", /Docker host address/);
 });
 
 test("launchd service plist uses daemon command and expected keepalive settings", () => {

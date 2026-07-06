@@ -1,0 +1,17 @@
+services:
+  healthlink:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    image: healthlink-local:dev
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    volumes:
+      - ./healthlink-data:/data
+    environment:
+      HEALTHLINK_HOST: 0.0.0.0
+      HEALTHLINK_PORT: "8787"
+      HEALTHLINK_DB: /data/healthlink.sqlite
+      HEALTHLINK_TRANSPORT: lan
+      HEALTHLINK_SERVER_URL: ${HEALTHLINK_SERVER_URL:?Set this to an iPhone-reachable URL, for example http://192.168.31.53:8787}

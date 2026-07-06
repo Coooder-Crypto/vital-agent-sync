@@ -91,6 +91,7 @@ Common deployment choices are documented separately:
 
 - Mac local mode: receiver, SQLite, and MCP run on the user's Mac.
 - Home server / NAS / N100 mode: receiver and SQLite run on an always-on home machine, usually via `systemd`.
+- Docker Compose mode: receiver runs in a container and SQLite lives in a mounted host volume.
 - User-owned VPS / public HTTPS mode: receiver and SQLite run on the user's server with user-managed HTTPS.
 
 Foreground compatibility/debug command:
