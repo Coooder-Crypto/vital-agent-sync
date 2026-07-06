@@ -45,12 +45,85 @@ struct SyncStatus: Codable {
     var lastHealthSyncAt: Date?
     var lastError: String?
     var lastSuccessMessage: String?
+    var lastSyncDetail: LastSyncDetail?
 
     static let empty = SyncStatus(
         lastHealthSyncAt: nil,
         lastError: nil,
-        lastSuccessMessage: nil
+        lastSuccessMessage: nil,
+        lastSyncDetail: nil
     )
+}
+
+enum SyncFailureCategory: String, Codable {
+    case receiverUnreachable
+    case tokenRevoked
+    case healthPermissionMissing
+    case networkUnavailable
+    case requestTimedOut
+    case serverError
+    case configuration
+    case unknown
+
+    var title: String {
+        switch self {
+        case .receiverUnreachable:
+            return "Receiver unreachable"
+        case .tokenRevoked:
+            return "Token revoked"
+        case .healthPermissionMissing:
+            return "Health permission missing"
+        case .networkUnavailable:
+            return "Network unavailable"
+        case .requestTimedOut:
+            return "Request timed out"
+        case .serverError:
+            return "Server error"
+        case .configuration:
+            return "Setup incomplete"
+        case .unknown:
+            return "Sync failed"
+        }
+    }
+
+    var recoveryHint: String {
+        switch self {
+        case .receiverUnreachable:
+            return "Make sure the Agent receiver is running and this iPhone can reach the saved server URL."
+        case .tokenRevoked:
+            return "Pair this iPhone with the Agent again to receive a fresh device token."
+        case .healthPermissionMissing:
+            return "Open iOS Settings and allow HealthLink to read the selected Health data."
+        case .networkUnavailable:
+            return "Check Wi-Fi or cellular connectivity, then retry sync."
+        case .requestTimedOut:
+            return "Keep the Agent receiver online and retry when the network is stable."
+        case .serverError:
+            return "Check the Agent receiver logs, then retry sync."
+        case .configuration:
+            return "Scan a pairing QR or complete the saved server and token settings."
+        case .unknown:
+            return "Retry sync. If it keeps failing, check the Agent receiver status."
+        }
+    }
+}
+
+struct LastSyncDetail: Codable {
+    let attemptedAt: Date
+    let completedAt: Date?
+    let trigger: String
+    let serverURL: String?
+    let agentName: String?
+    let requestedDateRange: String?
+    let uploadedDayCount: Int
+    let acceptedSyncID: String?
+    let isIdempotent: Bool?
+    let failureCategory: SyncFailureCategory?
+    let failureMessage: String?
+
+    var succeeded: Bool {
+        acceptedSyncID != nil && failureCategory == nil
+    }
 }
 
 struct PairingLink {
@@ -208,6 +281,26 @@ enum GatewayError: LocalizedError {
             return .requestTimedOut
         default:
             return .receiverUnreachable
+        }
+    }
+
+    var syncFailureCategory: SyncFailureCategory {
+        switch self {
+        case .healthKitUnavailable, .healthPermissionRequired:
+            return .healthPermissionMissing
+        case .missingServerURL, .missingAPIToken, .missingPairedDevice, .invalidPairingURL:
+            return .configuration
+        case .invalidServerResponse(let statusCode):
+            if statusCode == 401 {
+                return .tokenRevoked
+            }
+            return .serverError
+        case .receiverUnreachable:
+            return .receiverUnreachable
+        case .networkUnavailable:
+            return .networkUnavailable
+        case .requestTimedOut:
+            return .requestTimedOut
         }
     }
 }

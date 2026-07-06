@@ -81,6 +81,18 @@ struct HomeView: View {
                         )
 
                         if settings.isPaired {
+                            if latestSyncDate == nil {
+                                FirstSyncGuidePanel(
+                                    isSyncing: sync.isSyncing,
+                                    onAuthorize: {
+                                        Task { await sync.requestHealthAuthorization(settings: settings) }
+                                    },
+                                    onSync: {
+                                        Task { await sync.sync(settings: settings, trigger: .manual) }
+                                    }
+                                )
+                            }
+
                             if sync.latestHealthSummary != nil {
                                 TodaySnapshotPanel(
                                     health: sync.latestHealthSummary
@@ -93,7 +105,8 @@ struct HomeView: View {
                             HomeSyncDetails(
                                 lastHealthSyncAt: sync.status.lastHealthSyncAt,
                                 autoSyncDetail: autoSyncDetail,
-                                lastSuccessMessage: sync.status.lastSuccessMessage
+                                lastSuccessMessage: sync.status.lastSuccessMessage,
+                                lastSyncDetail: sync.status.lastSyncDetail
                             )
                         } else {
                             PairingCommandPanel(onScan: { isShowingScanner = true })
@@ -185,6 +198,10 @@ struct SourcesView: View {
 
                 Section("Sync History") {
                     LabeledContent("Health", value: sync.status.lastHealthSyncAt.map(Self.formatDate) ?? "Never")
+
+                    if let lastSyncDetail = sync.status.lastSyncDetail {
+                        SyncDetailRows(detail: lastSyncDetail)
+                    }
 
                     if let lastSyncError = settings.lastSyncError ?? sync.status.lastError {
                         Label(lastSyncError, systemImage: "exclamationmark.triangle")
@@ -598,6 +615,102 @@ struct PairingCommandPanel: View {
     }
 }
 
+struct FirstSyncGuidePanel: View {
+    let isSyncing: Bool
+    let onAuthorize: () -> Void
+    let onSync: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionTitle("First Sync")
+
+            VStack(alignment: .leading, spacing: 14) {
+                FirstSyncStepRow(
+                    index: 1,
+                    title: "Grant Health access",
+                    detail: "Approve the Health categories HealthLink can summarize.",
+                    systemImage: "heart.text.square"
+                )
+
+                FirstSyncStepRow(
+                    index: 2,
+                    title: "Sync today and yesterday",
+                    detail: "Send compact daily summaries to your paired Agent receiver.",
+                    systemImage: "icloud.and.arrow.up"
+                )
+
+                FirstSyncStepRow(
+                    index: 3,
+                    title: "Ask your Agent",
+                    detail: "The Agent reads from its local HealthLink store after sync completes.",
+                    systemImage: "sparkles"
+                )
+
+                HStack(spacing: 10) {
+                    Button(action: onAuthorize) {
+                        Label("Allow Health", systemImage: "heart")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(isSyncing)
+
+                    Button(action: onSync) {
+                        Label(isSyncing ? "Syncing" : "Sync Now", systemImage: "arrow.triangle.2.circlepath")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(GatewayStyle.primary)
+                    .disabled(isSyncing)
+                }
+            }
+            .padding(16)
+            .background(GatewayStyle.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(GatewayStyle.border, lineWidth: 1)
+            )
+        }
+    }
+}
+
+struct FirstSyncStepRow: View {
+    let index: Int
+    let title: LocalizedStringKey
+    let detail: LocalizedStringKey
+    let systemImage: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(GatewayStyle.primary.opacity(0.12))
+                Image(systemName: systemImage)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(GatewayStyle.primary)
+            }
+            .frame(width: 30, height: 30)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    Text("\(index).")
+                    Text(title)
+                }
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(GatewayStyle.text)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(GatewayStyle.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
+        }
+    }
+}
+
 struct AgentPromptPanel: View {
     let agentName: String
 
@@ -645,6 +758,7 @@ struct HomeSyncDetails: View {
     let lastHealthSyncAt: Date?
     let autoSyncDetail: LocalizedStringKey
     let lastSuccessMessage: String?
+    let lastSyncDetail: LastSyncDetail?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -668,6 +782,10 @@ struct HomeSyncDetails: View {
                         systemImage: "checkmark.circle",
                         color: GatewayStyle.success
                     )
+                }
+
+                if let lastSyncDetail {
+                    SyncResultCard(detail: lastSyncDetail)
                 }
             }
             .padding(14)
@@ -967,6 +1085,138 @@ struct StatusMessage: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+}
+
+struct SyncResultCard: View {
+    let detail: LastSyncDetail
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: detail.succeeded ? "checkmark.seal" : "exclamationmark.triangle")
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(detail.succeeded ? GatewayStyle.success : GatewayStyle.warning)
+                    .frame(width: 22)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(GatewayStyle.text)
+
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(GatewayStyle.mutedText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            Divider()
+
+            SyncDetailRows(detail: detail)
+        }
+        .padding(12)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var title: String {
+        if detail.succeeded {
+            return "Agent received sync"
+        }
+        return detail.failureCategory?.title ?? "Sync failed"
+    }
+
+    private var subtitle: String {
+        if let failureCategory = detail.failureCategory {
+            return failureCategory.recoveryHint
+        }
+        if let acceptedSyncID = detail.acceptedSyncID {
+            return "Accepted sync \(shortID(acceptedSyncID))."
+        }
+        return "Latest sync completed."
+    }
+}
+
+struct SyncDetailRows: View {
+    let detail: LastSyncDetail
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SyncDetailRow(label: "Trigger", value: detail.trigger)
+            SyncDetailRow(label: "Attempted", value: Self.formatDate(detail.attemptedAt))
+
+            if let completedAt = detail.completedAt {
+                SyncDetailRow(label: "Completed", value: Self.formatDate(completedAt))
+            }
+
+            if let requestedDateRange = detail.requestedDateRange {
+                SyncDetailRow(label: "Dates", value: requestedDateRange)
+            }
+
+            if detail.uploadedDayCount > 0 || detail.succeeded {
+                SyncDetailRow(label: "Uploaded", value: "\(detail.uploadedDayCount) days")
+            }
+
+            if let acceptedSyncID = detail.acceptedSyncID {
+                SyncDetailRow(label: "Accepted ID", value: shortID(acceptedSyncID))
+            }
+
+            if let isIdempotent = detail.isIdempotent {
+                SyncDetailRow(label: "Duplicate", value: isIdempotent ? "Yes" : "No")
+            }
+
+            if let serverURL = detail.serverURL {
+                SyncDetailRow(label: "Receiver", value: serverURL)
+            }
+
+            if let agentName = detail.agentName {
+                SyncDetailRow(label: "Agent", value: agentName)
+            }
+
+            if let failureCategory = detail.failureCategory {
+                SyncDetailRow(label: "Failure", value: failureCategory.title)
+                SyncDetailRow(label: "Next Step", value: failureCategory.recoveryHint)
+            }
+
+            if let failureMessage = detail.failureMessage {
+                SyncDetailRow(label: "Message", value: failureMessage)
+            }
+        }
+    }
+
+    private static func formatDate(_ date: Date) -> String {
+        date.formatted(date: .abbreviated, time: .shortened)
+    }
+}
+
+struct SyncDetailRow: View {
+    let label: LocalizedStringKey
+    let value: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text(label)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(GatewayStyle.mutedText)
+                .frame(width: 82, alignment: .leading)
+
+            Text(value)
+                .font(.caption)
+                .foregroundStyle(GatewayStyle.text)
+                .lineLimit(3)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+private func shortID(_ value: String) -> String {
+    guard value.count > 16 else {
+        return value
+    }
+    return "\(value.prefix(10))...\(value.suffix(6))"
 }
 
 struct AutoSyncStatusRow: View {
