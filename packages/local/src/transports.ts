@@ -1,5 +1,6 @@
 import { networkInterfaces } from "node:os";
 import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 
 export const TRANSPORT_PROVIDER_IDS = [
   "lan",
@@ -56,6 +57,39 @@ export function getAdvertisedServerUrl(options: {
   serverUrl?: string;
 }): string {
   return getLanAdvertisedServerUrl(options);
+}
+
+export function getServerUrlDiagnostics(options: {
+  serverUrl?: string;
+  runningInContainer?: boolean;
+}): TransportStatus[] {
+  const results: TransportStatus[] = [];
+  if (options.serverUrl && isLoopbackServerUrl(options.serverUrl)) {
+    results.push({
+      status: "warn",
+      detail: `${normalizeServerUrl(options.serverUrl)} only works from the same machine. For iPhone, Docker, or WSL pairing, use a host LAN, Tailscale, or public HTTPS URL.`
+    });
+  }
+  if (options.runningInContainer) {
+    results.push({
+      status: "warn",
+      detail: options.serverUrl
+        ? "Container runtime detected. Confirm --server-url points to the Docker host address that the iPhone can reach, not a container-only address."
+        : "Container runtime detected. Pass --server-url with the Docker host LAN, Tailscale, or public HTTPS URL before pairing an iPhone."
+    });
+  }
+  return results;
+}
+
+export function isContainerRuntime(): boolean {
+  if (existsSync("/.dockerenv")) {
+    return true;
+  }
+  try {
+    return /docker|containerd|kubepods|podman/i.test(readFileSync("/proc/1/cgroup", "utf8"));
+  } catch {
+    return false;
+  }
 }
 
 function createLanTransportProvider(options: TransportProviderOptions): TransportProvider {
@@ -238,6 +272,16 @@ function isTailscaleIpv4(address: string): boolean {
 
 function normalizeServerUrl(serverUrl: string): string {
   return serverUrl.replace(/\/+$/, "");
+}
+
+function isLoopbackServerUrl(serverUrl: string): boolean {
+  try {
+    const parsed = new URL(serverUrl);
+    const hostname = parsed.hostname.toLowerCase();
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "[::1]";
+  } catch {
+    return false;
+  }
 }
 
 function transportLabel(id: TransportProviderId): string {

@@ -2,11 +2,12 @@
 
 This document describes the common ways to run HealthLink. It is organized by deployment method, not by Agent runtime. Hermes, OpenClaw, WorkBuddy, Claude, Codex, and other MCP-compatible Agents are consumers of the same HealthLink MCP surface.
 
-The three deployment methods to support first are:
+The common deployment methods to support first are:
 
 1. Mac local mode
 2. Home server / NAS / N100 mode
-3. User-owned VPS / public HTTPS mode
+3. Docker Compose mode
+4. User-owned VPS / public HTTPS mode
 
 ## Comparison
 
@@ -14,6 +15,7 @@ The three deployment methods to support first are:
 | --- | --- | --- | --- | --- | --- |
 | Mac local | User's Mac | `~/.healthlink/healthlink.sqlite` on Mac | Same Mac | LAN QR URL | Supported, default path |
 | Home server / NAS / N100 | Always-on home server | Server-local SQLite | Same server or LAN host | LAN or Tailscale URL | Supported by `daemon` and Linux user-level `systemd` service |
+| Docker Compose | Docker host | Mounted `/data/healthlink.sqlite` volume | Same host or shared volume | Host LAN, Tailscale, or HTTPS URL | Template and compose printer supported |
 | User-owned VPS / HTTPS | User's VPS | VPS-local SQLite | Same VPS or adjacent host | HTTPS URL | Power-user path; requires user-managed HTTPS |
 
 ## 1. Mac Local Mode
@@ -133,7 +135,66 @@ Privacy boundary: data stays on the user's home server or private mesh network. 
 
 Windows hosts are currently treated as `manual`: run `healthlink-local daemon` manually or use Docker/PM2 until Task Scheduler or Windows Service support is added.
 
-## 3. User-Owned VPS / Public HTTPS Mode
+### WSL Variant
+
+WSL is treated as Linux. If systemd is enabled inside WSL, `healthlink-local setup --agent generic --service` can use the same systemd path.
+
+The iPhone still needs a reachable host URL. Do not pair with `127.0.0.1`, `localhost`, a container hostname, or a WSL-only IP. Prefer a Windows host LAN IP, Tailscale URL, public HTTPS URL, or Docker Desktop with explicit port publishing.
+
+## 3. Docker Compose Mode
+
+Best for NAS/N100 users, Windows Docker Desktop users, WSL users, and servers where Docker is the preferred process manager.
+
+```text
+iPhone
+  -> host LAN / Tailscale / HTTPS URL
+  -> Docker host port 8787
+  -> HealthLink receiver container
+  -> /data/healthlink.sqlite mounted volume
+  -> MCP-compatible Agent on the host or another container with the same volume
+```
+
+Generate a standalone compose file that runs the published npm package in `node:22-bookworm-slim`:
+
+```bash
+healthlink-local print-docker-compose --server-url http://192.168.31.53:8787 > docker-compose.yml
+docker compose up --build
+```
+
+Or use the repository template when building from this source tree:
+
+```bash
+export HEALTHLINK_SERVER_URL=http://192.168.31.53:8787
+docker compose -f deploy/docker/docker-compose.yml up --build
+```
+
+Both compose variants:
+
+- publish `8787:8787`
+- store SQLite in `./healthlink-data` on the Docker host
+- pass `/data/healthlink.sqlite` to `healthlink-local daemon`
+- require `HEALTHLINK_SERVER_URL`
+
+The repository template additionally:
+
+- builds from `deploy/docker/Dockerfile`
+
+Pairing:
+
+- Run `healthlink-local pair` inside the container, or use the receiver `/pair` page through the host URL.
+- The pairing URL must use the Docker host address that the iPhone can reach, not `127.0.0.1` or a container hostname.
+
+Diagnostics:
+
+```bash
+docker compose ps
+docker compose logs healthlink
+healthlink-local doctor --transport lan --server-url http://192.168.31.53:8787
+```
+
+Privacy boundary: data stays on the Docker host volume. If another Agent container reads the database, mount the same volume intentionally.
+
+## 4. User-Owned VPS / Public HTTPS Mode
 
 Best for users whose Agent already runs on a VPS or who want sync to work outside the home network without Tailscale.
 

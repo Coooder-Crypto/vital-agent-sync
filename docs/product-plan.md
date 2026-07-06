@@ -119,7 +119,28 @@ healthlink-local daemon --host 0.0.0.0 --port 8787 --transport tailscale --tails
 
 This installs a user-level systemd service for the receiver, waits until it is reachable, and prints a pairing QR. If systemd is not available on the NAS, use PM2, Docker Compose, or the NAS vendor's process manager to keep the daemon running. Windows hosts are detected as manual until Task Scheduler or Windows Service support is added.
 
-### 3. User-Owned VPS / Public HTTPS Mode
+### 3. Docker Compose Mode
+
+Best for NAS/N100, WSL, Windows Docker Desktop, and users who prefer container-managed receiver deployment.
+
+```text
+iPhone
+  -> host LAN / Tailscale / HTTPS URL
+  -> Docker host port 8787
+  -> HealthLink receiver container
+  -> /data/healthlink.sqlite mounted volume
+  -> MCP-compatible Agent on the host or shared volume
+```
+
+Recommended standalone compose generation command:
+
+```bash
+healthlink-local print-docker-compose --server-url http://192.168.31.53:8787 > docker-compose.yml
+```
+
+Docker mode requires an explicit iPhone-reachable `server_url`. `127.0.0.1`, `localhost`, container names, and WSL-only IPs should not be used in pairing URLs.
+
+### 4. User-Owned VPS / Public HTTPS Mode
 
 Best for users whose receiver and Agent already run on a user-controlled VPS.
 
@@ -144,7 +165,7 @@ healthlink-local daemon \
 
 This mode requires the user to provide HTTPS, DNS, persistence, and server hardening. Health summaries leave the phone and home network, but remain on infrastructure controlled by the user.
 
-Future deployment work can add tunnel managers, an official Docker image, remote MCP over HTTPS, and a HealthLink-hosted relay. Those are intentionally not part of the first deployment pass.
+Future deployment work can add tunnel managers, an official published Docker image, remote MCP over HTTPS, and a HealthLink-hosted relay. Those are intentionally not part of the first deployment pass.
 
 ## Pairing Flow
 
@@ -409,6 +430,7 @@ Exit criteria:
 - Mac local deployment guide
 - home server / NAS / N100 deployment guide
 - Linux systemd user service installer
+- Docker Compose and WSL deployment guide
 - Tailscale pairing guidance
 - user-owned VPS / public HTTPS deployment guide
 - clear privacy boundary for each method
