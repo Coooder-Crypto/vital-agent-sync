@@ -50,7 +50,13 @@ import {
   readInstalledHermesSkill
 } from "../src/skill.js";
 import { renderTerminalQr } from "../src/terminal-qr.js";
-import { createTransportProvider, getServerUrlDiagnostics } from "../src/transports.js";
+import {
+  createTransportProvider,
+  getServerUrlDiagnostics,
+  parseLinuxRouteSource,
+  parseSshConnectionLocalAddress,
+  selectLanAdvertisedHost
+} from "../src/transports.js";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -500,6 +506,82 @@ test("Transport providers keep LAN default and allow explicit future URLs", asyn
     port: 8787
   });
   await assert.rejects(() => cloudflare.getAdvertisedUrl(), /not implemented/);
+});
+
+test("LAN advertised host prefers SSH server address and default-route source before interface scan", () => {
+  assert.equal(
+    parseSshConnectionLocalAddress("192.168.31.230 62100 192.168.31.53 22"),
+    "192.168.31.53"
+  );
+  assert.equal(parseSshConnectionLocalAddress("192.168.31.230 62100 127.0.0.1 22"), undefined);
+  assert.equal(parseLinuxRouteSource("1.1.1.1 via 192.168.31.1 dev eth0 src 192.168.31.53 uid 1000"), "192.168.31.53");
+
+  assert.equal(selectLanAdvertisedHost({
+    bindHost: "0.0.0.0",
+    sshConnection: "192.168.31.230 62100 192.168.31.53 22",
+    routeHost: "10.0.0.12",
+    interfaces: {
+      docker0: [{
+        address: "172.17.0.1",
+        netmask: "255.255.0.0",
+        family: "IPv4",
+        mac: "00:00:00:00:00:00",
+        internal: false,
+        cidr: "172.17.0.1/16"
+      }],
+      eth0: [{
+        address: "10.0.0.12",
+        netmask: "255.255.255.0",
+        family: "IPv4",
+        mac: "00:00:00:00:00:00",
+        internal: false,
+        cidr: "10.0.0.12/24"
+      }]
+    }
+  }), "192.168.31.53");
+
+  assert.equal(selectLanAdvertisedHost({
+    bindHost: "0.0.0.0",
+    routeHost: "10.0.0.12",
+    interfaces: {}
+  }), "10.0.0.12");
+});
+
+test("LAN advertised host scores physical LAN addresses above Docker and Tailscale interfaces", () => {
+  assert.equal(selectLanAdvertisedHost({
+    bindHost: "0.0.0.0",
+    interfaces: {
+      docker0: [{
+        address: "172.17.0.1",
+        netmask: "255.255.0.0",
+        family: "IPv4",
+        mac: "00:00:00:00:00:00",
+        internal: false,
+        cidr: "172.17.0.1/16"
+      }],
+      tailscale0: [{
+        address: "100.86.131.13",
+        netmask: "255.255.255.255",
+        family: "IPv4",
+        mac: "00:00:00:00:00:00",
+        internal: false,
+        cidr: "100.86.131.13/32"
+      }],
+      en0: [{
+        address: "192.168.31.53",
+        netmask: "255.255.255.0",
+        family: "IPv4",
+        mac: "00:00:00:00:00:00",
+        internal: false,
+        cidr: "192.168.31.53/24"
+      }]
+    }
+  }), "192.168.31.53");
+
+  assert.equal(selectLanAdvertisedHost({
+    bindHost: "127.0.0.1",
+    interfaces: {}
+  }), "127.0.0.1");
 });
 
 test("Docker Compose output uses persistent SQLite volume and explicit server URL", () => {

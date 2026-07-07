@@ -323,6 +323,14 @@ For an always-on Linux home server, `setup --manager systemd` writes `~/.config/
 healthlink-local setup --agent generic --manager systemd
 ```
 
+For SSH-based LAN installs, HealthLink tries to advertise the server address automatically. It checks the SSH session's local address first, then the default route source address, then non-virtual LAN interfaces. For example, `ssh jarvis@192.168.31.53` should usually produce a pairing URL using `http://192.168.31.53:8787`.
+
+If the printed pairing URL uses an address the iPhone cannot reach, pass the URL explicitly:
+
+```bash
+healthlink-local setup --agent generic --manager systemd --server-url http://192.168.31.53:8787
+```
+
 The systemd unit runs:
 
 ```bash

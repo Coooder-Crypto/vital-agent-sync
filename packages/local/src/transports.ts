@@ -1,4 +1,4 @@
-import { networkInterfaces } from "node:os";
+import { networkInterfaces, type NetworkInterfaceInfo } from "node:os";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 
@@ -205,19 +205,152 @@ function getLanAdvertisedServerUrl(options: {
 }
 
 function getAdvertisedHost(bindHost: string): string {
-  if (bindHost !== "0.0.0.0" && bindHost !== "::") {
-    return bindHost;
+  return selectLanAdvertisedHost({
+    bindHost,
+    sshConnection: process.env.SSH_CONNECTION,
+    routeHost: detectDefaultRouteIpv4(),
+    interfaces: networkInterfaces()
+  });
+}
+
+export function selectLanAdvertisedHost(options: {
+  bindHost: string;
+  sshConnection?: string;
+  routeHost?: string;
+  interfaces?: NodeJS.Dict<NetworkInterfaceInfo[]>;
+}): string {
+  if (options.bindHost !== "0.0.0.0" && options.bindHost !== "::") {
+    return options.bindHost;
   }
 
-  for (const addresses of Object.values(networkInterfaces())) {
+  const sshLocalAddress = parseSshConnectionLocalAddress(options.sshConnection);
+  if (sshLocalAddress) {
+    return sshLocalAddress;
+  }
+
+  if (isUsableAdvertisedIpv4(options.routeHost)) {
+    return options.routeHost;
+  }
+
+  const candidates: Array<{
+    address: string;
+    score: number;
+    order: number;
+  }> = [];
+  let order = 0;
+  for (const [name, addresses] of Object.entries(options.interfaces ?? {})) {
     for (const address of addresses ?? []) {
-      if (address.family === "IPv4" && !address.internal) {
-        return address.address;
+      if (address.family === "IPv4" && !address.internal && isUsableAdvertisedIpv4(address.address)) {
+        candidates.push({
+          address: address.address,
+          score: scoreInterfaceAddress(name, address.address),
+          order
+        });
       }
+      order += 1;
     }
   }
 
-  return "127.0.0.1";
+  const best = candidates.sort((left, right) => right.score - left.score || left.order - right.order)[0];
+  return best?.address ?? "127.0.0.1";
+}
+
+export function parseSshConnectionLocalAddress(value: string | undefined): string | undefined {
+  const parts = value?.trim().split(/\s+/) ?? [];
+  const localAddress = parts[2];
+  return isUsableAdvertisedIpv4(localAddress) ? localAddress : undefined;
+}
+
+export function parseLinuxRouteSource(value: string): string | undefined {
+  const match = value.match(/\bsrc\s+(\d{1,3}(?:\.\d{1,3}){3})\b/);
+  const source = match?.[1];
+  return isUsableAdvertisedIpv4(source) ? source : undefined;
+}
+
+function detectDefaultRouteIpv4(): string | undefined {
+  if (process.platform === "linux") {
+    try {
+      return parseLinuxRouteSource(execFileSync("ip", ["route", "get", "1.1.1.1"], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+        timeout: 1000
+      }));
+    } catch {
+      return undefined;
+    }
+  }
+  if (process.platform === "darwin") {
+    try {
+      const route = execFileSync("route", ["-n", "get", "default"], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+        timeout: 1000
+      });
+      const iface = route.match(/\binterface:\s+(\S+)/)?.[1];
+      if (!iface) {
+        return undefined;
+      }
+      const address = execFileSync("ipconfig", ["getifaddr", iface], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+        timeout: 1000
+      }).trim();
+      return isUsableAdvertisedIpv4(address) ? address : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+function scoreInterfaceAddress(name: string, address: string): number {
+  const lowerName = name.toLowerCase();
+  let score = 50;
+  if (isPrivateLanIpv4(address)) {
+    score = 100;
+  } else if (isTailscaleIpv4(address)) {
+    score = 60;
+  } else if (!isLinkLocalIpv4(address)) {
+    score = 80;
+  }
+
+  if (/^(docker|br-|veth|virbr|vmnet|podman|container)/.test(lowerName)) {
+    score -= 50;
+  }
+  if (/(tailscale|utun|wg|tun)/.test(lowerName)) {
+    score -= 20;
+  }
+  return score;
+}
+
+function isUsableAdvertisedIpv4(value: string | undefined): value is string {
+  return typeof value === "string"
+    && isValidIpv4(value)
+    && value !== "0.0.0.0"
+    && !value.startsWith("127.")
+    && !isLinkLocalIpv4(value);
+}
+
+function isValidIpv4(value: string): boolean {
+  const parts = value.split(".");
+  return parts.length === 4 && parts.every((part) => {
+    if (!/^\d{1,3}$/.test(part)) {
+      return false;
+    }
+    const number = Number(part);
+    return number >= 0 && number <= 255;
+  });
+}
+
+function isPrivateLanIpv4(value: string): boolean {
+  const [first = 0, second = 0] = value.split(".").map(Number);
+  return first === 10
+    || (first === 172 && second >= 16 && second <= 31)
+    || (first === 192 && second === 168);
+}
+
+function isLinkLocalIpv4(value: string): boolean {
+  return value.startsWith("169.254.");
 }
 
 function findTailscaleIpv4(): string | undefined {
