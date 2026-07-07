@@ -32,7 +32,7 @@ export async function requestPairingSession(options: PairingClientOptions): Prom
     });
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    throw new Error(`HealthLink receiver is not reachable at ${endpoint}. Run healthlink-local service start or healthlink-local setup --service first. ${detail}`);
+    throw new Error(`HealthLink receiver is not reachable at ${endpoint}. Run healthlink-local service start or healthlink-local setup first. ${detail}`);
   }
   if (!response.ok) {
     throw new Error(`HealthLink receiver rejected pairing request: HTTP ${response.status}`);

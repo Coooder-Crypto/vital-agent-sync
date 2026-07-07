@@ -87,7 +87,7 @@ iPhone
 Recommended command:
 
 ```bash
-npx -y healthlink-local setup --agent hermes --service
+npx -y healthlink-local setup
 ```
 
 The iOS app syncs summaries to the Mac receiver. The Agent reads the same SQLite database through MCP and does not need to reconnect after every iOS sync.
@@ -108,7 +108,7 @@ iPhone
 Recommended receiver command on Linux home servers:
 
 ```bash
-healthlink-local setup --agent generic --service --manager systemd
+healthlink-local setup --agent generic --manager systemd
 ```
 
 Tailscale is the preferred private remote-access option for this mode:

@@ -3,7 +3,7 @@ import {
   formatStandardMcpConfig,
   buildHealthLinkMcpServerConfig
 } from "./mcp-config.js";
-import { getAgentAdapter, isAgentAdapterId, type AgentAdapterId } from "./agents.js";
+import { detectPreferredAgentAdapter, getAgentAdapter, isAgentAdapterId, type AgentAdapterId } from "./agents.js";
 import { openHealthLinkDatabase } from "./database.js";
 import { buildDockerComposeYaml } from "./docker-compose.js";
 import { getHealthStatus } from "./health-ingest.js";
@@ -37,6 +37,7 @@ type CliOptions = {
   useService: boolean;
   installHermes: boolean;
   installSkill: boolean;
+  agentAuto: boolean;
   logLines: number;
   agentId: AgentAdapterId;
   transportId: TransportProviderId;
@@ -58,6 +59,7 @@ function parseArgs(argv: string[]): CliOptions {
     useService: false,
     installHermes: false,
     installSkill: false,
+    agentAuto: true,
     logLines: 80,
     agentId: "generic",
     transportId: "lan",
@@ -101,10 +103,17 @@ function parseArgs(argv: string[]): CliOptions {
       index += 1;
     } else if (arg === "--agent") {
       const value = argv[index + 1];
+      if (value === "auto") {
+        options.agentId = "generic";
+        options.agentAuto = true;
+        index += 1;
+        continue;
+      }
       if (!value || !isAgentAdapterId(value)) {
-        throw new Error("Expected --agent to be one of: generic, hermes, openclaw, workbuddy.");
+        throw new Error("Expected --agent to be one of: auto, generic, hermes, openclaw, workbuddy.");
       }
       options.agentId = value;
+      options.agentAuto = false;
       index += 1;
     } else if (arg === "--transport") {
       const value = argv[index + 1];
@@ -138,6 +147,7 @@ function parseArgs(argv: string[]): CliOptions {
     } else if (arg === "--hermes" || arg === "--install-hermes") {
       options.installHermes = true;
       options.agentId = "hermes";
+      options.agentAuto = false;
     } else if (arg === "--install-skill") {
       options.installSkill = true;
     } else if (arg === "--service") {
@@ -150,6 +160,9 @@ function parseArgs(argv: string[]): CliOptions {
   }
   if (!Number.isInteger(options.logLines) || options.logLines <= 0) {
     throw new Error("Expected --lines to be a positive integer.");
+  }
+  if (options.command === "setup" || options.command === "ensure") {
+    options.useService = true;
   }
 
   return options;
@@ -360,19 +373,22 @@ async function runServiceCommand(options: CliOptions): Promise<void> {
 }
 
 async function runSetup(options: CliOptions): Promise<void> {
-  if (!options.useService) {
-    throw new Error("setup currently requires --service. Use init for the foreground receiver.");
-  }
-  const shouldInstallSkill = options.installSkill || options.agentId === "hermes";
-  if (shouldInstallSkill && options.agentId !== "hermes") {
+  const agentId = resolveSetupAgentId(options);
+  const effectiveOptions = {
+    ...options,
+    agentId
+  };
+  const shouldInstallSkill = options.installSkill || agentId === "hermes";
+  if (shouldInstallSkill && agentId !== "hermes") {
     throw new Error("--install-skill currently supports --agent hermes only.");
   }
 
-  const agent = getAgentAdapter(options.agentId);
+  const agent = getAgentAdapter(agentId);
   console.log(`Setting up HealthLink for ${agent.displayName}`);
+  printAgentAutoDetectSummary(options, agentId);
   await runServiceSetupWorkflow({
     installAgent: () => {
-      if (options.agentId === "generic") {
+      if (agentId === "generic") {
         console.log("Agent config: generic MCP config will be printed on request.");
         return;
       }
@@ -396,18 +412,18 @@ async function runSetup(options: CliOptions): Promise<void> {
       }
     },
     installService: () => {
-      const status = installHealthLinkService(toServiceOptions(options));
+      const status = installHealthLinkService(toServiceOptions(effectiveOptions));
       console.log(`Service manager:   ${status.manager}`);
       console.log(`Service installed: ${status.configPath}`);
       console.log(`Service logs:      ${status.stdoutPath}`);
       console.log(`Service errors:    ${status.stderrPath}`);
     },
     startService: () => {
-      startHealthLinkService(toServiceOptions(options));
+      startHealthLinkService(toServiceOptions(effectiveOptions));
       console.log("Service start requested.");
     },
-    waitForReady: () => waitForLocalReceiver(options),
-    pair: () => printPairingSession(options),
+    waitForReady: () => waitForLocalReceiver(effectiveOptions),
+    pair: () => printPairingSession(effectiveOptions),
     printReloadHint: () => {
       printSetupNextSteps(agent, resolveServiceManagerIdForCli(options));
     }
@@ -417,9 +433,6 @@ async function runSetup(options: CliOptions): Promise<void> {
 }
 
 async function runEnsure(options: CliOptions): Promise<void> {
-  if (!options.useService) {
-    throw new Error("ensure currently requires --service. Use setup --agent hermes --service for first-time onboarding, or init for the foreground receiver.");
-  }
   const serviceOptions = toServiceOptions(options);
   let lastStatus: HealthLinkServiceStatus | undefined;
   console.log("Ensuring HealthLink receiver service");
@@ -449,6 +462,32 @@ async function runEnsure(options: CliOptions): Promise<void> {
       await printServiceStatusDetails(status, options);
     }
   });
+}
+
+function resolveSetupAgentId(options: CliOptions): AgentAdapterId {
+  if (!options.agentAuto) {
+    return options.agentId;
+  }
+  return detectPreferredAgentAdapter({
+    hermesConfigPath: options.hermesConfigPath,
+    openclawConfigPath: options.openclawConfigPath
+  }).id;
+}
+
+function printAgentAutoDetectSummary(options: CliOptions, agentId: AgentAdapterId): void {
+  if (!options.agentAuto) {
+    return;
+  }
+  const detected = detectPreferredAgentAdapter({
+    hermesConfigPath: options.hermesConfigPath,
+    openclawConfigPath: options.openclawConfigPath
+  });
+  if (agentId === "generic") {
+    console.log("Agent auto-detect: no Hermes/OpenClaw config found; using generic MCP output.");
+    console.log("Agent auto-detect: pass --agent hermes or --agent openclaw to force a specific adapter.");
+    return;
+  }
+  console.log(`Agent auto-detect: ${getAgentAdapter(agentId).displayName} (${detected.status?.detail ?? "detected"})`);
 }
 
 async function printPairingSession(options: CliOptions): Promise<void> {
@@ -534,7 +573,7 @@ async function printServiceStatusDetails(status: HealthLinkServiceStatus, option
     console.log(`Last sync: ${health.last_sync_at ?? "never"}`);
     console.log("");
     if (!status.installed) {
-      console.log("Next: run healthlink-local setup --agent hermes --service to install and start the receiver.");
+      console.log("Next: run healthlink-local setup to install and start the receiver.");
     } else if (!status.running) {
       console.log("Next: run healthlink-local service start, then healthlink-local pair.");
     } else if (!receiver.reachable) {
@@ -808,7 +847,7 @@ async function probeLocalReceiver(options: CliOptions): Promise<ReceiverProbeRes
     const listenerDetail = listener ? ` Listener on port ${options.port}: ${listener}.` : "";
     return {
       reachable: false,
-      detail: `${endpoint} is not reachable. Run healthlink-local service start or healthlink-local setup --agent hermes --service.${listenerDetail} ${error instanceof Error ? error.message : String(error)}`
+      detail: `${endpoint} is not reachable. Run healthlink-local service start or healthlink-local setup.${listenerDetail} ${error instanceof Error ? error.message : String(error)}`
     };
   }
 }

@@ -75,17 +75,17 @@ node packages/local/dist/cli.js mcp --db ~/.healthlink/healthlink.sqlite
 Published-package pairing loop:
 
 ```bash
-npx -y healthlink-local setup --agent hermes --service
+npx -y healthlink-local setup
 ```
 
 Development pairing loop:
 
 ```bash
 npm run build:local
-node packages/local/dist/cli.js setup --agent hermes --service
+node packages/local/dist/cli.js setup
 ```
 
-`setup --agent hermes --service` backs up and writes `~/.hermes/config.yaml`, installs the HealthLink Hermes skill, installs and starts the background receiver through the current platform's service manager, prints the iPhone pairing QR, and points Hermes at the same HealthLink database. macOS uses `launchd`; Linux servers use a user-level `systemd` service. After pairing and syncing, restart Hermes or run `/reload-mcp`. If the QR expires, run `healthlink-local pair` or `npx -y healthlink-local pair`.
+`setup` installs and starts the background receiver through the current platform's service manager, prints the iPhone pairing QR, and auto-detects Hermes/OpenClaw when their config exists. If Hermes is detected, it backs up and writes `~/.hermes/config.yaml`, installs the HealthLink Hermes skill, and points Hermes at the same HealthLink database. macOS uses `launchd`; Linux servers use a user-level `systemd` service. Pass `--agent hermes`, `--agent openclaw`, or `--agent generic` to force an adapter. After pairing and syncing, restart Hermes or run `/reload-mcp` when an Agent config was changed. If the QR expires, run `healthlink-local pair` or `npx -y healthlink-local pair`.
 
 Common deployment choices are documented separately:
 
@@ -107,10 +107,10 @@ After that first setup, Hermes does not need to reconnect for every sync. iOS wr
 If an Agent supports a startup hook, it can run this idempotent command before loading MCP tools:
 
 ```bash
-npx -y healthlink-local ensure --service
+npx -y healthlink-local ensure
 ```
 
-`ensure --service` makes sure the background receiver service exists and is running. It is intentionally separate from `setup`: it does not print a QR, rewrite Agent config, or install skills, so it is safe to call repeatedly when an Agent starts.
+`ensure` makes sure the background receiver service exists and is running. It is intentionally separate from `setup`: it does not print a QR, rewrite Agent config, or install skills, so it is safe to call repeatedly when an Agent starts.
 
 Agent integration helpers:
 
@@ -126,9 +126,10 @@ Published package shape:
 ```bash
 npx -y healthlink-local init
 npx -y healthlink-local init --hermes
-npx -y healthlink-local setup --agent hermes --service
-npx -y healthlink-local setup --agent openclaw --service
-npx -y healthlink-local ensure --service
+npx -y healthlink-local setup
+npx -y healthlink-local setup --agent hermes
+npx -y healthlink-local setup --agent openclaw
+npx -y healthlink-local ensure
 npx -y healthlink-local service status
 npx -y healthlink-local logs
 npx -y healthlink-local pair
@@ -164,7 +165,7 @@ HealthKit requires a real iPhone for meaningful testing. In Xcode:
 2. Set your Apple Developer Team.
 3. Keep the HealthKit capability enabled.
 4. Run on a physical iPhone.
-5. Run `node packages/local/dist/cli.js setup --agent hermes --service` on the Agent machine.
+5. Run `node packages/local/dist/cli.js setup` on the Agent machine.
 6. Scan the pairing QR in the app Settings tab.
 7. Confirm the server/scopes, then grant Health permission.
 8. Sync once, then restart Hermes or run `/reload-mcp`.

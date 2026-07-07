@@ -9,7 +9,7 @@ import {
   listAgentAuditLog,
   recordAgentRead
 } from "../src/agent-audit.js";
-import { getAgentAdapter } from "../src/agents.js";
+import { detectPreferredAgentAdapter, getAgentAdapter } from "../src/agents.js";
 import { openHealthLinkDatabase } from "../src/database.js";
 import { listDevices, revokeDevice } from "../src/devices.js";
 import { buildDockerComposeYaml } from "../src/docker-compose.js";
@@ -414,6 +414,33 @@ test("Agent adapters expose generic MCP config and Hermes install behavior", () 
     assert.equal(openclawInstalled.id, "openclaw");
     assert.equal(openclawStatus.installed, true);
     assert.deepEqual(openclawConfig.mcp.servers.healthlink.args.slice(0, 2), ["mcp", "--db"]);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("Agent auto-detection prefers installed or available specific adapters before generic MCP", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-agent-autodetect-test-"));
+  try {
+    const hermesConfigPath = join(tempDir, "config.yaml");
+    const openclawConfigPath = join(tempDir, "openclaw.json");
+
+    assert.equal(detectPreferredAgentAdapter({
+      hermesConfigPath,
+      openclawConfigPath
+    }).id, "generic");
+
+    writeFileSync(openclawConfigPath, JSON.stringify({ model: { provider: "test" } }, null, 2), "utf8");
+    assert.equal(detectPreferredAgentAdapter({
+      hermesConfigPath,
+      openclawConfigPath
+    }).id, "openclaw");
+
+    writeFileSync(hermesConfigPath, "model:\n  provider: test\n", "utf8");
+    assert.equal(detectPreferredAgentAdapter({
+      hermesConfigPath,
+      openclawConfigPath
+    }).id, "hermes");
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }

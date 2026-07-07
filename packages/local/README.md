@@ -26,16 +26,16 @@ The default local server will use port `8787`.
 For the published package, the intended user path is one command:
 
 ```bash
-npx -y healthlink-local setup --agent hermes --service
+npx -y healthlink-local setup
 ```
 
-This installs the background receiver with the current platform's service manager, writes the Agent MCP config, installs the HealthLink Hermes skill for Hermes users, starts the receiver, and prints a 10-minute iPhone pairing QR. After the first successful pair and sync, the terminal can close.
+This auto-selects the current platform's service manager, auto-detects a supported Agent config when possible, installs the background receiver, starts it, and prints a 10-minute iPhone pairing QR. If Hermes is detected, it writes the Hermes MCP config and installs the HealthLink Hermes skill. After the first successful pair and sync, the terminal can close.
 
 For a global install:
 
 ```bash
 npm install -g healthlink-local
-healthlink-local setup --agent hermes --service
+healthlink-local setup
 ```
 
 Run this before publishing a tarball or release:
@@ -52,9 +52,11 @@ Current package commands:
 
 ```bash
 npx -y healthlink-local
-npx -y healthlink-local setup --agent hermes --service
-npx -y healthlink-local setup --agent openclaw --service
-npx -y healthlink-local ensure --service
+npx -y healthlink-local setup
+npx -y healthlink-local setup --agent hermes
+npx -y healthlink-local setup --agent openclaw
+npx -y healthlink-local setup --agent auto
+npx -y healthlink-local ensure
 npx -y healthlink-local init
 npx -y healthlink-local init --agent hermes
 npx -y healthlink-local init --hermes
@@ -87,18 +89,18 @@ npx -y healthlink-local doctor --agent hermes --transport lan
 Recommended background pairing command:
 
 ```bash
-npx -y healthlink-local setup --agent hermes --service
+npx -y healthlink-local setup
 ```
 
-This writes the Agent MCP config, installs the HealthLink Hermes skill when `--agent hermes` is selected, installs and starts the receiver with the current platform's service manager, waits for it to become reachable, and prints a 10-minute pairing QR. macOS uses `launchd`; Linux uses a user-level `systemd` unit. After pairing, the terminal can close while the background receiver keeps accepting iOS syncs.
+This installs and starts the receiver with the current platform's service manager, waits for it to become reachable, and prints a 10-minute pairing QR. macOS uses `launchd`; Linux uses a user-level `systemd` unit. `setup` auto-detects Hermes/OpenClaw when their config exists; pass `--agent hermes`, `--agent openclaw`, or `--agent generic` to force a specific adapter. After pairing, the terminal can close while the background receiver keeps accepting iOS syncs.
 
 For Agent startup hooks, use the idempotent receiver check:
 
 ```bash
-npx -y healthlink-local ensure --service
+npx -y healthlink-local ensure
 ```
 
-`ensure --service` installs the platform service if missing, starts it if stopped, waits for `/health/status`, and then prints service status. It does not rewrite Agent config, install skills, or print a pairing QR. Use it when an Agent wants to make sure HealthLink is available before loading MCP tools.
+`ensure` installs the platform service if missing, starts it if stopped, waits for `/health/status`, and then prints service status. It does not rewrite Agent config, install skills, or print a pairing QR. Use it when an Agent wants to make sure HealthLink is available before loading MCP tools.
 
 If the QR expires, do not reinstall the service. Print a fresh pairing code:
 
@@ -274,7 +276,7 @@ npx -y healthlink-local doctor --transport lan
 
 `print-mcp-config` and `print-agent-config --agent generic` print standard `mcpServers.healthlink` JSON. `print-agent-config --agent hermes` prints a Hermes-style `mcp_servers.healthlink` YAML snippet. `print-agent-config --agent openclaw` prints an OpenClaw-style `mcp.servers.healthlink` JSON snippet. `install-hermes` backs up `~/.hermes/config.yaml`, writes `mcp_servers.healthlink`, and uses the same local database and tool surface as `healthlink-local mcp`. `init --agent hermes` and `init --hermes` perform the same Hermes install step as part of the foreground pairing flow. `init --agent openclaw` backs up and writes `~/.openclaw/openclaw.json` when it is valid JSON; use `--openclaw-config <path>` for a custom file.
 
-`print-skill` prints the portable HealthLink skill Markdown. `install-hermes-skill` writes it to `~/.hermes/skills/health/healthlink-personal-context/SKILL.md` with a timestamped backup when replacing an existing file. `setup --agent hermes --service` installs the Hermes MCP config and the Hermes skill by default. Use `init --hermes --install-skill` when you want the same skill install behavior in the foreground compatibility flow.
+`print-skill` prints the portable HealthLink skill Markdown. `install-hermes-skill` writes it to `~/.hermes/skills/health/healthlink-personal-context/SKILL.md` with a timestamped backup when replacing an existing file. `setup` auto-detects Hermes and installs the Hermes MCP config and skill by default when Hermes config is present. Use `setup --agent hermes` to force Hermes, or `init --hermes --install-skill` when you want the same skill install behavior in the foreground compatibility flow.
 
 Use `status` to inspect the local database and paired source devices. Use `doctor` to check Node.js, the SQLite database, MCP command generation, the selected Agent adapter, the selected transport provider, the platform service manager, and local receiver reachability.
 
@@ -290,7 +292,7 @@ The source-device API is available at `/source-devices` and `/source-devices/:so
 
 HealthLink deployment is about where the receiver, SQLite database, and MCP process run. The Agent type is configured separately through `--agent` or `print-agent-config`.
 
-`setup --service` and `service` choose a manager automatically:
+`setup`, `ensure`, and `service` choose a manager automatically:
 
 - macOS: `launchd`
 - Linux: user-level `systemd`
@@ -299,7 +301,7 @@ HealthLink deployment is about where the receiver, SQLite database, and MCP proc
 Override the manager when needed:
 
 ```bash
-healthlink-local setup --agent hermes --service --manager systemd
+healthlink-local setup --agent hermes --manager systemd
 healthlink-local service status --manager systemd
 ```
 
@@ -315,10 +317,10 @@ Use `healthlink-local logs` to inspect the service logs. The raw files are `~/.h
 
 ### Home server / NAS / N100 mode
 
-For an always-on Linux home server, `setup --service --manager systemd` writes `~/.config/systemd/user/healthlink-local.service`, enables it, starts it, waits for the receiver, and prints a QR:
+For an always-on Linux home server, `setup --manager systemd` writes `~/.config/systemd/user/healthlink-local.service`, enables it, starts it, waits for the receiver, and prints a QR:
 
 ```bash
-healthlink-local setup --agent generic --service --manager systemd
+healthlink-local setup --agent generic --manager systemd
 ```
 
 The systemd unit runs:
@@ -355,7 +357,7 @@ Windows hosts are detected as `manual` in the first implementation. Run `healthl
 WSL is treated as a Linux deployment variant. If systemd is enabled inside WSL, this command can use the same user-level systemd path as Linux:
 
 ```bash
-healthlink-local setup --agent generic --service
+healthlink-local setup --agent generic
 ```
 
 The hard part is networking. The iPhone must reach the receiver through a Windows host LAN IP, Tailscale address, or public HTTPS URL. `127.0.0.1`, `localhost`, container names, and WSL-only IPs are not valid iPhone pairing URLs. If LAN access to WSL is unreliable, prefer Docker Desktop with explicit port publishing or Tailscale.
