@@ -177,24 +177,32 @@ HealthLink can also try to read Tailscale MagicDNS from `tailscale status --json
 
 ## CLI Shape
 
-The Hermes-first local install command should be:
+The default local install command should be:
 
 ```bash
-npx -y healthlink-local setup --agent hermes --service
+npx -y healthlink-local setup
 ```
 
-`setup --agent hermes --service` should:
+`setup` should:
 
 - Check Node.js version.
 - Create `~/.healthlink/`.
 - Initialize SQLite.
-- Back up and write `~/.hermes/config.yaml`.
-- Install or update the HealthLink Hermes skill.
+- Auto-detect a supported Agent config such as Hermes or OpenClaw.
+- Back up and write the selected Agent MCP config.
+- Install or update the HealthLink Hermes skill when Hermes is selected.
 - Install and start the background HTTP receiver.
 - Create a short-lived pairing session.
 - Open or print the pairing page.
 - Print MCP config for common agents.
 - Tell the user to restart Hermes or run `/reload-mcp`.
+
+Advanced users can still force an adapter or manager:
+
+```bash
+npx -y healthlink-local setup --agent hermes
+npx -y healthlink-local setup --agent openclaw --manager systemd
+```
 
 The foreground compatibility receiver remains:
 
@@ -208,7 +216,7 @@ The background service commands are:
 
 ```bash
 npx -y healthlink-local daemon
-npx -y healthlink-local ensure --service
+npx -y healthlink-local ensure
 npx -y healthlink-local pair
 npx -y healthlink-local service install
 npx -y healthlink-local service start
@@ -218,9 +226,9 @@ npx -y healthlink-local service stop
 npx -y healthlink-local service uninstall
 ```
 
-Agents that provide lifecycle hooks should call `healthlink-local ensure --service` during startup. This command is an idempotent receiver check: it installs the supported platform service if missing, starts it if stopped, waits for the local receiver to answer `/health/status`, and prints service status. It intentionally does not create a pairing QR, rewrite Agent config, or reinstall skills.
+Agents that provide lifecycle hooks should call `healthlink-local ensure` during startup. This command is an idempotent receiver check: it installs the supported platform service if missing, starts it if stopped, waits for the local receiver to answer `/health/status`, and prints service status. It intentionally does not create a pairing QR, rewrite Agent config, or reinstall skills.
 
-First-time user onboarding should still use `setup --agent <agent> --service`, because setup writes the Agent MCP config and creates the initial pairing QR. Long-running non-service deployments, such as Docker, PM2, Task Scheduler, or custom cloud process managers, should run `healthlink-local daemon` under their own supervisor instead of relying on `ensure --service`.
+First-time user onboarding should still use `setup`, because setup writes the Agent MCP config and creates the initial pairing QR. Long-running non-service deployments, such as Docker, PM2, Task Scheduler, or custom cloud process managers, should run `healthlink-local daemon` under their own supervisor instead of relying on `ensure`.
 
 Expected output:
 
@@ -250,7 +258,7 @@ Implemented local MVP command:
 
 ```bash
 npm run build:local
-node packages/local/dist/cli.js setup --agent hermes --service
+node packages/local/dist/cli.js setup
 ```
 
 ## Pairing QR Payload
@@ -318,7 +326,7 @@ Implemented helpers:
 npx -y healthlink-local print-mcp-config
 npx -y healthlink-local install-hermes
 npx -y healthlink-local init --hermes
-npx -y healthlink-local setup --agent hermes --service
+npx -y healthlink-local setup
 npx -y healthlink-local service status
 npx -y healthlink-local logs
 npx -y healthlink-local pair
@@ -326,7 +334,7 @@ npx -y healthlink-local status
 npx -y healthlink-local doctor
 ```
 
-The helpers should not invent new protocols. They should write or print the same MCP command with the correct database path. `setup --agent hermes --service` uses the same install logic as `install-hermes`, installs the HealthLink Hermes skill by default, installs/starts the receiver service, and folds pairing into one Agent-driven flow. `init --hermes` remains the foreground compatibility path.
+The helpers should not invent new protocols. They should write or print the same MCP command with the correct database path. `setup` uses the same install logic as the selected Agent adapter, installs the HealthLink Hermes skill by default when Hermes is selected, installs/starts the receiver service, and folds pairing into one Agent-driven flow. `init --hermes` remains the foreground compatibility path.
 
 ## Skill Layer
 

@@ -34,11 +34,12 @@ iPhone
 Recommended command:
 
 ```bash
-npx -y healthlink-local setup --agent hermes --service
+npx -y healthlink-local setup
 ```
 
 What it does:
 
+- Auto-detects Hermes/OpenClaw when their config exists.
 - Writes Agent MCP config for the selected Agent.
 - Installs the macOS `launchd` receiver.
 - Starts the receiver on `0.0.0.0:8787`.
@@ -54,7 +55,7 @@ npx -y healthlink-local pair
 If the local Agent has a startup hook, it can keep the receiver available without rerunning setup:
 
 ```bash
-npx -y healthlink-local ensure --service
+npx -y healthlink-local ensure
 ```
 
 This is safe to run repeatedly. It ensures the background receiver service is installed and running, but does not rewrite Agent config or create a new pairing QR.
@@ -86,7 +87,7 @@ iPhone
 Recommended receiver command:
 
 ```bash
-healthlink-local setup --agent generic --service --manager systemd
+healthlink-local setup --agent generic --manager systemd
 ```
 
 This writes and starts a user-level systemd unit at:
@@ -114,10 +115,10 @@ loginctl enable-linger "$USER"
 If the Agent starts on the same Linux user account, add this to the Agent startup hook:
 
 ```bash
-healthlink-local ensure --service --manager systemd
+healthlink-local ensure --manager systemd
 ```
 
-That command can repair a stopped receiver before the Agent loads MCP. If the host uses Docker, PM2, Task Scheduler, or a NAS vendor process manager instead of systemd, configure that process manager to run `healthlink-local daemon`; `ensure --service` only manages built-in launchd/systemd services.
+That command can repair a stopped receiver before the Agent loads MCP. If the host uses Docker, PM2, Task Scheduler, or a NAS vendor process manager instead of systemd, configure that process manager to run `healthlink-local daemon`; `ensure` only manages built-in launchd/systemd services.
 
 For Tailscale:
 
@@ -153,7 +154,7 @@ Windows hosts are currently treated as `manual`: run `healthlink-local daemon` m
 
 ### WSL Variant
 
-WSL is treated as Linux. If systemd is enabled inside WSL, `healthlink-local setup --agent generic --service` can use the same systemd path.
+WSL is treated as Linux. If systemd is enabled inside WSL, `healthlink-local setup --agent generic` can use the same systemd path.
 
 The iPhone still needs a reachable host URL. Do not pair with `127.0.0.1`, `localhost`, a container hostname, or a WSL-only IP. Prefer a Windows host LAN IP, Tailscale URL, public HTTPS URL, or Docker Desktop with explicit port publishing.
 

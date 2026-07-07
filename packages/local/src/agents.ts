@@ -31,6 +31,12 @@ export type AgentInstallStatus = {
   configPath?: string;
 };
 
+export type AgentAutoDetectResult = {
+  id: AgentAdapterId;
+  status?: AgentInstallStatus;
+  statuses: AgentInstallStatus[];
+};
+
 export type AgentInstallResult = {
   id: AgentAdapterId;
   configPath?: string;
@@ -72,6 +78,30 @@ export function getAgentAdapter(id: AgentAdapterId): AgentAdapter {
 
 export function isAgentAdapterId(value: string): value is AgentAdapterId {
   return AGENT_ADAPTER_IDS.includes(value as AgentAdapterId);
+}
+
+export function detectPreferredAgentAdapter(options?: AgentAdapterOptions): AgentAutoDetectResult {
+  const statuses = (["hermes", "openclaw"] as AgentAdapterId[]).map((id) => getAgentAdapter(id).detect(options));
+  const installed = statuses.find((status) => status.installed);
+  if (installed) {
+    return {
+      id: installed.id,
+      status: installed,
+      statuses
+    };
+  }
+  const available = statuses.find((status) => status.available);
+  if (available) {
+    return {
+      id: available.id,
+      status: available,
+      statuses
+    };
+  }
+  return {
+    id: "generic",
+    statuses
+  };
 }
 
 function toHermesOptions(options: AgentAdapterOptions | undefined, config: McpConfigOptions): HermesInstallOptions {
