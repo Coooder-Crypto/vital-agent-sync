@@ -90,6 +90,14 @@ Recommended receiver command:
 healthlink-local setup --agent generic --manager systemd
 ```
 
+For SSH-based LAN installs, HealthLink tries to advertise the server address automatically. It first checks the SSH session's local address, then the default route source address, then non-virtual LAN interfaces. A command such as `ssh jarvis@192.168.31.53` should usually produce a pairing URL using `http://192.168.31.53:8787` without an explicit `--server-url`.
+
+Pass `--server-url` only when the auto-detected address is not reachable from the iPhone, or when the receiver is behind Tailscale, Docker, WSL, a reverse proxy, or public HTTPS:
+
+```bash
+healthlink-local setup --agent generic --manager systemd --server-url http://192.168.31.53:8787
+```
+
 This writes and starts a user-level systemd unit at:
 
 ```text
@@ -136,7 +144,8 @@ If systemd is not available on the NAS, run the daemon under PM2, Docker Compose
 Pairing:
 
 - Run `healthlink-local pair` on the server when the receiver is reachable from the server loopback.
-- If pairing is generated through another admin surface, the `server` value must be the LAN or Tailscale URL that the iPhone can reach.
+- Check the printed pairing URL before scanning; the `server` value must be the LAN, Tailscale, or HTTPS URL that the iPhone can reach.
+- If auto-detection prints `127.0.0.1`, a Docker bridge, a WSL-only address, or the wrong NIC, rerun `setup` or `pair` with `--server-url`.
 
 Diagnostics:
 
