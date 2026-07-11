@@ -56,5 +56,8 @@ jobs:
       - name: Audit production runtime dependencies
         run: npm run audit:dependencies
 
+      - name: Audit website production dependencies
+        run: npm run audit:www-dependencies
+
       - name: Verify npm package contents
         run: npm run pack:check --workspace healthlink-local
