@@ -1,6 +1,6 @@
 # HealthLink E2EE Relay Technical Route
 
-This document defines the next HealthLink architecture direction: keep HealthLink MCP-native and source-owned, while adding an end-to-end encrypted relay transport and Agent-specific onboarding adapters. The goal is to improve setup UX without coupling HealthLink to any one Agent. For staged execution, see [e2ee-relay-implementation-plan.md](e2ee-relay-implementation-plan.md).
+This document defines the next HealthLink architecture direction: keep HealthLink MCP-native and source-owned, while adding an end-to-end encrypted relay transport and Agent-specific onboarding adapters. The goal is to improve setup UX without coupling HealthLink to any one Agent. For the canonical install and onboarding state machine, see [agent-first-onboarding.md](agent-first-onboarding.md). For staged relay execution, see [e2ee-relay-implementation-plan.md](e2ee-relay-implementation-plan.md).
 
 The product shape can learn from existing Apple Health sync products for agents, but HealthLink must use its own protocol, code, schemas, copy, assets, and branding.
 
@@ -436,6 +436,8 @@ The core runtime exposes one stdio MCP server and one local SQLite model. Agent 
 
 They must not implement relay cryptography, ingest health payloads, fork the tool schema, or read relay secrets. `generic` prints standard `mcpServers` JSON, Hermes writes `mcp_servers.healthlink`, and OpenClaw writes its adapter-specific MCP shape. All three point to the same `healthlink-local mcp --db <path>` process.
 
+Agent-first setup does not change this boundary. Skills invoke the shared bootstrap, present a redacted plan, offer one onboarding action, and verify the first sync through MCP. The website installer and marketplace packages are distribution surfaces over the same setup state.
+
 The repeatable compatibility gate is `npm run audit:agent-adapters`. It calls `healthlink_status` through a generic MCP client, installs Hermes config and skill state into a temporary HOME, then uses the locally installed Hermes CLI to connect and discover all 12 HealthLink tools. An Agent-specific marketplace package is not required for this gate.
 
 ## Optional OpenClaw Adapter
@@ -456,6 +458,8 @@ install healthlink-local
   -> call MCP tools for analysis
   -> suggest CronJobs for recurring pull/report
 ```
+
+The complete onboarding payload remains sensitive. Until a short-lived, single-use onboarding ticket exists, the Skill should prefer a local QR page/file and require explicit user intent before attaching a credential-bearing QR to a cloud-hosted Agent conversation.
 
 The exported ClawHub folder uses `SKILL.md` frontmatter as the authoritative package metadata. Under `metadata.openclaw`, it declares the required `healthlink-local` binary and its Node install specification; no separate custom manifest is needed. ClawHub publication applies MIT-0, so the skill does not declare a conflicting license.
 

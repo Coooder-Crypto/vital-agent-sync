@@ -53,6 +53,8 @@ npm run dev:local
 
 The local package lives in `packages/local` and is named `healthlink-local`. The package is prepared for public npm publishing and exposes the `healthlink-local` CLI.
 
+The target product entry is Agent-first: the user asks an existing Agent to install HealthLink, the Agent adapter invokes the shared `healthlink-local` bootstrap, and the user receives one QR/deep-link action for the iOS app. The Skill is an orchestration layer only; MCP remains the data contract. See [Agent-First Onboarding And Runtime Bootstrap](docs/agent-first-onboarding.md).
+
 The current local development loop is:
 
 ```text
@@ -72,7 +74,7 @@ npm run build:local
 node packages/local/dist/cli.js mcp --db ~/.healthlink/healthlink.sqlite
 ```
 
-Published-package pairing loop:
+Current portable CLI fallback:
 
 ```bash
 npx -y healthlink-local setup
@@ -86,6 +88,8 @@ node packages/local/dist/cli.js setup
 ```
 
 `setup` installs and starts the background receiver through the current platform's service manager, prints the iPhone pairing QR, and auto-detects Hermes/OpenClaw when their config exists. If Hermes is detected, it backs up and writes `~/.hermes/config.yaml`, installs the HealthLink Hermes skill, and points Hermes at the same HealthLink database. macOS uses `launchd`; Linux servers use a user-level `systemd` service. Pass `--agent hermes`, `--agent openclaw`, or `--agent generic` to force an adapter. After pairing and syncing, restart Hermes or run `/reload-mcp` when an Agent config was changed. If the QR expires, run `healthlink-local pair` or `npx -y healthlink-local pair`.
+
+The planned one-command installer only bootstraps this package into a user-writable prefix. It must not create a second setup implementation. Agent-first, website, and manual CLI entry points all converge on `healthlink-local setup`, the same local state, and the same MCP tools.
 
 Common deployment choices are documented separately:
 
@@ -188,6 +192,8 @@ No repeated QR scan, `install-hermes`, or `/reload-mcp` is needed unless the pai
 ## Agent Skills
 
 MCP is the stable integration contract. Skills are optional agent-side usage guidance that help an AI decide when to call HealthLink and how to format analysis.
+
+Skills may also guide installation, onboarding, first-sync verification, and Agent-native scheduling by invoking `healthlink-local`. They must not implement relay cryptography, store a separate copy of health data, expose onboarding credentials, or bypass MCP. OpenClaw marketplace publication is optional; Hermes and generic MCP remain supported without it.
 
 For Hermes, the preferred skill behavior is:
 
