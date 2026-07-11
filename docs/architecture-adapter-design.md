@@ -1,6 +1,6 @@
 # HealthLink Adapter Architecture Design
 
-This document turns the architecture upgrade TODO into implementation guidance for future source apps, agent runtimes, and transport modes. It is intentionally adapter-focused: the stable product surface remains scoped pairing, normalized storage, and MCP query tools.
+This document turns the architecture upgrade TODO into implementation guidance for future source apps, agent runtimes, and transport modes. It is intentionally adapter-focused: the stable product surface remains scoped pairing, normalized storage, and MCP query tools. The shared installer and orchestration contract is defined in [agent-first-onboarding.md](agent-first-onboarding.md).
 
 ## Current Status
 
@@ -12,7 +12,9 @@ Implemented in the local MVP branch:
 - Hermes MCP config install and optional HealthLink skill install.
 - Agent adapter and transport provider interfaces.
 - LAN default transport and Tailscale IPv4 detection.
-- Foreground auto-sync in the iOS app.
+- E2EE Hosted/Self-hosted Relay runtime, onboarding, pull, and lifecycle controls.
+- OpenClaw package export and Agent adapter compatibility audits.
+- Foreground auto-sync and best-effort BGAppRefresh scheduling in the iOS app.
 - MCP freshness metadata, source coverage, audit logging, weekly summary, and feedback events.
 
 Still intentionally future work:
@@ -22,7 +24,9 @@ Still intentionally future work:
 - Automatic WorkBuddy config installer.
 - Native tunnel process management.
 - Public HTTPS deployment automation.
-- iOS background sync runtime tasks.
+- HealthKit observer-driven `needsSync` state and physical-device background validation.
+- Agent-first non-interactive bootstrap output and setup resume state.
+- Short-lived, single-use onboarding tickets for safe in-chat handoff.
 
 ## Boundary Model
 
@@ -44,6 +48,8 @@ Adapters must not leak product semantics into each other:
 - Transport providers only choose how the source reaches the gateway.
 - Agent adapters only install, print, test, or reload MCP/skill config.
 - Query tools hide provider-specific collection details behind provider-neutral summaries.
+
+The setup orchestrator is also a boundary. Agent adapters may invoke the shared bootstrap and translate its safe status into conversation, but they must not fork installation state, key generation, transport selection, or first-sync verification.
 
 This means Android, Xiaomi, Hermes, OpenClaw, WorkBuddy, LAN, and tunnels can be added without changing the user-facing contract:
 
@@ -224,9 +230,9 @@ Before an adapter writes files automatically, it must have verified:
 
 If any of those are unknown, the adapter should fall back to `print-agent-config --agent generic` and `print-skill`.
 
-## OpenClaw Adapter Research
+## OpenClaw Adapter And Product Benchmark
 
-No local OpenClaw checkout was available under `/Users/coooder/Code/Agent/all-agents` during this pass. The implemented adapter therefore follows OpenClaw's documented `mcp.servers` config shape and remains conservative about writes: it only auto-writes configs that parse as JSON.
+The implemented config adapter remains conservative about writes: it only auto-writes configs that parse as JSON. A separate exported Skill package can guide setup without changing the core runtime.
 
 Implemented adapter behavior:
 
@@ -237,9 +243,12 @@ Implemented adapter behavior:
 
 Open questions to close before expanding implementation:
 
-- Does it support per-tool descriptions from MCP, separate rules, or both?
-- Can reload happen in-session, or does it require restart?
-- Should HealthLink install portable skill text into an OpenClaw skill directory, or should it keep skills manual through `print-skill`?
+- Confirm the final marketplace install/update command against the release toolchain.
+- Confirm reload behavior and all 12 MCP tools in an isolated OpenClaw environment.
+- Keep ClawHub publication optional and independently removable.
+- Ensure the Skill invokes the Agent-neutral bootstrap instead of adding Python/runtime data paths.
+
+The [Apple Health Sync ClawHub package](https://clawhub.ai/lukasosterheider/skills/apple-health-sync) is an interaction benchmark: initialize from Agent chat, prefer one QR handoff, complete a first iOS sync, pull/decrypt locally, and offer summaries or schedules. HealthLink should match that sequence while retaining its shared TypeScript runtime and MCP-only health-data access.
 
 ## WorkBuddy Adapter Research
 

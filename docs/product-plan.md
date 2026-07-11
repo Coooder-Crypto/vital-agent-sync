@@ -19,7 +19,7 @@ Agent queries the latest authorized personal context.
 
 The user should not need to manually export files after setup. The iOS app syncs compact summaries to a user-controlled gateway endpoint. Agents query the latest available context through MCP or an SDK. The intended steady state is "pair once, authorize once, keep syncing, ask the Agent anytime."
 
-For the detailed Agent connection UX, see [agent-connection.md](agent-connection.md). For common deployment methods, see [deployment-methods.md](deployment-methods.md). For the multi-source, multi-agent, multi-transport upgrade checklist, see [architecture-upgrade-todo.md](architecture-upgrade-todo.md).
+For the canonical Agent-first install and onboarding flow, see [agent-first-onboarding.md](agent-first-onboarding.md). For the detailed Agent connection UX, see [agent-connection.md](agent-connection.md). For common deployment methods, see [deployment-methods.md](deployment-methods.md). For the multi-source, multi-agent, multi-transport upgrade checklist, see [architecture-upgrade-todo.md](architecture-upgrade-todo.md).
 
 ## Principles
 

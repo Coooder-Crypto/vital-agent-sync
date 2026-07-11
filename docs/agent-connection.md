@@ -2,23 +2,24 @@
 
 This document defines the target "foolproof" path for connecting HealthLink iOS to Hermes Agent or any other agent runtime.
 
+For the canonical installation/bootstrap state machine, security boundary, and delivery slices, see [agent-first-onboarding.md](agent-first-onboarding.md).
 For the longer-term adapter architecture and implementation checklist covering Android, Xiaomi, OpenClaw, WorkBuddy, Tailscale, tunnels, and public HTTPS, see [architecture-upgrade-todo.md](architecture-upgrade-todo.md).
 For adapter implementation guidance, see [architecture-adapter-design.md](architecture-adapter-design.md).
 
 ## Target User Experience
 
 ```text
-1. User asks an agent or runs a command to install HealthLink.
-2. HealthLink starts an Agent-side receiver and shows a QR code.
-3. User scans the QR code with the iOS app.
-4. User selects which data types to expose.
-5. User authorizes Apple Health once.
-6. The Agent-side receiver stores the data locally.
-7. The iOS app syncs compact summaries manually or automatically.
-8. The agent reads the latest stored data through MCP tools.
+1. User asks an Agent to install HealthLink, or uses the portable CLI fallback.
+2. The Agent shows a redacted setup plan and invokes the shared healthlink-local bootstrap.
+3. HealthLink initializes local state, MCP, and the selected transport.
+4. The user receives one QR/deep-link action and opens it with the iOS app.
+5. The user selects which data types to expose and authorizes Apple Health once.
+6. The iOS app sends compact summaries directly or as encrypted relay envelopes.
+7. healthlink-local ingests the summaries into the same local SQLite model.
+8. The Agent verifies freshness and reads data only through MCP tools.
 ```
 
-The user should not manually copy tokens, edit SQLite, or understand HealthKit. The only required setup steps should be "run install", "scan QR", "approve scopes", and "grant Apple permissions". Manual sync remains available, but the product expectation is pair once, authorize once, then keep the local Agent context fresh automatically when iOS allows it.
+The user should not manually copy tokens, edit SQLite, or understand HealthKit. The only required setup steps should be "approve install", "open onboarding", "approve scopes", and "grant Apple permissions". Manual sync remains available, but the product expectation is pair once, authorize once, then keep the local Agent context fresh automatically when iOS allows it.
 
 ## Product Boundary
 
@@ -32,8 +33,8 @@ HealthLink iOS
   manual and automatic sync
 
 healthlink-local
-  pairing QR
-  /health/sync receiver
+  Agent-first bootstrap and onboarding artifact
+  direct receiver and encrypted Relay pull
   SQLite/Postgres storage
   MCP tools
 
@@ -43,7 +44,7 @@ Agent runtime
   may load optional HealthLink skills
 ```
 
-The agent never talks to HealthKit directly. The cloud should not become a health data warehouse by default.
+The agent never talks to HealthKit directly. Skills and Agent adapters do not become alternate data stores. The Hosted Relay handles opaque encrypted envelopes and must not become a health data warehouse.
 
 ## Persistent Link Model
 
@@ -123,7 +124,7 @@ HealthLink should expose one product flow with multiple transport modes undernea
 
 ### Mode A: LAN
 
-Default for MVP and local agents.
+Available for local agents and development.
 
 ```text
 iPhone -> http://192.168.x.x:8787 -> healthlink-local -> SQLite -> MCP -> Agent
@@ -157,13 +158,13 @@ Requirements:
 
 ### Mode C: Tunnel / Relay
 
-For users who cannot expose a local machine or configure public HTTPS.
+The E2EE Hosted Relay is the target product default for users who should not expose a local machine or configure public HTTPS.
 
 ```text
-iPhone -> tunnel or relay URL -> user Agent receiver -> storage -> MCP -> Agent
+iPhone -> encrypted Relay -> healthlink-local pull/decrypt -> SQLite -> MCP -> Agent
 ```
 
-The relay must be a transport layer, not a data platform. Payloads should be end-to-end encrypted before this mode is treated as production-quality.
+The relay is a transport layer, not a data platform. It stores opaque, bounded, expiring envelopes; decryption, validation, normalized storage, and MCP access stay in healthlink-local.
 
 ### Mode D: Tailscale
 
@@ -177,7 +178,7 @@ HealthLink can also try to read Tailscale MagicDNS from `tailscale status --json
 
 ## CLI Shape
 
-The default local install command should be:
+The current portable fallback is:
 
 ```bash
 npx -y healthlink-local setup
@@ -196,6 +197,10 @@ npx -y healthlink-local setup
 - Open or print the pairing page.
 - Print MCP config for common agents.
 - Tell the user to restart Hermes or run `/reload-mcp`.
+
+The Agent-first target adds versioned machine-readable setup state, safe resume behavior, and first-sync verification. Agent adapters invoke that same command rather than reimplementing setup. A future website `install.sh` only makes the package available in a user-writable prefix and then delegates to `setup`.
+
+Agent-facing output may include setup stage, detected adapter, service status, a locally rendered onboarding artifact, reload hint, freshness, and a suggested next action. It must not include private keys, complete onboarding payloads, relay access tokens, upload secrets, or health plaintext.
 
 Advanced users can still force an adapter or manager:
 
@@ -340,16 +345,28 @@ The helpers should not invent new protocols. They should write or print the same
 
 MCP is the product protocol. Skills are optional agent-specific instructions that improve natural-language tool use.
 
-HealthLink should provide a small, portable skill document for agents that support skills. Hermes can be the first-class target.
+HealthLink should provide small, portable skill documents for agents that support them. OpenClaw and Hermes can provide first-class onboarding adapters, while generic MCP remains the mandatory fallback.
 
 Skill responsibilities:
 
+- invoke the shared setup, status, pull, and lifecycle commands
+- present a setup plan before persistent changes
+- offer one onboarding format at a time
+- verify the first sync through MCP
 - recognize questions such as "How am I today?", "Should I exercise?", and "Am I recovered?"
 - call `get_personal_context` first for broad personal-context questions
 - use lower-level tools only for drill-down questions
 - report data freshness before analysis
 - combine health, sleep, activity, and recovery
 - avoid diagnosis, prescriptions, or unsupported medical claims
+
+Skill non-responsibilities:
+
+- generating a separate health schema or database
+- implementing E2EE or parsing HealthKit payloads
+- reading SQLite or Relay secrets directly
+- dumping decoded onboarding fields into Agent chat
+- returning health data through deep-link callbacks
 
 Potential helper commands:
 
