@@ -53,7 +53,7 @@ final class SyncCoordinator: ObservableObject {
             beginOperation()
 
             let healthSummaries = try await buildHealthSummaries(context: context)
-            let request = makeHealthSyncRequest(healthSummaries, context: context)
+            let request = try makeHealthSyncRequest(healthSummaries, context: context, settings: settings)
             let response = try await uploadHealthSyncRequest(request)
             let latestSummary = healthSummaries.last
             let syncedAt = Date()
@@ -61,7 +61,7 @@ final class SyncCoordinator: ObservableObject {
                 attemptedAt: attemptedAt,
                 completedAt: syncedAt,
                 trigger: trigger.displayName,
-                serverURL: context.serverURL.absoluteString,
+                serverURL: context.displayServerURL,
                 agentName: context.agentName,
                 requestedDateRange: context.dateRangeDescription,
                 uploadedDayCount: response.health_daily_count,
@@ -157,7 +157,11 @@ final class SyncCoordinator: ObservableObject {
         return healthSummaries
     }
 
-    private func makeHealthSyncRequest(_ healthSummaries: [DailyHealthSummary], context: SyncRequestContext) -> HealthSyncRequest {
+    private func makeHealthSyncRequest(
+        _ healthSummaries: [DailyHealthSummary],
+        context: SyncRequestContext,
+        settings: GatewaySettings
+    ) throws -> HealthSyncRequest {
         let payload = HealthSyncPayload(
             device_id: context.deviceID,
             sync_id: makeSyncID(),
@@ -165,11 +169,48 @@ final class SyncCoordinator: ObservableObject {
             timezone: TimeZone.current.identifier,
             health_daily_summaries: healthSummaries
         )
-        return HealthSyncRequest(client: GatewayAPIClient(serverURL: context.serverURL, apiToken: context.apiToken), payload: payload)
+        if let relayOnboarding = context.relayOnboarding {
+            guard let relayURL = URL(string: relayOnboarding.relay_url) else {
+                throw GatewayError.missingServerURL
+            }
+            let envelope = try RelayCrypto.encrypt(
+                payload: payload,
+                onboarding: relayOnboarding,
+                sequence: settings.nextRelayEnvelopeSequence()
+            )
+            return .relay(
+                relayURL: relayURL,
+                relayAccessToken: relayOnboarding.relay_access_token,
+                relayAPIToken: relayOnboarding.relay_api_token,
+                envelope: envelope,
+                localResponse: HealthSyncResponse(
+                ok: true,
+                accepted_sync_id: payload.sync_id,
+                health_daily_count: payload.health_daily_summaries.count,
+                idempotent: false
+                )
+            )
+        }
+        guard let serverURL = context.serverURL,
+              let apiToken = context.apiToken else {
+            throw GatewayError.missingServerURL
+        }
+        return .direct(client: GatewayAPIClient(serverURL: serverURL, apiToken: apiToken), payload: payload)
     }
 
     private func uploadHealthSyncRequest(_ request: HealthSyncRequest) async throws -> HealthSyncResponse {
-        try await request.client.uploadHealthSync(request.payload)
+        switch request {
+        case .direct(let client, let payload):
+            return try await client.uploadHealthSync(payload)
+        case .relay(let relayURL, let relayAccessToken, let relayAPIToken, let envelope, let localResponse):
+            _ = try await GatewayAPIClient.uploadRelayEnvelope(
+                envelope,
+                relayURL: relayURL,
+                relayAccessToken: relayAccessToken,
+                relayAPIToken: relayAPIToken
+            )
+            return localResponse
+        }
     }
 
     private func successMessage(response: HealthSyncResponse, trigger: SyncTrigger) -> String {
@@ -212,34 +253,44 @@ final class SyncCoordinator: ObservableObject {
     }
 
     private struct SyncRequestContext {
-        let serverURL: URL
-        let apiToken: String
+        let serverURL: URL?
+        let apiToken: String?
         let deviceID: String
         let agentName: String?
         let uploadHealthEnabled: Bool
         let dates: [Date]
+        let relayOnboarding: RelayOnboardingPayload?
 
         @MainActor
         init(settings: GatewaySettings, daysBack: Int) throws {
+            if let relayOnboarding = settings.relayOnboarding {
+                self.serverURL = URL(string: relayOnboarding.relay_url)
+                self.apiToken = nil
+                self.deviceID = relayOnboarding.source_device_id
+                self.agentName = relayOnboarding.agent_name
+                self.uploadHealthEnabled = settings.uploadHealthEnabled
+                self.dates = Self.datesToSync(daysBack: daysBack)
+                self.relayOnboarding = relayOnboarding
+                return
+            }
+
             guard let serverURL = settings.serverURL else {
                 throw GatewayError.missingServerURL
             }
-
             let token = settings.apiTokenText.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !token.isEmpty else {
                 throw GatewayError.missingAPIToken
             }
-
             guard let deviceID = settings.pairedDeviceID else {
                 throw GatewayError.missingPairedDevice
             }
-
             self.serverURL = serverURL
             self.apiToken = token
             self.deviceID = deviceID
             self.agentName = settings.pairedAgentName
             self.uploadHealthEnabled = settings.uploadHealthEnabled
             self.dates = Self.datesToSync(daysBack: daysBack)
+            self.relayOnboarding = nil
         }
 
         var dateRangeDescription: String? {
@@ -252,6 +303,10 @@ final class SyncCoordinator: ObservableObject {
             return start == end ? start : "\(start) - \(end)"
         }
 
+        var displayServerURL: String? {
+            serverURL?.absoluteString ?? relayOnboarding?.relay_url
+        }
+
         private static func datesToSync(daysBack: Int) -> [Date] {
             let calendar = Calendar.current
             let today = calendar.startOfDay(for: Date())
@@ -262,9 +317,15 @@ final class SyncCoordinator: ObservableObject {
         }
     }
 
-    private struct HealthSyncRequest {
-        let client: GatewayAPIClient
-        let payload: HealthSyncPayload
+    private enum HealthSyncRequest {
+        case direct(client: GatewayAPIClient, payload: HealthSyncPayload)
+        case relay(
+            relayURL: URL,
+            relayAccessToken: String,
+            relayAPIToken: String?,
+            envelope: RelayEncryptedEnvelope,
+            localResponse: HealthSyncResponse
+        )
     }
 }
 

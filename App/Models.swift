@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 struct WorkoutSummary: Codable, Identifiable {
     let id: String
@@ -195,12 +196,318 @@ struct PairingPreview: Identifiable {
     let status: PairingStatusResponse
 }
 
+struct RelayOnboardingPayload: Codable, Identifiable {
+    let protocolVersion: String
+    let mode: String
+    let relay_url: String
+    let user_id: String
+    let source_device_id: String
+    let agent_name: String
+    let encryption_public_key: String?
+    let encryption_public_key_x25519: String
+    let signing_public_key: String?
+    let upload_auth_secret: String
+    let relay_access_token: String
+    let relay_api_token: String?
+    let fingerprint: String
+    let requested_scopes: [String]
+    let created_at: String
+
+    var id: String { source_device_id }
+
+    enum CodingKeys: String, CodingKey {
+        case protocolVersion = "protocol"
+        case mode
+        case relay_url
+        case user_id
+        case source_device_id
+        case agent_name
+        case encryption_public_key
+        case encryption_public_key_x25519
+        case signing_public_key
+        case upload_auth_secret
+        case relay_access_token
+        case relay_api_token
+        case fingerprint
+        case requested_scopes
+        case created_at
+    }
+
+    init(
+        protocolVersion: String,
+        mode: String,
+        relay_url: String,
+        user_id: String,
+        source_device_id: String,
+        agent_name: String,
+        encryption_public_key: String?,
+        encryption_public_key_x25519: String,
+        signing_public_key: String?,
+        upload_auth_secret: String,
+        relay_access_token: String,
+        relay_api_token: String?,
+        fingerprint: String,
+        requested_scopes: [String],
+        created_at: String
+    ) {
+        self.protocolVersion = protocolVersion
+        self.mode = mode
+        self.relay_url = relay_url
+        self.user_id = user_id
+        self.source_device_id = source_device_id
+        self.agent_name = agent_name
+        self.encryption_public_key = encryption_public_key
+        self.encryption_public_key_x25519 = encryption_public_key_x25519
+        self.signing_public_key = signing_public_key
+        self.upload_auth_secret = upload_auth_secret
+        self.relay_access_token = relay_access_token
+        self.relay_api_token = relay_api_token
+        self.fingerprint = fingerprint
+        self.requested_scopes = requested_scopes
+        self.created_at = created_at
+    }
+
+    init(rawValue: String) throws {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let encodedValue: String
+        if let components = URLComponents(string: trimmed),
+           components.scheme?.lowercased() == "healthlink",
+           components.host?.lowercased() == "onboard",
+           let payload = components.queryItems?.first(where: { $0.name == "payload" })?.value {
+            encodedValue = payload
+        } else {
+            encodedValue = trimmed
+        }
+
+        let data: Data
+        if encodedValue.first == "{" {
+            guard let rawData = encodedValue.data(using: .utf8) else {
+                throw GatewayError.invalidPairingURL
+            }
+            data = rawData
+        } else {
+            let prefix = "healthlink-e2ee-v1:"
+            let base64URL = encodedValue.hasPrefix(prefix)
+                ? String(encodedValue.dropFirst(prefix.count))
+                : encodedValue
+            data = try Data(base64URLEncoded: base64URL)
+        }
+        let decoded = try JSONDecoder().decode(RelayOnboardingPayload.self, from: data)
+        let encryptionKey = try? Data(base64URLEncoded: decoded.encryption_public_key_x25519)
+        let uploadSecret = try? Data(base64URLEncoded: decoded.upload_auth_secret)
+        let relayAccessToken = try? Data(base64URLEncoded: decoded.relay_access_token)
+        guard let relayComponents = URLComponents(string: decoded.relay_url),
+              let relayScheme = relayComponents.scheme?.lowercased(),
+              relayComponents.host != nil,
+              relayComponents.user == nil,
+              relayComponents.password == nil,
+              relayComponents.query == nil,
+              relayComponents.fragment == nil,
+              ["hosted_relay", "self_hosted_relay"].contains(decoded.mode),
+              (decoded.mode == "hosted_relay" ? relayScheme == "https" : ["http", "https"].contains(relayScheme)) else {
+            throw GatewayError.invalidPairingURL
+        }
+        guard decoded.protocolVersion == "healthlink-e2ee-v1",
+              decoded.relay_url.count <= 2_048,
+              Self.isIdentifier(decoded.user_id),
+              Self.isIdentifier(decoded.source_device_id),
+              !decoded.agent_name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              decoded.agent_name.count <= 256,
+              encryptionKey?.count == 32,
+              uploadSecret?.count == 32,
+              relayAccessToken?.count == 32,
+              !decoded.requested_scopes.isEmpty,
+              decoded.requested_scopes.count <= 32,
+              decoded.requested_scopes.allSatisfy(Self.isScope),
+              Self.isISO8601Timestamp(decoded.created_at) else {
+            throw GatewayError.invalidPairingURL
+        }
+        self = decoded
+    }
+
+    private static func isIdentifier(_ value: String) -> Bool {
+        !value.isEmpty &&
+            value.count <= 256 &&
+            value.range(of: "^[A-Za-z0-9._-]+$", options: .regularExpression) != nil
+    }
+
+    private static func isScope(_ value: String) -> Bool {
+        !value.isEmpty &&
+            value.count <= 128 &&
+            value.range(of: "^[A-Za-z0-9._:-]+$", options: .regularExpression) != nil
+    }
+
+    private static func isISO8601Timestamp(_ value: String) -> Bool {
+        ISO8601DateFormatter.gatewayDateTime.date(from: value) != nil ||
+            ISO8601DateFormatter.gatewayDateTimeWithFractionalSeconds.date(from: value) != nil
+    }
+}
+
+struct RelayOnboardingPreview: Identifiable {
+    var id: String { payload.source_device_id }
+
+    let payload: RelayOnboardingPayload
+}
+
 struct HealthSyncPayload: Codable {
     let device_id: String
     let sync_id: String
     let generated_at: String
     let timezone: String
     let health_daily_summaries: [DailyHealthSummary]
+}
+
+struct RelayEncryptedEnvelope: Codable {
+    let protocolVersion: String
+    let user_id: String
+    let device_id: String
+    let envelope_id: String
+    let sequence: Int
+    let payload_type: String
+    let created_at: String
+    let content_encoding: String
+    let crypto: RelayEnvelopeCrypto
+
+    enum CodingKeys: String, CodingKey {
+        case protocolVersion = "protocol"
+        case user_id
+        case device_id
+        case envelope_id
+        case sequence
+        case payload_type
+        case created_at
+        case content_encoding
+        case crypto
+    }
+}
+
+struct RelayEnvelopeCrypto: Codable {
+    let alg: String
+    let sender_public_key_x25519: String
+    let nonce: String
+    let tag: String
+    let ciphertext: String
+    let signature: String
+}
+
+struct RelayEnvelopePostResponse: Codable {
+    let ok: Bool
+    let envelope_id: String
+}
+
+enum HealthLinkCallbackPolicy {
+    static func safeCallbackURL(rawCallbackURL: String?, requestID: String?, status: String) -> URL? {
+        guard allowedStatuses.contains(status),
+              let rawCallbackURL,
+              let callbackURL = URL(string: rawCallbackURL),
+              let scheme = callbackURL.scheme?.lowercased(),
+              allowedSchemes.contains(scheme),
+              var components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false),
+              components.user == nil,
+              components.password == nil else {
+            return nil
+        }
+
+        var queryItems: [URLQueryItem] = []
+        if let requestID = sanitizedRequestID(requestID) {
+            queryItems.append(URLQueryItem(name: "request_id", value: requestID))
+        }
+        queryItems.append(URLQueryItem(name: "status", value: status))
+        queryItems.append(URLQueryItem(name: "source", value: "healthlink"))
+        components.queryItems = queryItems
+        components.fragment = nil
+        return components.url
+    }
+
+    private static func sanitizedRequestID(_ value: String?) -> String? {
+        guard let value else {
+            return nil
+        }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              trimmed.count <= 128,
+              trimmed.range(of: "^[A-Za-z0-9._-]+$", options: .regularExpression) != nil else {
+            return nil
+        }
+        return trimmed
+    }
+
+    private static let allowedSchemes: Set<String> = ["openclaw"]
+    private static let allowedStatuses: Set<String> = ["ok", "failed", "paired", "unpaired"]
+}
+
+enum RelayCrypto {
+    static func encrypt(
+        payload: HealthSyncPayload,
+        onboarding: RelayOnboardingPayload,
+        sequence: Int? = nil
+    ) throws -> RelayEncryptedEnvelope {
+        let recipientRawKey = try Data(base64URLEncoded: onboarding.encryption_public_key_x25519)
+        let recipientPublicKey = try Curve25519.KeyAgreement.PublicKey(rawRepresentation: recipientRawKey)
+        let ephemeralPrivateKey = Curve25519.KeyAgreement.PrivateKey()
+        let sharedSecret = try ephemeralPrivateKey.sharedSecretFromKeyAgreement(with: recipientPublicKey)
+        let symmetricKey = deriveSymmetricKey(sharedSecret)
+        let nonceData = Data((0..<12).map { _ in UInt8.random(in: 0...255) })
+        let nonce = try ChaChaPoly.Nonce(data: nonceData)
+        let plaintext = try canonicalJSONData(payload)
+        let sealedBox = try ChaChaPoly.seal(plaintext, using: symmetricKey, nonce: nonce)
+        let sequence = sequence ?? Int(Date().timeIntervalSince1970 * 1_000)
+        let createdAt = ISO8601DateFormatter.gatewayDateTime.string(from: Date())
+        let unsigned = RelayEncryptedEnvelope(
+            protocolVersion: "healthlink-e2ee-v1",
+            user_id: onboarding.user_id,
+            device_id: payload.device_id,
+            envelope_id: "env_\(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased())",
+            sequence: sequence,
+            payload_type: "health.sync",
+            created_at: createdAt,
+            content_encoding: "canonical-json",
+            crypto: RelayEnvelopeCrypto(
+                alg: "x25519-hkdf-sha256-chacha20poly1305-hmac-sha256",
+                sender_public_key_x25519: ephemeralPrivateKey.publicKey.rawRepresentation.base64URLEncodedString(),
+                nonce: nonceData.base64URLEncodedString(),
+                tag: sealedBox.tag.base64URLEncodedString(),
+                ciphertext: sealedBox.ciphertext.base64URLEncodedString(),
+                signature: ""
+            )
+        )
+        let signature = try sign(unsignedEnvelope: unsigned, uploadAuthSecret: onboarding.upload_auth_secret)
+        return RelayEncryptedEnvelope(
+            protocolVersion: unsigned.protocolVersion,
+            user_id: unsigned.user_id,
+            device_id: unsigned.device_id,
+            envelope_id: unsigned.envelope_id,
+            sequence: unsigned.sequence,
+            payload_type: unsigned.payload_type,
+            created_at: unsigned.created_at,
+            content_encoding: unsigned.content_encoding,
+            crypto: RelayEnvelopeCrypto(
+                alg: unsigned.crypto.alg,
+                sender_public_key_x25519: unsigned.crypto.sender_public_key_x25519,
+                nonce: unsigned.crypto.nonce,
+                tag: unsigned.crypto.tag,
+                ciphertext: unsigned.crypto.ciphertext,
+                signature: signature
+            )
+        )
+    }
+
+    private static func deriveSymmetricKey(_ sharedSecret: SharedSecret) -> SymmetricKey {
+        sharedSecret.hkdfDerivedSymmetricKey(
+            using: SHA256.self,
+            salt: Data(),
+            sharedInfo: Data("healthlink-e2ee-v1 envelope".utf8),
+            outputByteCount: 32
+        )
+    }
+
+    private static func sign(unsignedEnvelope: RelayEncryptedEnvelope, uploadAuthSecret: String) throws -> String {
+        let keyData = try Data(base64URLEncoded: uploadAuthSecret)
+        let key = SymmetricKey(data: keyData)
+        let data = try canonicalJSONData(unsignedEnvelope)
+        let mac = HMAC<SHA256>.authenticationCode(for: data, using: key)
+        return Data(mac).base64URLEncodedString()
+    }
 }
 
 struct HealthSyncResponse: Codable {
@@ -320,10 +627,49 @@ extension DateFormatter {
     }()
 }
 
+func canonicalJSONData<T: Encodable>(_ value: T) throws -> Data {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    return try encoder.encode(value)
+}
+
+extension Data {
+    init(base64URLEncoded value: String) throws {
+        guard !value.isEmpty,
+              value.range(of: "^[A-Za-z0-9_-]+$", options: .regularExpression) != nil else {
+            throw GatewayError.invalidPairingURL
+        }
+        var base64 = value
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        let padding = base64.count % 4
+        if padding > 0 {
+            base64 += String(repeating: "=", count: 4 - padding)
+        }
+        guard let data = Data(base64Encoded: base64) else {
+            throw GatewayError.invalidPairingURL
+        }
+        self = data
+    }
+
+    func base64URLEncodedString() -> String {
+        base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+}
+
 extension ISO8601DateFormatter {
     static let gatewayDateTime: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withColonSeparatorInTimeZone]
+        return formatter
+    }()
+
+    static let gatewayDateTimeWithFractionalSeconds: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withColonSeparatorInTimeZone, .withFractionalSeconds]
         return formatter
     }()
 }
