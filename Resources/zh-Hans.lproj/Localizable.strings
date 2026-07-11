@@ -142,8 +142,10 @@
 "Agent removed" = "Agent 已移除";
 "Removed locally. Receiver revoke failed: %@" = "已在本地移除。接收器撤销失败：%@";
 "Health permission request completed" = "健康权限请求已完成";
-"Uploaded %lld health" = "已上传 %lld 条健康数据";
-"Auto sync (%@) uploaded %lld health" = "自动同步（%@）已上传 %lld 条健康数据";
+"Receiver accepted %lld Health summaries" = "接收器已接收 %lld 条健康摘要";
+"Relay queued %lld encrypted Health summaries" = "Relay 已排队 %lld 条加密健康摘要";
+"Auto sync (%@): receiver accepted %lld Health summaries" = "自动同步（%@）：接收器已接收 %lld 条健康摘要";
+"Auto sync (%@): relay queued %lld encrypted Health summaries" = "自动同步（%@）：Relay 已排队 %lld 条加密健康摘要";
 
 "First Sync" = "首次同步";
 "Grant Health access" = "授权健康访问";
@@ -155,7 +157,11 @@
 "Allow Health" = "授权健康";
 "Sync Now" = "立即同步";
 "Syncing" = "同步中";
-"Agent received sync" = "Agent 已收到同步";
+"Receiver accepted sync" = "接收器已接收同步";
+"Encrypted sync queued" = "加密同步已排队";
+"Sync accepted" = "同步已接收";
+"The paired receiver stored this sync for Agent tools." = "已配对的接收器已保存这次同步，Agent 工具可以读取。";
+"The relay accepted the encrypted envelope. Your Agent can read it after HealthLink Local pulls it." = "Relay 已接收加密信封。HealthLink Local 拉取后，你的 Agent 才能读取。";
 "Sync failed" = "同步失败";
 "Latest sync completed." = "最近一次同步已完成。";
 "Trigger" = "触发方式";
@@ -165,6 +171,7 @@
 "Uploaded" = "已上传";
 "Accepted ID" = "接收 ID";
 "Duplicate" = "重复请求";
+"Delivery" = "交付状态";
 "Receiver" = "接收器";
 "Agent" = "Agent";
 "Failure" = "失败原因";
@@ -192,4 +199,3 @@
 "Recent Sync Attempts" = "最近同步尝试";
 "No sync attempts yet" = "暂无同步尝试";
 "Sync history appears here after the first attempt." = "首次尝试同步后，历史记录会显示在这里。";
-"Sync succeeded" = "同步成功";

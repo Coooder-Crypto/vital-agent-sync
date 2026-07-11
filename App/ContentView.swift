@@ -46,6 +46,7 @@ struct ContentView: View {
                     Task {
                         let paired = await settings.confirmPairing(preview)
                         if paired {
+                            sync.reset()
                             await sync.attemptAutoSync(settings: settings, reason: "pairing")
                         }
                     }
@@ -62,6 +63,7 @@ struct ContentView: View {
                 onConfirm: {
                     let paired = settings.confirmRelayOnboarding(preview)
                     if paired {
+                        sync.reset()
                         Task { await sync.attemptAutoSync(settings: settings, reason: "relay_onboarding") }
                     }
                 }
@@ -118,10 +120,10 @@ struct HomeView: View {
 
                             AgentPromptPanel(agentName: agentName)
                             HomeSyncDetails(
-                                lastHealthSyncAt: sync.status.lastHealthSyncAt,
+                                lastHealthSyncAt: latestSyncDate,
                                 autoSyncDetail: autoSyncDetail,
                                 lastSuccessMessage: sync.status.lastSuccessMessage,
-                                lastSyncDetail: sync.status.lastSyncDetail
+                                lastSyncDetail: visibleSyncDetail
                             )
                         } else {
                             PairingCommandPanel(onScan: { isShowingScanner = true })
@@ -144,9 +146,18 @@ struct HomeView: View {
     }
 
     private var latestSyncDate: Date? {
-        [sync.status.lastHealthSyncAt, settings.lastManualSyncAt, settings.lastAutoSyncAt]
+        [
+            sync.status.lastHealthSyncAt,
+            settings.latestSuccessfulSyncDetail?.completedAt,
+            settings.lastManualSyncAt,
+            settings.lastAutoSyncAt
+        ]
             .compactMap { $0 }
             .max()
+    }
+
+    private var visibleSyncDetail: LastSyncDetail? {
+        sync.status.lastSyncDetail ?? settings.latestSyncDetail
     }
 
     private var autoSyncDetail: LocalizedStringKey {
@@ -212,9 +223,9 @@ struct SourcesView: View {
                 }
 
                 Section("Sync History") {
-                    LabeledContent("Health", value: sync.status.lastHealthSyncAt.map(Self.formatDate) ?? "Never")
+                    LabeledContent("Health", value: latestHealthSyncAt.map(Self.formatDate) ?? "Never")
 
-                    if let lastSyncDetail = sync.status.lastSyncDetail {
+                    if let lastSyncDetail = visibleSyncDetail {
                         SyncDetailRows(detail: lastSyncDetail)
                     }
 
@@ -260,6 +271,21 @@ struct SourcesView: View {
 
     private static func formatDate(_ date: Date) -> String {
         date.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    private var latestHealthSyncAt: Date? {
+        [
+            sync.status.lastHealthSyncAt,
+            settings.latestSuccessfulSyncDetail?.completedAt,
+            settings.lastManualSyncAt,
+            settings.lastAutoSyncAt
+        ]
+            .compactMap { $0 }
+            .max()
+    }
+
+    private var visibleSyncDetail: LastSyncDetail? {
+        sync.status.lastSyncDetail ?? settings.latestSyncDetail
     }
 }
 
@@ -400,6 +426,9 @@ struct ConnectionView: View {
                 Button("Remove Agent", role: .destructive) {
                     Task {
                         await settings.disconnect()
+                        if !settings.isPaired {
+                            sync.reset()
+                        }
                         BackgroundSyncManager.scheduleAppRefresh(settings: settings)
                     }
                 }
@@ -1224,7 +1253,7 @@ struct SyncResultCard: View {
 
     private var title: String {
         if detail.succeeded {
-            return "Agent received sync"
+            return detail.deliveryState?.title ?? String(localized: "Sync accepted")
         }
         return detail.failureCategory?.title ?? "Sync failed"
     }
@@ -1232,6 +1261,9 @@ struct SyncResultCard: View {
     private var subtitle: String {
         if let failureCategory = detail.failureCategory {
             return failureCategory.recoveryHint
+        }
+        if let deliveryState = detail.deliveryState {
+            return deliveryState.detail
         }
         if let acceptedSyncID = detail.acceptedSyncID {
             return "Accepted sync \(shortID(acceptedSyncID))."
@@ -1266,6 +1298,10 @@ struct SyncDetailRows: View {
 
             if let isIdempotent = detail.isIdempotent {
                 SyncDetailRow(label: "Duplicate", value: isIdempotent ? "Yes" : "No")
+            }
+
+            if let deliveryState = detail.deliveryState {
+                SyncDetailRow(label: "Delivery", value: deliveryState.title)
             }
 
             if let serverURL = detail.serverURL {
@@ -1318,7 +1354,7 @@ struct SyncHistoryRowLabel: View {
 
     private var title: String {
         if detail.succeeded {
-            return "Sync succeeded"
+            return detail.deliveryState?.title ?? String(localized: "Sync accepted")
         }
         return detail.failureCategory?.title ?? "Sync failed"
     }
