@@ -1,0 +1,119 @@
+name: Relay CI
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/relay-ci.yml
+      - App/**
+      - HealthLink.xcodeproj/**
+      - deploy/relay/**
+      - packages/local/**
+      - scripts/agent-adapter-audit.mjs
+      - scripts/e2ee-relay-*.mjs
+      - scripts/ios-relay-crypto-fixture.swift
+      - scripts/npm-release-preflight.mjs
+      - scripts/release-secret-scan.mjs
+      - package.json
+      - project.yml
+      - tsconfig.base.json
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/relay-ci.yml
+      - App/**
+      - HealthLink.xcodeproj/**
+      - deploy/relay/**
+      - packages/local/**
+      - scripts/agent-adapter-audit.mjs
+      - scripts/e2ee-relay-*.mjs
+      - scripts/ios-relay-crypto-fixture.swift
+      - scripts/npm-release-preflight.mjs
+      - scripts/release-secret-scan.mjs
+      - package.json
+      - project.yml
+      - tsconfig.base.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  package-audit:
+    name: Isolated package audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Audit packed relay runtime
+        run: npm run audit:relay-package
+
+  container-audit:
+    name: Hardened container audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Report Docker versions
+        run: |
+          docker version
+          docker compose version
+
+      - name: Audit hardened relay container
+        run: npm run audit:relay-container
+
+  ios-interop:
+    name: iOS source and crypto interoperability
+    runs-on: macos-15
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Audit local relay and iOS interoperability
+        run: npm run audit:relay-local
