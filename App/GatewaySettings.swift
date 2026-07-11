@@ -64,8 +64,8 @@ final class GatewaySettings: ObservableObject {
     @Published var lastSavedMessage: String?
     @Published private(set) var relayOnboarding: RelayOnboardingPayload?
 
-    private let defaults = UserDefaults.standard
-    private let keychain = KeychainStore.shared
+    private let defaults: UserDefaults
+    private let keychain: KeychainStoring
 
     private enum Keys {
         static let serverURL = "gateway.serverURL"
@@ -97,7 +97,9 @@ final class GatewaySettings: ObservableObject {
         "health.daily_summary.write"
     ]
 
-    init() {
+    init(defaults: UserDefaults = .standard, keychain: KeychainStoring = KeychainStore.shared) {
+        self.defaults = defaults
+        self.keychain = keychain
         self.serverURLText = defaults.string(forKey: Keys.serverURL) ?? ""
         self.apiTokenText = (try? keychain.get(account: Keys.apiToken)) ?? ""
         self.pairedDeviceID = defaults.string(forKey: Keys.pairedDeviceID)
@@ -475,7 +477,7 @@ final class GatewaySettings: ObservableObject {
         return Array(history.prefix(maxSyncHistoryCount))
     }
 
-    private static func loadRelayOnboarding(from defaults: UserDefaults, keychain: KeychainStore) -> RelayOnboardingPayload? {
+    private static func loadRelayOnboarding(from defaults: UserDefaults, keychain: KeychainStoring) -> RelayOnboardingPayload? {
         guard let data = defaults.data(forKey: Keys.relayOnboarding),
               var payload = try? JSONDecoder().decode(RelayOnboardingPayload.self, from: data),
               let secret = try? keychain.get(account: Keys.relayUploadAuthSecret),

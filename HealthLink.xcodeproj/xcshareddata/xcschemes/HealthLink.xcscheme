@@ -39,6 +39,16 @@
          </BuildableReference>
       </MacroExpansion>
       <Testables>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "08A71FCC7376DA18CE0EDC91"
+               BuildableName = "HealthLinkTests.xctest"
+               BlueprintName = "HealthLinkTests"
+               ReferencedContainer = "container:HealthLink.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
       <CommandLineArguments>
       </CommandLineArguments>

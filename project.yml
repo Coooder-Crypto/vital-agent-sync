@@ -54,4 +54,16 @@ targets:
         CODE_SIGN_STYLE: Automatic
         ENABLE_USER_SCRIPT_SANDBOXING: "YES"
     scheme:
-      testTargets: []
+      testTargets:
+        - HealthLinkTests
+  HealthLinkTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests/HealthLinkTests
+    dependencies:
+      - target: HealthLink
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.healthlink.ios.tests
+        GENERATE_INFOPLIST_FILE: "YES"
