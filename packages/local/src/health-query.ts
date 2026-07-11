@@ -1,5 +1,6 @@
 import type { HealthLinkDatabase } from "./database.js";
 import { getHealthStatus } from "./health-ingest.js";
+import { getRelayLocalStatus, type RelayLocalStatus } from "./relay-status.js";
 
 export type QueryOptions = {
   date?: string;
@@ -56,7 +57,10 @@ type SourceCoverageRow = {
 };
 
 export function getAgentHealthStatus(database: HealthLinkDatabase): unknown {
-  return getHealthStatus(database);
+  return {
+    ...getHealthStatus(database),
+    relay: getRelayLocalStatus()
+  };
 }
 
 export function getPersonalContext(database: HealthLinkDatabase, options: QueryOptions = {}): unknown {
@@ -364,14 +368,22 @@ export function buildQueryMetadata(database: HealthLinkDatabase): {
   freshness: {
     latest_sync_at: string | null;
     latest_health_updated_at: string | null;
+    latest_source_generated_at: string | null;
+    latest_successful_relay_pull_at: string | null;
   };
+  relay: RelayLocalStatus;
   source_coverage: SourceCoverageRow[];
   missing_metrics: string[];
 } {
   const status = getHealthStatus(database);
+  const relay = getRelayLocalStatus();
   const latestHealthUpdatedAt = database.sqlite.prepare(`
     select max(updated_at) as value
     from health_daily_summaries
+  `).get() as { value: string | null };
+  const latestSourceGeneratedAt = database.sqlite.prepare(`
+    select max(generated_at) as value
+    from sync_batches
   `).get() as { value: string | null };
   const sourceCoverage = database.sqlite.prepare(`
     select
@@ -390,8 +402,11 @@ export function buildQueryMetadata(database: HealthLinkDatabase): {
   return {
     freshness: {
       latest_sync_at: status.last_sync_at,
-      latest_health_updated_at: latestHealthUpdatedAt.value
+      latest_health_updated_at: latestHealthUpdatedAt.value,
+      latest_source_generated_at: latestSourceGeneratedAt.value,
+      latest_successful_relay_pull_at: relay.last_successful_pull_at
     },
+    relay,
     source_coverage: sourceCoverage,
     missing_metrics: missingMetrics({
       healthCount: countRows(database, "health_daily_summaries"),

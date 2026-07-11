@@ -1,6 +1,6 @@
 {
   "name": "healthlink-local",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local HealthLink Agent server for pairing, ingest, storage, and MCP tools.",
   "license": "MIT",
   "type": "module",
@@ -33,6 +33,7 @@
   },
   "scripts": {
     "dev": "tsx src/cli.ts",
+    "relay:fixture-flow": "tsx src/relay-fixture-flow.ts",
     "build": "tsc -p tsconfig.json",
     "test": "tsx --test tests/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",

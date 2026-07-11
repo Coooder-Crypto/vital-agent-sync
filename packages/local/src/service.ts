@@ -8,24 +8,32 @@ import type { TransportProviderId } from "./transports.js";
 
 export const HEALTHLINK_LAUNCHD_LABEL = "com.healthlink.local";
 export const HEALTHLINK_SYSTEMD_UNIT = "healthlink-local.service";
+export const HEALTHLINK_RELAY_PULL_LAUNCHD_LABEL = "com.healthlink.local.relay-pull";
+export const HEALTHLINK_RELAY_PULL_SYSTEMD_UNIT = "healthlink-relay-pull.service";
 
 export type ServiceManagerId = "auto" | "launchd" | "systemd" | "manual";
+export type HealthLinkServiceMode = "receiver" | "relay_pull";
 
 export type LaunchdServiceOptions = {
   homeDir?: string;
   cliCommand?: string;
   manager?: ServiceManagerId;
   platform?: NodeJS.Platform;
+  mode?: HealthLinkServiceMode;
   databasePath?: string;
+  stateDir?: string;
   host: string;
   port: number;
   transport: TransportProviderId;
   serverUrl?: string;
+  relayUrl?: string;
   tailscaleName?: string;
+  pullIntervalSeconds?: number;
 };
 
 export type HealthLinkServicePaths = {
   manager: Exclude<ServiceManagerId, "auto">;
+  mode: HealthLinkServiceMode;
   configPath: string;
   plistPath: string;
   logDir: string;
@@ -65,48 +73,56 @@ export function resolveServiceManagerId(options: Pick<LaunchdServiceOptions, "ma
   return "manual";
 }
 
-export function getLaunchdServicePaths(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath"> = {}): HealthLinkServicePaths {
+export function getLaunchdServicePaths(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "mode"> = {}): HealthLinkServicePaths {
   const home = options.homeDir ?? homedir();
   const healthlinkDir = join(home, ".healthlink");
   const logDir = join(healthlinkDir, "logs");
+  const mode = options.mode ?? "receiver";
+  const label = serviceLaunchdLabel(mode);
+  const logPrefix = mode === "relay_pull" ? "relay-pull" : "daemon";
   return {
     manager: "launchd",
-    configPath: join(home, "Library", "LaunchAgents", `${HEALTHLINK_LAUNCHD_LABEL}.plist`),
-    plistPath: join(home, "Library", "LaunchAgents", `${HEALTHLINK_LAUNCHD_LABEL}.plist`),
+    mode,
+    configPath: join(home, "Library", "LaunchAgents", `${label}.plist`),
+    plistPath: join(home, "Library", "LaunchAgents", `${label}.plist`),
     logDir,
-    stdoutPath: join(logDir, "daemon.out.log"),
-    stderrPath: join(logDir, "daemon.err.log"),
+    stdoutPath: join(logDir, `${logPrefix}.out.log`),
+    stderrPath: join(logDir, `${logPrefix}.err.log`),
     databasePath: resolveHomePath(options.databasePath ?? getDefaultDatabasePath(), home)
   };
 }
 
-export function getSystemdServicePaths(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath"> = {}): HealthLinkServicePaths {
+export function getSystemdServicePaths(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "mode"> = {}): HealthLinkServicePaths {
   const home = options.homeDir ?? homedir();
   const healthlinkDir = join(home, ".healthlink");
   const logDir = join(healthlinkDir, "logs");
-  const unitPath = join(home, ".config", "systemd", "user", HEALTHLINK_SYSTEMD_UNIT);
+  const mode = options.mode ?? "receiver";
+  const unit = serviceSystemdUnit(mode);
+  const unitPath = join(home, ".config", "systemd", "user", unit);
   return {
     manager: "systemd",
+    mode,
     configPath: unitPath,
     plistPath: unitPath,
     logDir,
-    stdoutPath: `journalctl --user -u ${HEALTHLINK_SYSTEMD_UNIT}`,
-    stderrPath: `journalctl --user -u ${HEALTHLINK_SYSTEMD_UNIT}`,
+    stdoutPath: `journalctl --user -u ${unit}`,
+    stderrPath: `journalctl --user -u ${unit}`,
     databasePath: resolveHomePath(options.databasePath ?? getDefaultDatabasePath(), home)
   };
 }
 
 export function buildLaunchdPlist(options: LaunchdServiceOptions): string {
   const paths = getLaunchdServicePaths(options);
-  const args = buildDaemonProgramArguments(options, paths.databasePath);
+  const args = buildServiceProgramArguments(options, paths.databasePath);
   const argumentXml = args.map((arg) => `    <string>${escapeXml(arg)}</string>`).join("\n");
+  const label = serviceLaunchdLabel(options.mode ?? "receiver");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>${HEALTHLINK_LAUNCHD_LABEL}</string>
+  <string>${label}</string>
   <key>ProgramArguments</key>
   <array>
 ${argumentXml}
@@ -126,12 +142,13 @@ ${argumentXml}
 
 export function buildSystemdUnit(options: LaunchdServiceOptions): string {
   const paths = getSystemdServicePaths(options);
-  const command = buildDaemonProgramArguments(options, paths.databasePath)
+  const command = buildServiceProgramArguments(options, paths.databasePath)
     .map(quoteSystemdArg)
     .join(" ");
+  const description = options.mode === "relay_pull" ? "HealthLink Relay Puller" : "HealthLink Local Receiver";
 
   return `[Unit]
-Description=HealthLink Local Receiver
+Description=${description}
 After=network-online.target
 
 [Service]
@@ -147,6 +164,16 @@ WantedBy=default.target
 }
 
 export function buildDaemonProgramArguments(options: LaunchdServiceOptions, databasePath = getLaunchdServicePaths(options).databasePath): string[] {
+  return buildReceiverProgramArguments(options, databasePath);
+}
+
+export function buildServiceProgramArguments(options: LaunchdServiceOptions, databasePath = getLaunchdServicePaths(options).databasePath): string[] {
+  return options.mode === "relay_pull"
+    ? buildRelayPullProgramArguments(options, databasePath)
+    : buildReceiverProgramArguments(options, databasePath);
+}
+
+function buildReceiverProgramArguments(options: LaunchdServiceOptions, databasePath: string): string[] {
   const args = [
     ...getDaemonCommandPrefix(options.cliCommand),
     "daemon",
@@ -168,6 +195,25 @@ export function buildDaemonProgramArguments(options: LaunchdServiceOptions, data
   return args;
 }
 
+export function buildRelayPullProgramArguments(options: LaunchdServiceOptions, databasePath = getLaunchdServicePaths(options).databasePath): string[] {
+  const args = [
+    ...getDaemonCommandPrefix(options.cliCommand),
+    "pull",
+    "--watch",
+    "--interval-seconds",
+    String(options.pullIntervalSeconds ?? 300),
+    "--db",
+    databasePath
+  ];
+  if (options.stateDir) {
+    args.push("--state-dir", options.stateDir);
+  }
+  if (options.relayUrl) {
+    args.push("--relay-url", options.relayUrl);
+  }
+  return args;
+}
+
 export function installLaunchdService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
   assertMacOSLaunchd();
   const paths = getLaunchdServicePaths(options);
@@ -180,11 +226,12 @@ export function installLaunchdService(options: LaunchdServiceOptions): HealthLin
 export function startLaunchdService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
   assertMacOSLaunchd();
   const paths = getLaunchdServicePaths(options);
+  const label = serviceLaunchdLabel(options.mode ?? "receiver");
   if (!existsSync(paths.plistPath)) {
     throw new Error(`HealthLink launchd service is not installed: ${paths.plistPath}`);
   }
   runLaunchctl(["bootstrap", launchdDomain(), paths.plistPath], { allowFailure: true });
-  runLaunchctl(["kickstart", "-k", `${launchdDomain()}/${HEALTHLINK_LAUNCHD_LABEL}`], { allowFailure: true });
+  runLaunchctl(["kickstart", "-k", `${launchdDomain()}/${label}`], { allowFailure: true });
   return getLaunchdServiceStatus(options);
 }
 
@@ -207,36 +254,39 @@ export function uninstallLaunchdService(options: LaunchdServiceOptions): HealthL
 export function installSystemdService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
   assertLinuxSystemd();
   const paths = getSystemdServicePaths(options);
+  const unit = serviceSystemdUnit(options.mode ?? "receiver");
   mkdirSync(dirname(paths.configPath), { recursive: true });
   mkdirSync(paths.logDir, { recursive: true });
   writeFileSync(paths.configPath, buildSystemdUnit(options), "utf8");
   runSystemctl(["--user", "daemon-reload"]);
-  runSystemctl(["--user", "enable", HEALTHLINK_SYSTEMD_UNIT]);
+  runSystemctl(["--user", "enable", unit]);
   return getSystemdServiceStatus(options);
 }
 
 export function startSystemdService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
   assertLinuxSystemd();
   const paths = getSystemdServicePaths(options);
+  const unit = serviceSystemdUnit(options.mode ?? "receiver");
   if (!existsSync(paths.configPath)) {
     throw new Error(`HealthLink systemd service is not installed: ${paths.configPath}`);
   }
   runSystemctl(["--user", "daemon-reload"], { allowFailure: true });
-  runSystemctl(["--user", "start", HEALTHLINK_SYSTEMD_UNIT]);
+  runSystemctl(["--user", "start", unit]);
   return getSystemdServiceStatus(options);
 }
 
 export function stopSystemdService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
   assertLinuxSystemd();
-  runSystemctl(["--user", "stop", HEALTHLINK_SYSTEMD_UNIT], { allowFailure: true });
+  runSystemctl(["--user", "stop", serviceSystemdUnit(options.mode ?? "receiver")], { allowFailure: true });
   return getSystemdServiceStatus(options);
 }
 
 export function uninstallSystemdService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
   assertLinuxSystemd();
   const paths = getSystemdServicePaths(options);
+  const unit = serviceSystemdUnit(options.mode ?? "receiver");
   stopSystemdService(options);
-  runSystemctl(["--user", "disable", HEALTHLINK_SYSTEMD_UNIT], { allowFailure: true });
+  runSystemctl(["--user", "disable", unit], { allowFailure: true });
   if (existsSync(paths.configPath)) {
     unlinkSync(paths.configPath);
   }
@@ -244,32 +294,36 @@ export function uninstallSystemdService(options: LaunchdServiceOptions): HealthL
   return getSystemdServiceStatus(options);
 }
 
-export function getLaunchdServiceStatus(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath"> = {}): HealthLinkServiceStatus {
+export function getLaunchdServiceStatus(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "mode"> = {}): HealthLinkServiceStatus {
   const paths = getLaunchdServicePaths(options);
+  const mode = options.mode ?? "receiver";
   return {
-    label: HEALTHLINK_LAUNCHD_LABEL,
+    label: serviceLaunchdLabel(mode),
     installed: existsSync(paths.plistPath),
-    running: isLaunchdServiceRunning(),
+    running: isLaunchdServiceRunning(mode),
     ...paths
   };
 }
 
-export function getSystemdServiceStatus(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath"> = {}): HealthLinkServiceStatus {
+export function getSystemdServiceStatus(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "mode"> = {}): HealthLinkServiceStatus {
   const paths = getSystemdServicePaths(options);
+  const mode = options.mode ?? "receiver";
   return {
-    label: HEALTHLINK_SYSTEMD_UNIT,
+    label: serviceSystemdUnit(mode),
     installed: existsSync(paths.configPath),
-    running: isSystemdServiceRunning(),
+    running: isSystemdServiceRunning(mode),
     ...paths
   };
 }
 
-export function getManualServiceStatus(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "platform"> = {}): HealthLinkServiceStatus {
+export function getManualServiceStatus(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "platform" | "mode"> = {}): HealthLinkServiceStatus {
   const home = options.homeDir ?? homedir();
   const healthlinkDir = join(home, ".healthlink");
   const logDir = join(healthlinkDir, "logs");
+  const mode = options.mode ?? "receiver";
   return {
     manager: "manual",
+    mode,
     label: "manual",
     installed: false,
     running: false,
@@ -283,7 +337,7 @@ export function getManualServiceStatus(options: Pick<LaunchdServiceOptions, "hom
   };
 }
 
-export function getHealthLinkServiceStatus(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "manager" | "platform"> = {}): HealthLinkServiceStatus {
+export function getHealthLinkServiceStatus(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "manager" | "platform" | "mode"> = {}): HealthLinkServiceStatus {
   const manager = resolveServiceManagerId(options);
   if (manager === "launchd") {
     return getLaunchdServiceStatus(options);
@@ -338,17 +392,17 @@ export function uninstallHealthLinkService(options: LaunchdServiceOptions): Heal
   throw new Error(manualServiceMessage(options.platform));
 }
 
-export function readLaunchdPlist(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath"> = {}): string | undefined {
+export function readLaunchdPlist(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "mode"> = {}): string | undefined {
   const plistPath = getLaunchdServicePaths(options).plistPath;
   return existsSync(plistPath) ? readFileSync(plistPath, "utf8") : undefined;
 }
 
-export function readSystemdUnit(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath"> = {}): string | undefined {
+export function readSystemdUnit(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "mode"> = {}): string | undefined {
   const unitPath = getSystemdServicePaths(options).configPath;
   return existsSync(unitPath) ? readFileSync(unitPath, "utf8") : undefined;
 }
 
-export function readLaunchdServiceLog(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath"> & {
+export function readLaunchdServiceLog(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "mode"> & {
   stream: "stdout" | "stderr";
   lines?: number;
 }): HealthLinkServiceLog {
@@ -369,7 +423,7 @@ export function readLaunchdServiceLog(options: Pick<LaunchdServiceOptions, "home
   };
 }
 
-export function readHealthLinkServiceLog(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "manager" | "platform"> & {
+export function readHealthLinkServiceLog(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "manager" | "platform" | "mode"> & {
   stream: "stdout" | "stderr";
   lines?: number;
 }): HealthLinkServiceLog {
@@ -387,12 +441,12 @@ export function readHealthLinkServiceLog(options: Pick<LaunchdServiceOptions, "h
   };
 }
 
-function isLaunchdServiceRunning(): boolean {
+function isLaunchdServiceRunning(mode: HealthLinkServiceMode): boolean {
   if (process.platform !== "darwin") {
     return false;
   }
   try {
-    execFileSync("launchctl", ["print", `${launchdDomain()}/${HEALTHLINK_LAUNCHD_LABEL}`], {
+    execFileSync("launchctl", ["print", `${launchdDomain()}/${serviceLaunchdLabel(mode)}`], {
       stdio: ["ignore", "ignore", "ignore"]
     });
     return true;
@@ -401,12 +455,12 @@ function isLaunchdServiceRunning(): boolean {
   }
 }
 
-function isSystemdServiceRunning(): boolean {
+function isSystemdServiceRunning(mode: HealthLinkServiceMode): boolean {
   if (process.platform !== "linux") {
     return false;
   }
   try {
-    execFileSync("systemctl", ["--user", "is-active", "--quiet", HEALTHLINK_SYSTEMD_UNIT], {
+    execFileSync("systemctl", ["--user", "is-active", "--quiet", serviceSystemdUnit(mode)], {
       stdio: ["ignore", "ignore", "ignore"]
     });
     return true;
@@ -451,10 +505,11 @@ function runSystemctl(args: string[], options: { allowFailure?: boolean } = {}):
   }
 }
 
-function readSystemdServiceLog(options: { lines?: number }): HealthLinkServiceLog {
-  const path = `journalctl --user -u ${HEALTHLINK_SYSTEMD_UNIT}`;
+function readSystemdServiceLog(options: { lines?: number; mode?: HealthLinkServiceMode }): HealthLinkServiceLog {
+  const unit = serviceSystemdUnit(options.mode ?? "receiver");
+  const path = `journalctl --user -u ${unit}`;
   try {
-    const output = execFileSync("journalctl", ["--user", "-u", HEALTHLINK_SYSTEMD_UNIT, "-n", String(options.lines ?? 80), "--no-pager"], {
+    const output = execFileSync("journalctl", ["--user", "-u", unit, "-n", String(options.lines ?? 80), "--no-pager"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"]
     });
@@ -470,6 +525,14 @@ function readSystemdServiceLog(options: { lines?: number }): HealthLinkServiceLo
       content: error instanceof Error ? error.message : String(error)
     };
   }
+}
+
+function serviceLaunchdLabel(mode: HealthLinkServiceMode): string {
+  return mode === "relay_pull" ? HEALTHLINK_RELAY_PULL_LAUNCHD_LABEL : HEALTHLINK_LAUNCHD_LABEL;
+}
+
+function serviceSystemdUnit(mode: HealthLinkServiceMode): string {
+  return mode === "relay_pull" ? HEALTHLINK_RELAY_PULL_SYSTEMD_UNIT : HEALTHLINK_SYSTEMD_UNIT;
 }
 
 function launchdDomain(): string {

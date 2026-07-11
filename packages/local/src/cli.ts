@@ -5,7 +5,7 @@ import {
 } from "./mcp-config.js";
 import { detectPreferredAgentAdapter, getAgentAdapter, isAgentAdapterId, type AgentAdapterId } from "./agents.js";
 import { openHealthLinkDatabase } from "./database.js";
-import { buildDockerComposeYaml } from "./docker-compose.js";
+import { buildDockerComposeYaml, buildRelayDockerComposeYaml } from "./docker-compose.js";
 import { getHealthStatus } from "./health-ingest.js";
 import { startLocalServer } from "./server.js";
 import { startMcpServer } from "./mcp.js";
@@ -17,23 +17,72 @@ import {
   startHealthLinkService,
   stopHealthLinkService,
   uninstallHealthLinkService,
+  type HealthLinkServiceMode,
   type HealthLinkServiceStatus,
   type LaunchdServiceOptions,
   type ServiceManagerId
 } from "./service.js";
 import { requestPairingSession } from "./pairing-client.js";
-import { describePortListeners } from "./port-diagnostics.js";
+import { describePortListeners, findAvailableTcpPort } from "./port-diagnostics.js";
+import { buildRelayFixtureEnvelope } from "./relay-fixture.js";
+import { migrateRelayRuntime, resetRelayRuntime, rotateRelayRuntime, unlinkRelaySourceDevice } from "./relay-lifecycle.js";
+import { auditRelayDeployment } from "./relay-audit.js";
+import { pullRelayEnvelopes } from "./relay-pull.js";
+import { resolveRelayServeConfig } from "./relay-serve-config.js";
+import { getRelayLocalStatus } from "./relay-status.js";
+import {
+  DEFAULT_RELAY_URL,
+  formatRelayOnboarding,
+  initializeRelayRuntime,
+  normalizeRelayUrlForMode,
+  readRelayRuntimeConfig,
+  resolveDefaultRelayUrl,
+  validateRelayRuntimeState
+} from "./relay-runtime.js";
+import { startRelayServer } from "./relay-server.js";
 import { runServiceEnsureWorkflow, runServiceSetupWorkflow } from "./setup.js";
-import { buildHealthLinkSkillMarkdown } from "./skill.js";
+import { buildHealthLinkSkillMarkdown, exportHealthLinkSkillPackage } from "./skill.js";
 import { listSourceDevices } from "./source-devices.js";
 import { renderTerminalQr } from "./terminal-qr.js";
 import { createTransportProvider, getServerUrlDiagnostics, isContainerRuntime, isTransportProviderId, type TransportProviderId } from "./transports.js";
 
 type CliOptions = {
-  command: "server" | "init" | "daemon" | "pair" | "setup" | "ensure" | "service" | "logs" | "mcp" | "print-mcp-config" | "print-agent-config" | "print-docker-compose" | "print-skill" | "install-hermes" | "install-hermes-skill" | "status" | "doctor";
+  command: "server" | "init" | "daemon" | "pair" | "setup" | "ensure" | "service" | "logs" | "mcp" | "print-mcp-config" | "print-agent-config" | "print-docker-compose" | "print-relay-docker-compose" | "print-skill" | "export-skill" | "print-onboarding" | "install-hermes" | "install-hermes-skill" | "status" | "doctor" | "pull" | "relay" | "version" | "help";
   serviceAction?: "install" | "start" | "stop" | "status" | "uninstall";
+  serviceMode: HealthLinkServiceMode;
+  relayAction?: "serve" | "status" | "fixture" | "audit" | "unlink" | "rotate" | "reset" | "migrate";
   port: number;
+  portProvided: boolean;
+  pullWatch: boolean;
+  pullIntervalSeconds: number;
+  relayRetentionDays: number;
+  relayRetentionDaysProvided: boolean;
+  relayMaxEnvelopeBytes: number;
+  relayMaxEnvelopeBytesProvided: boolean;
+  relayMaxUploadsPerMinute: number;
+  relayMaxUploadsPerMinuteProvided: boolean;
+  relayMaxQueuedEnvelopesPerUser: number;
+  relayMaxQueuedEnvelopesPerUserProvided: boolean;
+  relayMaxDevicesPerUser: number;
+  relayMaxDevicesPerUserProvided: boolean;
+  relayTrustProxy: boolean;
+  relayTrustProxyProvided: boolean;
+  relayApiToken?: string;
+  relayApiTokenProvided: boolean;
+  relayMetricsToken?: string;
+  relayMetricsTokenProvided: boolean;
+  relayAuditActive: boolean;
+  fixtureDate?: string;
+  fixtureSteps: number;
+  fixtureSleepMinutes: number;
+  fixtureActiveEnergyKcal: number;
+  fixtureSequence?: number;
+  fixtureSyncId?: string;
+  fixtureGeneratedAt?: string;
+  fixtureCreatedAt?: string;
+  fixtureTimezone?: string;
   host: string;
+  hostProvided: boolean;
   useService: boolean;
   installHermes: boolean;
   installSkill: boolean;
@@ -41,21 +90,49 @@ type CliOptions = {
   logLines: number;
   agentId: AgentAdapterId;
   transportId: TransportProviderId;
+  transportProvided: boolean;
   serviceManager: ServiceManagerId;
   databasePath?: string;
+  databasePathProvided: boolean;
   serverUrl?: string;
   tailscaleName?: string;
+  relayUrl?: string;
+  stateDir?: string;
   agentName?: string;
+  outputDir?: string;
   hermesConfigPath?: string;
   hermesSkillPath?: string;
   openclawConfigPath?: string;
+  yes: boolean;
 };
 
 function parseArgs(argv: string[]): CliOptions {
   const options: CliOptions = {
     command: "server",
     port: 8787,
+    portProvided: false,
+    pullWatch: false,
+    pullIntervalSeconds: 300,
+    relayRetentionDays: 30,
+    relayRetentionDaysProvided: false,
+    relayMaxEnvelopeBytes: 512 * 1024,
+    relayMaxEnvelopeBytesProvided: false,
+    relayMaxUploadsPerMinute: 120,
+    relayMaxUploadsPerMinuteProvided: false,
+    relayMaxQueuedEnvelopesPerUser: 1000,
+    relayMaxQueuedEnvelopesPerUserProvided: false,
+    relayMaxDevicesPerUser: 5,
+    relayMaxDevicesPerUserProvided: false,
+    relayTrustProxy: false,
+    relayTrustProxyProvided: false,
+    relayApiTokenProvided: false,
+    relayMetricsTokenProvided: false,
+    relayAuditActive: false,
+    fixtureSteps: 7777,
+    fixtureSleepMinutes: 420,
+    fixtureActiveEnergyKcal: 520,
     host: "0.0.0.0",
+    hostProvided: false,
     useService: false,
     installHermes: false,
     installSkill: false,
@@ -63,12 +140,20 @@ function parseArgs(argv: string[]): CliOptions {
     logLines: 80,
     agentId: "generic",
     transportId: "lan",
-    serviceManager: "auto"
+    transportProvided: false,
+    serviceManager: "auto",
+    serviceMode: "receiver",
+    databasePathProvided: false,
+    yes: false
   };
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (arg === "service") {
+    if (arg === "--help" || arg === "-h" || arg === "help") {
+      options.command = "help";
+    } else if (arg === "--version" || arg === "-v" || arg === "version") {
+      options.command = "version";
+    } else if (arg === "service") {
       options.command = "service";
       const action = argv[index + 1];
       if (action && !action.startsWith("--")) {
@@ -78,28 +163,120 @@ function parseArgs(argv: string[]): CliOptions {
         options.serviceAction = action;
         index += 1;
       }
-    } else if (arg === "server" || arg === "init" || arg === "daemon" || arg === "pair" || arg === "setup" || arg === "ensure" || arg === "service" || arg === "logs" || arg === "mcp" || arg === "print-mcp-config" || arg === "print-agent-config" || arg === "print-docker-compose" || arg === "print-skill" || arg === "install-hermes" || arg === "install-hermes-skill" || arg === "status" || arg === "doctor") {
+    } else if (arg === "relay") {
+      options.command = "relay";
+      const action = argv[index + 1];
+      if (action && !action.startsWith("--")) {
+        if (!isRelayAction(action)) {
+          throw new Error("Expected relay action to be one of: serve, status, fixture, audit, unlink, rotate, reset, migrate.");
+        }
+        options.relayAction = action;
+        index += 1;
+      }
+    } else if (arg === "server" || arg === "init" || arg === "daemon" || arg === "pair" || arg === "setup" || arg === "ensure" || arg === "service" || arg === "logs" || arg === "mcp" || arg === "print-mcp-config" || arg === "print-agent-config" || arg === "print-docker-compose" || arg === "print-relay-docker-compose" || arg === "print-skill" || arg === "export-skill" || arg === "print-onboarding" || arg === "install-hermes" || arg === "install-hermes-skill" || arg === "status" || arg === "doctor" || arg === "pull") {
       options.command = arg;
     } else if (arg === "--port") {
-      options.port = Number(argv[index + 1]);
+      options.port = Number(requiredOptionValue(argv, index, arg));
+      options.portProvided = true;
       index += 1;
     } else if (arg === "--host") {
-      options.host = argv[index + 1] ?? options.host;
+      options.host = requiredOptionValue(argv, index, arg);
+      options.hostProvided = true;
       index += 1;
     } else if (arg === "--db") {
-      options.databasePath = argv[index + 1];
+      options.databasePath = requiredOptionValue(argv, index, arg);
+      options.databasePathProvided = true;
       index += 1;
     } else if (arg === "--server-url") {
-      options.serverUrl = argv[index + 1];
+      options.serverUrl = requiredOptionValue(argv, index, arg);
+      index += 1;
+    } else if (arg === "--relay-url") {
+      options.relayUrl = requiredOptionValue(argv, index, arg);
+      index += 1;
+    } else if (arg === "--state-dir") {
+      options.stateDir = requiredOptionValue(argv, index, arg);
       index += 1;
     } else if (arg === "--tailscale-name") {
-      options.tailscaleName = argv[index + 1];
+      options.tailscaleName = requiredOptionValue(argv, index, arg);
       index += 1;
     } else if (arg === "--agent-name") {
-      options.agentName = argv[index + 1];
+      options.agentName = requiredOptionValue(argv, index, arg);
+      index += 1;
+    } else if (arg === "--output-dir") {
+      options.outputDir = requiredOptionValue(argv, index, arg);
       index += 1;
     } else if (arg === "--lines") {
-      options.logLines = Number(argv[index + 1]);
+      options.logLines = Number(requiredOptionValue(argv, index, arg));
+      index += 1;
+    } else if (arg === "--once") {
+      options.pullWatch = false;
+    } else if (arg === "--watch") {
+      options.pullWatch = true;
+    } else if (arg === "--interval-seconds") {
+      options.pullIntervalSeconds = Number(requiredOptionValue(argv, index, arg));
+      index += 1;
+    } else if (arg === "--retention-days") {
+      options.relayRetentionDays = Number(requiredOptionValue(argv, index, arg));
+      options.relayRetentionDaysProvided = true;
+      index += 1;
+    } else if (arg === "--max-envelope-bytes") {
+      options.relayMaxEnvelopeBytes = Number(requiredOptionValue(argv, index, arg));
+      options.relayMaxEnvelopeBytesProvided = true;
+      index += 1;
+    } else if (arg === "--max-uploads-per-minute") {
+      options.relayMaxUploadsPerMinute = Number(requiredOptionValue(argv, index, arg));
+      options.relayMaxUploadsPerMinuteProvided = true;
+      index += 1;
+    } else if (arg === "--max-queued-envelopes-per-user") {
+      options.relayMaxQueuedEnvelopesPerUser = Number(requiredOptionValue(argv, index, arg));
+      options.relayMaxQueuedEnvelopesPerUserProvided = true;
+      index += 1;
+    } else if (arg === "--max-devices-per-user") {
+      options.relayMaxDevicesPerUser = Number(requiredOptionValue(argv, index, arg));
+      options.relayMaxDevicesPerUserProvided = true;
+      index += 1;
+    } else if (arg === "--trust-proxy") {
+      options.relayTrustProxy = true;
+      options.relayTrustProxyProvided = true;
+    } else if (arg === "--no-trust-proxy") {
+      options.relayTrustProxy = false;
+      options.relayTrustProxyProvided = true;
+    } else if (arg === "--relay-api-token") {
+      options.relayApiToken = requiredOptionValue(argv, index, arg);
+      options.relayApiTokenProvided = true;
+      index += 1;
+    } else if (arg === "--metrics-token") {
+      options.relayMetricsToken = requiredOptionValue(argv, index, arg);
+      options.relayMetricsTokenProvided = true;
+      index += 1;
+    } else if (arg === "--active") {
+      options.relayAuditActive = true;
+    } else if (arg === "--date") {
+      options.fixtureDate = requiredOptionValue(argv, index, arg);
+      index += 1;
+    } else if (arg === "--steps") {
+      options.fixtureSteps = Number(requiredOptionValue(argv, index, arg));
+      index += 1;
+    } else if (arg === "--sleep-minutes") {
+      options.fixtureSleepMinutes = Number(requiredOptionValue(argv, index, arg));
+      index += 1;
+    } else if (arg === "--active-energy-kcal") {
+      options.fixtureActiveEnergyKcal = Number(requiredOptionValue(argv, index, arg));
+      index += 1;
+    } else if (arg === "--sequence") {
+      options.fixtureSequence = Number(requiredOptionValue(argv, index, arg));
+      index += 1;
+    } else if (arg === "--sync-id") {
+      options.fixtureSyncId = requiredOptionValue(argv, index, arg);
+      index += 1;
+    } else if (arg === "--generated-at") {
+      options.fixtureGeneratedAt = requiredOptionValue(argv, index, arg);
+      index += 1;
+    } else if (arg === "--created-at") {
+      options.fixtureCreatedAt = requiredOptionValue(argv, index, arg);
+      index += 1;
+    } else if (arg === "--timezone") {
+      options.fixtureTimezone = requiredOptionValue(argv, index, arg);
       index += 1;
     } else if (arg === "--agent") {
       const value = argv[index + 1];
@@ -117,10 +294,12 @@ function parseArgs(argv: string[]): CliOptions {
       index += 1;
     } else if (arg === "--transport") {
       const value = argv[index + 1];
-      if (!value || !isTransportProviderId(value)) {
-        throw new Error("Expected --transport to be one of: lan, tailscale, cloudflare, ngrok, public_https.");
+      const normalizedValue = normalizeTransportOption(value);
+      if (!normalizedValue || !isTransportProviderId(normalizedValue)) {
+        throw new Error("Expected --transport to be one of: lan, tailscale, cloudflare, ngrok, public_https, relay, hosted-relay, self_hosted_relay, self-hosted-relay.");
       }
-      options.transportId = value;
+      options.transportId = normalizedValue;
+      options.transportProvided = true;
       index += 1;
     } else if (arg === "--manager") {
       const value = argv[index + 1];
@@ -129,14 +308,24 @@ function parseArgs(argv: string[]): CliOptions {
       }
       options.serviceManager = value;
       index += 1;
+    } else if (arg === "--mode") {
+      const value = argv[index + 1];
+      if (value === "receiver") {
+        options.serviceMode = "receiver";
+      } else if (value === "relay-pull" || value === "relay_pull") {
+        options.serviceMode = "relay_pull";
+      } else {
+        throw new Error("Expected --mode to be one of: receiver, relay-pull.");
+      }
+      index += 1;
     } else if (arg === "--hermes-config") {
-      options.hermesConfigPath = argv[index + 1];
+      options.hermesConfigPath = requiredOptionValue(argv, index, arg);
       index += 1;
     } else if (arg === "--openclaw-config") {
-      options.openclawConfigPath = argv[index + 1];
+      options.openclawConfigPath = requiredOptionValue(argv, index, arg);
       index += 1;
     } else if (arg === "--hermes-skill-path") {
-      options.hermesSkillPath = argv[index + 1];
+      options.hermesSkillPath = requiredOptionValue(argv, index, arg);
       index += 1;
     } else if (arg === "--format") {
       const value = argv[index + 1];
@@ -150,8 +339,12 @@ function parseArgs(argv: string[]): CliOptions {
       options.agentAuto = false;
     } else if (arg === "--install-skill") {
       options.installSkill = true;
+    } else if (arg === "--yes") {
+      options.yes = true;
     } else if (arg === "--service") {
       options.useService = true;
+    } else {
+      throw new Error(arg.startsWith("-") ? `Unknown option: ${arg}` : `Unexpected argument: ${arg}`);
     }
   }
 
@@ -161,6 +354,42 @@ function parseArgs(argv: string[]): CliOptions {
   if (!Number.isInteger(options.logLines) || options.logLines <= 0) {
     throw new Error("Expected --lines to be a positive integer.");
   }
+  if (!Number.isInteger(options.pullIntervalSeconds) || options.pullIntervalSeconds <= 0) {
+    throw new Error("Expected --interval-seconds to be a positive integer.");
+  }
+  if (!Number.isFinite(options.relayRetentionDays) || options.relayRetentionDays <= 0) {
+    throw new Error("Expected --retention-days to be a positive number.");
+  }
+  if (!Number.isInteger(options.relayMaxEnvelopeBytes) || options.relayMaxEnvelopeBytes <= 0) {
+    throw new Error("Expected --max-envelope-bytes to be a positive integer.");
+  }
+  if (!Number.isInteger(options.relayMaxUploadsPerMinute) || options.relayMaxUploadsPerMinute <= 0) {
+    throw new Error("Expected --max-uploads-per-minute to be a positive integer.");
+  }
+  if (!Number.isInteger(options.relayMaxQueuedEnvelopesPerUser) || options.relayMaxQueuedEnvelopesPerUser <= 0) {
+    throw new Error("Expected --max-queued-envelopes-per-user to be a positive integer.");
+  }
+  if (!Number.isInteger(options.relayMaxDevicesPerUser) || options.relayMaxDevicesPerUser <= 0) {
+    throw new Error("Expected --max-devices-per-user to be a positive integer.");
+  }
+  if (!Number.isInteger(options.fixtureSteps) || options.fixtureSteps < 0) {
+    throw new Error("Expected --steps to be a non-negative integer.");
+  }
+  if (!Number.isInteger(options.fixtureSleepMinutes) || options.fixtureSleepMinutes < 0) {
+    throw new Error("Expected --sleep-minutes to be a non-negative integer.");
+  }
+  if (!Number.isInteger(options.fixtureActiveEnergyKcal) || options.fixtureActiveEnergyKcal < 0) {
+    throw new Error("Expected --active-energy-kcal to be a non-negative integer.");
+  }
+  if (options.fixtureSequence !== undefined && (!Number.isInteger(options.fixtureSequence) || options.fixtureSequence <= 0)) {
+    throw new Error("Expected --sequence to be a positive integer.");
+  }
+  if (options.relayMetricsTokenProvided && !options.relayMetricsToken?.trim()) {
+    throw new Error("Expected --metrics-token to be a non-empty string.");
+  }
+  if (options.relayApiTokenProvided && !options.relayApiToken?.trim()) {
+    throw new Error("Expected --relay-api-token to be a non-empty string.");
+  }
   if (options.command === "setup" || options.command === "ensure") {
     options.useService = true;
   }
@@ -168,12 +397,45 @@ function parseArgs(argv: string[]): CliOptions {
   return options;
 }
 
+function requiredOptionValue(argv: string[], index: number, option: string): string {
+  const value = argv[index + 1];
+  if (!value || value.startsWith("--")) {
+    throw new Error(`${option} requires a value.`);
+  }
+  return value;
+}
+
 function isServiceAction(value: string): value is NonNullable<CliOptions["serviceAction"]> {
   return value === "install" || value === "start" || value === "stop" || value === "status" || value === "uninstall";
 }
 
+function isRelayAction(value: string): value is NonNullable<CliOptions["relayAction"]> {
+  return value === "serve" || value === "status" || value === "fixture" || value === "audit" ||
+    value === "unlink" || value === "rotate" || value === "reset" || value === "migrate";
+}
+
+function normalizeTransportOption(value: string | undefined): string | undefined {
+  if (value === "hosted-relay") {
+    return "relay";
+  }
+  if (value === "self-hosted-relay") {
+    return "self_hosted_relay";
+  }
+  return value;
+}
+
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
+
+  if (options.command === "help") {
+    process.stdout.write(buildCliHelp());
+    return;
+  }
+
+  if (options.command === "version") {
+    console.log("healthlink-local 0.2.0");
+    return;
+  }
 
   if (options.command === "mcp") {
     await startMcpServer({
@@ -208,8 +470,44 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (options.command === "print-relay-docker-compose") {
+    process.stdout.write(buildRelayDockerComposeYaml({
+      port: options.portProvided ? options.port : undefined
+    }));
+    return;
+  }
+
   if (options.command === "print-skill") {
-    process.stdout.write(buildHealthLinkSkillMarkdown());
+    process.stdout.write(buildHealthLinkSkillMarkdown({
+      agent: options.agentId
+    }));
+    return;
+  }
+
+  if (options.command === "export-skill") {
+    const result = exportHealthLinkSkillPackage({
+      agent: options.agentId,
+      outputDir: options.outputDir ?? "healthlink-openclaw-skill"
+    });
+    console.log("HealthLink skill package exported");
+    console.log(`Package:  ${result.packageDir}`);
+    console.log(`Skill:    ${result.skillPath}`);
+    console.log(`README:   ${result.readmePath}`);
+    return;
+  }
+
+  if (options.command === "print-onboarding") {
+    printRelayOnboarding(options);
+    return;
+  }
+
+  if (options.command === "pull") {
+    await runRelayPull(options);
+    return;
+  }
+
+  if (options.command === "relay") {
+    await runRelayCommand(options);
     return;
   }
 
@@ -342,6 +640,54 @@ async function main(): Promise<void> {
   }
 }
 
+function buildCliHelp(): string {
+  return `HealthLink Local 0.2.0
+
+Usage:
+  healthlink-local <command> [options]
+
+Core setup:
+  setup --transport lan --agent <generic|hermes|openclaw|workbuddy>
+  setup --transport relay --relay-url https://HOSTED-RELAY --agent <agent>
+  setup --transport self-hosted-relay --relay-url http://HOST:8790 --agent <agent>
+  pair
+  status
+  doctor --agent <agent>
+
+Relay:
+  pull [--once|--watch] [--interval-seconds 300]
+  relay serve [--host 0.0.0.0] [--port 8790]
+  relay serve [--trust-proxy|--no-trust-proxy]
+  relay status
+  relay audit --relay-url <url> [--metrics-token <token>]
+  relay audit --relay-url <url> --active --yes [--relay-api-token <token>]
+  relay fixture [--date YYYY-MM-DD] [--steps N]
+  relay unlink|rotate|reset --yes
+  relay migrate --yes --transport <hosted-relay|self-hosted-relay> --relay-url <url>
+  print-onboarding --transport <relay|self-hosted-relay> [--relay-url <url>]
+  print-relay-docker-compose
+
+Agent integration:
+  mcp
+  print-mcp-config
+  print-agent-config --agent <agent>
+  print-skill --agent <generic|hermes|openclaw|workbuddy>
+  install-hermes
+  install-hermes-skill
+  export-skill --agent openclaw --output-dir <directory>  # optional ClawHub package
+
+Service:
+  service <install|start|stop|status|uninstall> [--mode receiver|relay-pull]
+  logs [--mode receiver|relay-pull] [--lines N]
+
+Global:
+  --db <path>        HealthLink SQLite path
+  --state-dir <path> Relay runtime state directory
+  --version, -v      Print version
+  --help, -h         Show this help
+`;
+}
+
 async function runServiceCommand(options: CliOptions): Promise<void> {
   const action = options.serviceAction ?? "status";
   const serviceOptions = toServiceOptions(options);
@@ -373,9 +719,15 @@ async function runServiceCommand(options: CliOptions): Promise<void> {
 }
 
 async function runSetup(options: CliOptions): Promise<void> {
+  if (options.transportId === "relay" || options.transportId === "self_hosted_relay") {
+    runRelaySetup(options);
+    return;
+  }
+
+  const setupOptions = await resolveAutoServicePort(options);
   const agentId = resolveSetupAgentId(options);
   const effectiveOptions = {
-    ...options,
+    ...setupOptions,
     agentId
   };
   const shouldInstallSkill = options.installSkill || agentId === "hermes";
@@ -393,10 +745,10 @@ async function runSetup(options: CliOptions): Promise<void> {
         return;
       }
       const agentInstall = agent.installMcp({
-        databasePath: options.databasePath
+        databasePath: setupOptions.databasePath
       }, {
-        hermesConfigPath: options.hermesConfigPath,
-        openclawConfigPath: options.openclawConfigPath
+        hermesConfigPath: setupOptions.hermesConfigPath,
+        openclawConfigPath: setupOptions.openclawConfigPath
       });
       console.log(`Agent config: ${agentInstall.message}`);
       if (agentInstall.backupPath) {
@@ -425,7 +777,7 @@ async function runSetup(options: CliOptions): Promise<void> {
     waitForReady: () => waitForLocalReceiver(effectiveOptions),
     pair: () => printPairingSession(effectiveOptions),
     printReloadHint: () => {
-      printSetupNextSteps(agent, resolveServiceManagerIdForCli(options));
+      printSetupNextSteps(agent, resolveServiceManagerIdForCli(setupOptions));
     }
   }, {
     installSkill: shouldInstallSkill
@@ -433,7 +785,8 @@ async function runSetup(options: CliOptions): Promise<void> {
 }
 
 async function runEnsure(options: CliOptions): Promise<void> {
-  const serviceOptions = toServiceOptions(options);
+  const ensureOptions = await resolveAutoServicePort(options);
+  const serviceOptions = toServiceOptions(ensureOptions);
   let lastStatus: HealthLinkServiceStatus | undefined;
   console.log("Ensuring HealthLink receiver service");
   await runServiceEnsureWorkflow({
@@ -455,13 +808,44 @@ async function runEnsure(options: CliOptions): Promise<void> {
       console.log("Service not running; starting...");
       lastStatus = startHealthLinkService(serviceOptions);
     },
-    waitForReady: () => waitForLocalReceiver(options),
+    waitForReady: () => waitForLocalReceiver(ensureOptions),
     printStatus: async () => {
       const status = getHealthLinkServiceStatus(serviceOptions);
       console.log("HealthLink receiver is ready.");
-      await printServiceStatusDetails(status, options);
+      await printServiceStatusDetails(status, ensureOptions);
     }
   });
+}
+
+async function resolveAutoServicePort(options: CliOptions): Promise<CliOptions> {
+  if (options.portProvided || options.serverUrl) {
+    return options;
+  }
+
+  const existingReceiver = await probeLocalReceiver(options);
+  if (existingReceiver.reachable) {
+    return options;
+  }
+
+  const selected = await findAvailableTcpPort({
+    preferredPort: options.port,
+    host: options.host,
+    maxAttempts: 20
+  });
+  if (!selected.changed) {
+    return options;
+  }
+
+  const listener = describePortListeners(options.port);
+  console.log(`Port ${options.port} is already in use; using ${selected.port} for HealthLink.`);
+  if (listener) {
+    console.log(`Current listener: ${listener}`);
+  }
+  console.log("Pass --port to choose a specific port.");
+  return {
+    ...options,
+    port: selected.port
+  };
 }
 
 function resolveSetupAgentId(options: CliOptions): AgentAdapterId {
@@ -545,11 +929,15 @@ async function waitForLocalReceiver(options: CliOptions): Promise<void> {
 function toServiceOptions(options: CliOptions): LaunchdServiceOptions {
   return {
     manager: options.serviceManager,
+    mode: options.serviceMode,
     databasePath: options.databasePath,
+    stateDir: options.stateDir,
     host: options.host,
     port: options.port,
     transport: options.transportId,
     serverUrl: options.serverUrl,
+    relayUrl: options.relayUrl,
+    pullIntervalSeconds: options.pullIntervalSeconds,
     tailscaleName: options.tailscaleName
   };
 }
@@ -627,10 +1015,224 @@ function printSetupNextSteps(agent: ReturnType<typeof getAgentAdapter>, manager:
   console.log(`After the first sync, this terminal can close. The ${manager} background receiver keeps accepting iOS syncs.`);
   console.log("Useful commands:");
   console.log("  healthlink-local service status");
-  console.log("  healthlink-local doctor --agent hermes");
+  console.log(`  healthlink-local doctor --agent ${agent.id}`);
   console.log("  healthlink-local logs");
   console.log("  healthlink-local pair");
   console.log("  healthlink-local service stop");
+}
+
+function runRelaySetup(options: CliOptions): void {
+  const agentId = resolveSetupAgentId(options);
+  const agent = getAgentAdapter(agentId);
+  const mode = options.transportId === "relay" ? "hosted_relay" : "self_hosted_relay";
+  const relayUrl = resolveDefaultRelayUrl({
+    mode,
+    relayUrl: options.relayUrl
+  });
+  const config = initializeRelayRuntime({
+    stateDir: options.stateDir,
+    relayUrl,
+    relayApiToken: options.relayApiToken,
+    agentName: options.agentName ?? defaultAgentName(agentId),
+    mode
+  });
+  const onboarding = formatRelayOnboarding(config, { mode });
+
+  console.log(`Setting up HealthLink relay for ${agent.displayName}`);
+  printAgentAutoDetectSummary(options, agentId);
+  if (agentId === "generic") {
+    console.log("Agent config: generic MCP config will be printed on request.");
+  } else {
+    const agentInstall = agent.installMcp({
+      databasePath: options.databasePath
+    }, {
+      hermesConfigPath: options.hermesConfigPath,
+      openclawConfigPath: options.openclawConfigPath
+    });
+    console.log(`Agent config: ${agentInstall.message}`);
+    if (agentInstall.backupPath) {
+      console.log(`Agent backup: ${agentInstall.backupPath}`);
+    }
+  }
+
+  const serviceOptions = {
+    ...options,
+    serviceMode: "relay_pull" as const,
+    relayUrl: config.relay_url
+  };
+  const serviceStatus = installHealthLinkService(toServiceOptions(serviceOptions));
+  startHealthLinkService(toServiceOptions(serviceOptions));
+  console.log(`Relay pull service: installed for ${serviceStatus.manager}`);
+  console.log(`Relay pull config:  ${serviceStatus.configPath}`);
+  console.log(`Relay pull logs:    ${serviceStatus.stdoutPath}`);
+
+  console.log("");
+  console.log(`State: ${options.stateDir ?? "~/.healthlink"}`);
+  console.log(`Relay: ${config.relay_url}`);
+  console.log("");
+  process.stdout.write(onboarding);
+  console.log("Next:");
+  if (mode === "self_hosted_relay") {
+    console.log("  1. Run healthlink-local relay serve to start the self-hosted relay.");
+    console.log("  2. Scan the onboarding QR from HealthLink iOS or a compatible agent/mobile app.");
+    console.log("  3. The background relay-pull service will decrypt synced envelopes into the local MCP database.");
+  } else {
+    console.log("  1. Scan the onboarding QR from HealthLink iOS or a compatible agent/mobile app.");
+    console.log("  2. The background relay-pull service will decrypt hosted relay envelopes into the local MCP database.");
+  }
+  console.log(`  4. ${agent.reloadHint()}`);
+  console.log("  5. Use healthlink-local status and healthlink-local logs --mode relay-pull to inspect freshness.");
+}
+
+function printRelayOnboarding(options: CliOptions): void {
+  const requestedMode = options.transportId === "relay" ? "hosted_relay" : "self_hosted_relay";
+  const config = initializeRelayRuntime({
+    stateDir: options.stateDir,
+    relayUrl: options.relayUrl,
+    relayApiToken: options.relayApiToken,
+    agentName: options.agentName ?? defaultAgentName(options.agentId),
+    mode: options.transportProvided ? requestedMode : undefined
+  });
+  const mode = options.transportProvided ? requestedMode : config.relay_mode;
+  process.stdout.write(formatRelayOnboarding(config, { mode }));
+}
+
+async function runRelayPull(options: CliOptions): Promise<void> {
+  do {
+    const result = await pullRelayEnvelopes({
+      stateDir: options.stateDir,
+      databasePath: options.databasePath,
+      relayUrl: options.relayUrl,
+      relayApiToken: options.relayApiToken
+    });
+    console.log("HealthLink relay pull complete");
+    console.log(`Fetched:         ${result.fetched}`);
+    console.log(`Ingested:        ${result.ingested}`);
+    console.log(`Acked:           ${result.acked}`);
+    console.log(`Latest sequence: ${result.latest_sequence}`);
+    if (!options.pullWatch) {
+      return;
+    }
+    console.log(`Next pull in ${options.pullIntervalSeconds} seconds.`);
+    await new Promise((resolve) => setTimeout(resolve, options.pullIntervalSeconds * 1000));
+  } while (options.pullWatch);
+}
+
+async function runRelayCommand(options: CliOptions): Promise<void> {
+  const action = options.relayAction ?? "serve";
+  if (action === "unlink" || action === "rotate" || action === "reset" || action === "migrate") {
+    if (!options.yes) {
+      throw new Error(`relay ${action} changes relay credentials or connectivity. Re-run with --yes after reviewing the lifecycle documentation.`);
+    }
+    const lifecycleOptions = {
+      stateDir: options.stateDir,
+      relayUrl: options.relayUrl,
+      relayApiToken: options.relayApiToken,
+      databasePath: options.databasePath
+    };
+    if (action === "migrate" && !options.relayUrl) {
+      throw new Error("relay migrate requires --relay-url with the target hosted or self-hosted relay URL.");
+    }
+    const result = action === "unlink"
+      ? await unlinkRelaySourceDevice(lifecycleOptions)
+      : action === "rotate"
+        ? await rotateRelayRuntime(lifecycleOptions)
+        : action === "reset"
+          ? await resetRelayRuntime(lifecycleOptions)
+          : await migrateRelayRuntime({
+              stateDir: options.stateDir,
+              databasePath: options.databasePath,
+              targetRelayUrl: options.relayUrl!,
+              targetRelayApiToken: options.relayApiToken ?? process.env.HEALTHLINK_RELAY_API_TOKEN,
+              targetMode: options.transportId === "self_hosted_relay" ? "self_hosted_relay" : "hosted_relay"
+            });
+    console.log(`HealthLink relay ${result.action} complete`);
+    console.log(`Relay:      ${result.relay_url}`);
+    console.log(`User:       ${result.user_id}`);
+    console.log(`Device:     ${result.source_device_id}`);
+    console.log(`Purged:     ${result.purged}`);
+    console.log("Onboarding: required on HealthLink iOS");
+    if (action !== "unlink") {
+      console.log("Next: run healthlink-local print-onboarding and reconnect the iOS app.");
+    } else {
+      console.log("Next: run healthlink-local relay rotate --yes before reconnecting this device.");
+    }
+    return;
+  }
+  if (action === "status") {
+    const local = getRelayLocalStatus({ stateDir: options.stateDir });
+    const config = readRelayRuntimeConfig({ stateDir: options.stateDir });
+    const relayUrl = normalizeRelayUrlForMode(options.relayUrl ?? local.relay_url ?? config.relay_url, config.relay_mode);
+    const response = await fetch(`${relayUrl}/v1/status`, {
+      signal: AbortSignal.timeout(1500)
+    });
+    if (!response.ok) {
+      throw new Error(`Relay returned HTTP ${response.status} from /v1/status.`);
+    }
+    console.log(JSON.stringify({
+      local,
+      remote: await response.json()
+    }, null, 2));
+    return;
+  }
+  if (action === "fixture") {
+    const config = initializeRelayRuntime({
+      stateDir: options.stateDir,
+      relayUrl: options.relayUrl,
+      relayApiToken: options.relayApiToken,
+      agentName: options.agentName ?? defaultAgentName(options.agentId),
+      mode: options.transportId === "relay" ? "hosted_relay" : "self_hosted_relay"
+    });
+    const envelope = buildRelayFixtureEnvelope({
+      config,
+      options: {
+        date: options.fixtureDate,
+        steps: options.fixtureSteps,
+        sleepMinutes: options.fixtureSleepMinutes,
+        activeEnergyKcal: options.fixtureActiveEnergyKcal,
+        sequence: options.fixtureSequence,
+        syncId: options.fixtureSyncId,
+        generatedAt: options.fixtureGeneratedAt,
+        createdAt: options.fixtureCreatedAt,
+        timezone: options.fixtureTimezone
+      }
+    });
+    console.log(JSON.stringify(envelope, null, 2));
+    return;
+  }
+  if (action === "audit") {
+    if (options.relayAuditActive && !options.yes) {
+      throw new Error("relay audit --active creates and revokes disposable relay identities. Re-run with --yes after reviewing the hosted runbook.");
+    }
+    const local = getRelayLocalStatus({ stateDir: options.stateDir });
+    const relayUrl = options.relayUrl ?? local.relay_url ?? readRelayRuntimeConfig({ stateDir: options.stateDir }).relay_url;
+    const result = await auditRelayDeployment({
+      relayUrl,
+      metricsToken: options.relayMetricsToken ?? process.env.HEALTHLINK_RELAY_METRICS_TOKEN,
+      relayApiToken: options.relayApiToken ?? process.env.HEALTHLINK_RELAY_API_TOKEN,
+      active: options.relayAuditActive
+    });
+    console.log(JSON.stringify(result, null, 2));
+    if (!result.ok) {
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  const serveOptions = resolveRelayServeConfig(options);
+  await startRelayServer({
+    host: serveOptions.host,
+    port: serveOptions.port,
+    databasePath: serveOptions.databasePath,
+    retentionMs: serveOptions.retentionDays * 24 * 60 * 60 * 1000,
+    maxEnvelopeBytes: serveOptions.maxEnvelopeBytes,
+    maxUploadsPerMinute: serveOptions.maxUploadsPerMinute,
+    maxQueuedEnvelopesPerUser: serveOptions.maxQueuedEnvelopesPerUser,
+    maxDevicesPerUser: serveOptions.maxDevicesPerUser,
+    trustProxy: serveOptions.trustProxy,
+    apiToken: serveOptions.apiToken,
+    metricsToken: serveOptions.metricsToken
+  });
 }
 
 function resolveServiceManagerIdForCli(options: Pick<CliOptions, "serviceManager">): Exclude<ServiceManagerId, "auto"> {
@@ -664,11 +1266,21 @@ function printStatus(options: CliOptions): void {
   try {
     const status = getHealthStatus(database);
     const sourceDevices = listSourceDevices(database);
+    const relay = getRelayLocalStatus({ stateDir: options.stateDir });
     console.log("HealthLink Local status");
     console.log(`Database:   ${database.path}`);
     console.log(`Sources:    ${status.device_count}`);
     console.log(`Syncs:      ${status.sync_count}`);
     console.log(`Last sync:  ${status.last_sync_at ?? "never"}`);
+    console.log(`Transport:  ${relay.transport_mode}`);
+    if (relay.initialized) {
+      console.log(`Relay:      ${relay.relay_url}`);
+      console.log(`Last pull:  ${relay.last_successful_pull_at ?? "never"}`);
+      if (relay.last_error) {
+        console.log(`Pull error: ${relay.last_error}`);
+      }
+      console.log(`Next:       ${relay.suggested_next_action}`);
+    }
     console.log("");
     if (sourceDevices.length === 0) {
       console.log("No paired source devices.");
@@ -754,6 +1366,34 @@ async function printDoctor(options: CliOptions): Promise<void> {
 
   const receiverStatus = await checkLocalReceiver(options);
   results.push(receiverStatus);
+
+  const relayStatus = getRelayLocalStatus({ stateDir: options.stateDir });
+  results.push({
+    status: relayStatus.last_error ? "WARN" : options.transportId === "relay" || options.transportId === "self_hosted_relay"
+      ? relayStatus.initialized ? "OK" : "WARN"
+      : "OK",
+    label: "Relay runtime",
+    detail: relayStatus.initialized
+      ? `${relayStatus.transport_mode} ${relayStatus.relay_url} last pull ${relayStatus.last_successful_pull_at ?? "never"}. ${relayStatus.suggested_next_action}`
+      : relayStatus.suggested_next_action
+  });
+  if (relayStatus.initialized) {
+    try {
+      const relayConfig = readRelayRuntimeConfig({ stateDir: options.stateDir });
+      const issues = validateRelayRuntimeState(relayConfig);
+      results.push({
+        status: issues.length === 0 ? "OK" : "FAIL",
+        label: "Relay keys and credentials",
+        detail: issues.length === 0 ? "private keys match configured public keys; relay credentials are valid" : issues.join("; ")
+      });
+    } catch (error) {
+      results.push({
+        status: "FAIL",
+        label: "Relay keys and credentials",
+        detail: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
 
   try {
     const transport = createTransportProvider({

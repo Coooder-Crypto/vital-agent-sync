@@ -7,7 +7,9 @@ export const TRANSPORT_PROVIDER_IDS = [
   "tailscale",
   "cloudflare",
   "ngrok",
-  "public_https"
+  "public_https",
+  "relay",
+  "self_hosted_relay"
 ] as const;
 
 export type TransportProviderId = typeof TRANSPORT_PROVIDER_IDS[number];
@@ -429,5 +431,9 @@ function transportLabel(id: TransportProviderId): string {
     return "ngrok";
   case "public_https":
     return "public HTTPS";
+  case "relay":
+    return "HealthLink Relay";
+  case "self_hosted_relay":
+    return "self-hosted HealthLink Relay";
   }
 }
