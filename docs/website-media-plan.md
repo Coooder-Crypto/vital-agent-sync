@@ -7,16 +7,16 @@ The homepage exposes stable `data-media-slot` hooks so production captures can r
 | Slot | Location | Final asset | Recommended content | Target |
 | --- | --- | --- | --- | --- |
 | `hero-route-motion` | Hero footer | Micro animation | iPhone encrypts, blind relay forwards, local agent decrypts | 6-8 second seamless loop |
-| `onboarding-demo-loop` | Four-step product workbench | UI animation or short capture | Install Skill, scan QR, encrypted sync, first answer | 12-18 seconds, synchronized with the four tabs |
+| `onboarding-demo-loop` | Four-step product workbench | UI animation or short capture | Run setup, scan QR, encrypted sync, first answer | 12-18 seconds, synchronized with the four tabs |
 | `privacy-route-motion` | Dark privacy band | Micro animation | Plaintext becomes ciphertext before the relay and opens only locally | 6-8 second loop, low contrast |
-| `agent-context-screenshot` | Main product frame | Desktop screenshot | Real OpenClaw answer with freshness, evidence, and scoped health facts | 16:10, 1600x1000 source |
+| `agent-context-screenshot` | Main product frame | Desktop screenshot | Real MCP Agent answer with freshness, evidence, and scoped health facts | 16:10, 1600x1000 source |
 | `ios-sync-screenshot` | Phone frame | iPhone screenshot | Real pairing or successful encrypted sync state | 1290x2796 source |
 | `product-demo-video` | Dark film strip | Product video | Complete first run from install to answer | 25-40 seconds with poster image |
 
 ## Capture Order
 
 1. Capture the iPhone pairing and sync states first. They establish the product as real.
-2. Capture the OpenClaw answer with the exact same sample account and timestamps.
+2. Capture the Agent answer with the exact same sample account and timestamps.
 3. Record the onboarding loop from those two captures.
 4. Produce the longer product video only after the onboarding flow is stable.
 

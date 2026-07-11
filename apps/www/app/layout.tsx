@@ -9,7 +9,7 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 export const metadata: Metadata = {
   title: "HealthLink | Private Apple Health context for AI agents",
   description:
-    "Install one OpenClaw Skill, pair your iPhone, and give MCP-compatible agents fresh Apple Health context through an end-to-end encrypted relay.",
+    "Run HealthLink Local, pair your iPhone, and give MCP-compatible agents fresh Apple Health context through an end-to-end encrypted relay.",
   metadataBase: new URL(siteUrl),
   openGraph: {
     title: "HealthLink | Apple Health context. Private by design.",

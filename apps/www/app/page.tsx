@@ -31,7 +31,7 @@ import {
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { usePageSnap, type SnapSection } from "./use-page-snap";
 
-const installCommand = "openclaw skills install @healthlink/healthlink-personal-context";
+const installCommand = "npx -y healthlink-local setup";
 const githubUrl = "https://github.com/Coooder-Crypto/health-link";
 
 const sections: SnapSection[] = [
@@ -49,8 +49,8 @@ const flowSteps = [
   {
     number: "01",
     label: "Install",
-    title: "Ask OpenClaw to set it up.",
-    body: "One Skill checks the local runtime, creates private keys, and prepares the local store.",
+    title: "Start the local runtime.",
+    body: "One published npm command starts the receiver, creates private keys, and prepares your Agent connection.",
     icon: Terminal,
   },
   {
@@ -229,7 +229,7 @@ function PageHeader({ active, onNavigate }: { active: number; onNavigate: (index
             <Github size={18} />
           </a>
           <button type="button" className="header-install" onClick={() => navigate(sections.length - 1)}>
-            <Terminal size={16} /><span>Install Skill</span>
+            <Terminal size={16} /><span>Install HealthLink</span>
           </button>
           <button type="button" className="header-menu-button" onClick={() => setMenuOpen((open) => !open)} aria-expanded={menuOpen} aria-label={menuOpen ? "Close section menu" : "Open section menu"}>
             {menuOpen ? <X size={19} /> : <Menu size={19} />}
@@ -265,13 +265,13 @@ function HeroPage({ copied, onCopy, onNavigate }: { copied: boolean; onCopy: () 
     <SnapPage id="overview" className="hero-page">
       <div className="hero-rules" aria-hidden="true"><i /><i /><i /><i /></div>
       <div className="hero-code" aria-hidden="true">HL/01</div>
-      <motion.div className="page-width hero-page-inner" initial="hidden" animate="show" variants={{ show: { transition: { staggerChildren: reducedMotion ? 0 : 0.07 } } }}>
+      <motion.div className="page-width hero-page-inner" initial={false} animate="show" variants={{ show: { transition: { staggerChildren: reducedMotion ? 0 : 0.07 } } }}>
         <div className="hero-main">
-          <motion.p className="page-kicker" variants={item}><span /> HealthLink for OpenClaw</motion.p>
+          <motion.p className="page-kicker" variants={item}><span /> HealthLink for MCP agents</motion.p>
           <motion.h1 variants={item}>Apple Health context.<strong>Private by design.</strong></motion.h1>
           <motion.p className="hero-lede" variants={item}>Fresh Apple Health summaries become scoped context for your agent. Encrypted on iPhone, decrypted on your machine.</motion.p>
           <motion.div className="hero-actions" variants={item}>
-            <button type="button" className="button button-dark" onClick={() => onNavigate(7)}>Install the Skill <ArrowRight size={17} /></button>
+            <button type="button" className="button button-dark" onClick={() => onNavigate(7)}>Install HealthLink <ArrowRight size={17} /></button>
             <button type="button" className="text-button" onClick={() => onNavigate(1)}>See the private route <ArrowDown size={16} /></button>
           </motion.div>
           <motion.div variants={item}><CommandBar copied={copied} onCopy={onCopy} /></motion.div>
@@ -305,7 +305,7 @@ function FirstRunPage() {
       <div className="page-width flow-page-inner">
         <div className="page-title-row">
           <PageTitle kicker="One guided first run" title="Install to answer, in four verified steps." />
-          <div className="page-stats"><span><strong>1</strong> Skill</span><span><strong>1</strong> Scan</span><span><strong>0</strong> Plaintext hops</span></div>
+          <div className="page-stats"><span><strong>1</strong> Command</span><span><strong>1</strong> Scan</span><span><strong>0</strong> Plaintext hops</span></div>
         </div>
 
         <div className="flow-workbench">
@@ -318,7 +318,7 @@ function FirstRunPage() {
             ))}
           </div>
           <div className="flow-window">
-            <div className="window-head"><span>OPENCLAW / HEALTHLINK</span><span><i /> {step.label.toUpperCase()}</span></div>
+            <div className="window-head"><span>LOCAL SETUP / HEALTHLINK</span><span><i /> {step.label.toUpperCase()}</span></div>
             <AnimatePresence mode="wait" initial={false}>
               <motion.div className="flow-window-body" key={active} initial={{ opacity: 0, y: reducedMotion ? 0 : 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: reducedMotion ? 0 : -8 }} transition={{ duration: reducedMotion ? 0 : 0.25 }}>
                 <div className="flow-copy"><p>{step.number} / 04</p><h3>{step.title}</h3><span>{step.body}</span></div>
@@ -336,8 +336,8 @@ function FlowVisual({ index }: { index: number }) {
   if (index === 0) {
     return (
       <div className="terminal-visual">
-        <p><span>YOU</span>Install HealthLink and connect my iPhone.</p>
-        <p className="agent"><span>OPENCLAW</span><Check size={15} /> Skill installed</p>
+        <p><span>TERMINAL</span>npx -y healthlink-local setup</p>
+        <p className="agent"><span>HEALTHLINK</span><Check size={15} /> Local runtime ready</p>
         <div><span><Check size={14} /> Runtime ready</span><span><Check size={14} /> Keys created</span><span><RefreshCw size={14} /> Awaiting iPhone</span></div>
       </div>
     );
@@ -384,14 +384,14 @@ function AgentAnswerPage() {
     <SnapPage id="agent-answer" className="agent-page">
       <div className="page-width agent-page-inner">
         <div className="agent-copy">
-          <PageTitle kicker="Useful on day one" title="Ask naturally. Keep the evidence visible." body="The Skill checks freshness, queries only the context it needs, and marks the line between observed data and inference." />
+          <PageTitle kicker="Useful on day one" title="Ask naturally. Keep the evidence visible." body="HealthLink checks freshness, returns only the context your Agent requests, and marks the line between observed data and inference." />
           <div className="segmented-tabs" role="tablist" aria-label="Health question examples">
             {questions.map((item, index) => <button key={item.label} type="button" role="tab" aria-selected={active === index} onClick={() => setActive(index)}>{item.label}</button>)}
           </div>
         </div>
 
         <div className="agent-console">
-          <div className="window-head"><span><Bot size={16} /> OPENCLAW / HEALTHLINK</span><span><i /> FRESH DATA</span></div>
+          <div className="window-head"><span><Bot size={16} /> MCP AGENT / HEALTHLINK</span><span><i /> FRESH DATA</span></div>
           <AnimatePresence mode="wait" initial={false}>
             <motion.div className="console-body" key={active} initial={{ opacity: 0, y: reducedMotion ? 0 : 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: reducedMotion ? 0 : -8 }} transition={{ duration: reducedMotion ? 0 : 0.24 }} aria-live="polite">
               <div className="console-line"><span>YOU</span><p>{question.question}</p></div>
@@ -499,7 +499,7 @@ function BuildersPage({ onNavigate }: { onNavigate: (index: number) => void }) {
     <SnapPage id="builders" className="builders-page">
       <div className="page-width builders-page-inner">
         <div className="builders-copy">
-          <PageTitle kicker="Portable by design" title="OpenClaw first. MCP underneath." body="The Skill guides setup and good agent behavior. HealthLink keeps crypto, storage, and health semantics in a portable local runtime." />
+          <PageTitle kicker="Portable by design" title="Agent-neutral. MCP underneath." body="Hermes, OpenClaw, and other MCP clients use the same local runtime. HealthLink keeps crypto, storage, and health semantics outside any single Agent." />
           <div className="builder-links"><a href={githubUrl} target="_blank" rel="noreferrer">Explore the repository <ExternalLink size={15} /></a><button type="button" onClick={() => onNavigate(4)}>Compare deployment modes <ArrowRight size={15} /></button></div>
           <div className="builder-facts"><span><ShieldCheck size={15} /> Scoped by default</span><span><Zap size={15} /> Freshness attached</span></div>
         </div>
@@ -519,8 +519,8 @@ function FinalPage({ copied, onCopy, onNavigate }: { copied: boolean; onCopy: ()
       <div className="final-code" aria-hidden="true">HL/08</div>
       <div className="page-width final-page-inner">
         <p className="page-kicker light"><span /> Give your agent better context</p>
-        <h2>Start with one Skill.</h2>
-        <p>OpenClaw takes it from install to your first private health answer.</p>
+        <h2>Start with one command.</h2>
+        <p>HealthLink detects supported Agents or prints standard MCP config for the client you already use.</p>
         <CommandBar copied={copied} onCopy={onCopy} inverse />
         <button type="button" className="back-to-top" onClick={() => onNavigate(0)}>Back to overview <ArrowRight size={15} /></button>
       </div>
@@ -538,7 +538,7 @@ function PageTitle({ kicker, title, body, light = false }: { kicker: string; tit
 }
 
 function CommandBar({ copied, onCopy, inverse = false }: { copied: boolean; onCopy: () => void; inverse?: boolean }) {
-  return <div className={`command-bar ${inverse ? "inverse" : ""}`}><span>$</span><code>{installCommand}</code><button type="button" onClick={onCopy} aria-label="Copy Skill install command">{copied ? <Check size={17} /> : <Copy size={17} />}<strong>{copied ? "Copied" : "Copy"}</strong></button></div>;
+  return <div className={`command-bar ${inverse ? "inverse" : ""}`}><span>$</span><code>{installCommand}</code><button type="button" onClick={onCopy} aria-label="Copy HealthLink setup command">{copied ? <Check size={17} /> : <Copy size={17} />}<strong>{copied ? "Copied" : "Copy"}</strong></button></div>;
 }
 
 function RouteNode({ icon: Icon, label, detail }: { icon: LucideIcon; label: string; detail: string }) {
