@@ -45,6 +45,13 @@ const sections: SnapSection[] = [
   { id: "install-now", title: "Install", theme: "dark" },
 ];
 
+const headerLinks = [
+  { index: 1, label: "How it works" },
+  { index: 3, label: "Privacy" },
+  { index: 4, label: "Deploy" },
+  { index: 6, label: "Builders" },
+];
+
 const flowSteps = [
   {
     number: "01",
@@ -196,64 +203,87 @@ function PageHeader({ active, onNavigate }: { active: number; onNavigate: (index
   }
 
   return (
-    <header className={`global-header ${isDark ? "header-dark" : "header-light"}`}>
-      <div className="header-inner page-width">
-        <button type="button" className="header-brand" onClick={() => navigate(0)} aria-label="Go to HealthLink overview">
-          <span className="header-mark"><HeartPulse size={19} /><i /></span>
-          <span className="header-brand-copy"><strong>HealthLink</strong><small>Private health context</small></span>
-        </button>
+    <>
+      <header className={`global-header ${isDark ? "header-dark" : "header-light"}`}>
+        <div className="header-inner page-width">
+          <button type="button" className="header-brand" onClick={() => navigate(0)} aria-label="Go to HealthLink overview">
+            <span className="header-mark"><HeartPulse size={18} /><i /></span>
+            <span className="header-brand-copy"><strong>HealthLink</strong><small>Private health context</small></span>
+          </button>
 
-        <div className="header-progress" aria-live="polite" aria-label={`Section ${active + 1} of ${sections.length}: ${section.title}`}>
-          <span className="header-index">{String(active + 1).padStart(2, "0")}</span>
-          <div>
-            <strong>{section.title}</strong>
-            <nav aria-label="Page sections">
-              {sections.map((item, index) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={index === active ? "active" : ""}
-                  onClick={() => navigate(index)}
-                  aria-label={`Go to ${item.title}`}
-                  aria-current={index === active ? "page" : undefined}
-                  title={item.title}
-                />
-              ))}
-            </nav>
+          <nav className="header-nav" aria-label="Primary navigation">
+            {headerLinks.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                className={active === item.index ? "active" : ""}
+                onClick={() => navigate(item.index)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="header-actions">
+            <a className="header-github" href={githubUrl} target="_blank" rel="noreferrer" aria-label="HealthLink on GitHub" title="GitHub">
+              <Github size={18} />
+            </a>
+            <button type="button" className="header-install" onClick={() => navigate(sections.length - 1)}>
+              <Terminal size={16} /><span>Install HealthLink</span>
+            </button>
+            <button type="button" className="header-menu-button" onClick={() => setMenuOpen((open) => !open)} aria-expanded={menuOpen} aria-label={menuOpen ? "Close section menu" : "Open section menu"}>
+              {menuOpen ? <X size={19} /> : <Menu size={19} />}
+            </button>
           </div>
-          <span className="header-total">/ {String(sections.length).padStart(2, "0")}</span>
         </div>
 
-        <div className="header-actions">
-          <a className="header-github" href={githubUrl} target="_blank" rel="noreferrer" aria-label="HealthLink on GitHub" title="GitHub">
-            <Github size={18} />
-          </a>
-          <button type="button" className="header-install" onClick={() => navigate(sections.length - 1)}>
-            <Terminal size={16} /><span>Install HealthLink</span>
-          </button>
-          <button type="button" className="header-menu-button" onClick={() => setMenuOpen((open) => !open)} aria-expanded={menuOpen} aria-label={menuOpen ? "Close section menu" : "Open section menu"}>
-            {menuOpen ? <X size={19} /> : <Menu size={19} />}
-          </button>
+        <AnimatePresence>
+          {menuOpen && (
+            <motion.div className="header-mobile-menu" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+              <div className="mobile-menu-grid">
+                {sections.map((item, index) => (
+                  <button key={item.id} type="button" className={index === active ? "active" : ""} onClick={() => navigate(index)}>
+                    <span>{String(index + 1).padStart(2, "0")}</span>{item.title}
+                  </button>
+                ))}
+              </div>
+              <a href={githubUrl} target="_blank" rel="noreferrer"><Github size={17} /> View source on GitHub <ExternalLink size={14} /></a>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </header>
+
+      <nav
+        className={`page-rail ${isDark ? "rail-dark" : "rail-light"}`}
+        aria-label={`Section ${active + 1} of ${sections.length}: ${section.title}`}
+      >
+        <span className="page-rail-current" aria-live="polite">{section.title}</span>
+        <div className="page-rail-shell">
+          <span className="page-rail-index">{String(active + 1).padStart(2, "0")}</span>
+          <div className="page-rail-track">
+            <motion.span
+              className="page-rail-fill"
+              initial={false}
+              animate={{ scaleY: (active + 1) / sections.length }}
+              transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+            />
+            {sections.map((item, index) => (
+              <button
+                key={item.id}
+                type="button"
+                className={index === active ? "active" : ""}
+                onClick={() => navigate(index)}
+                aria-label={`Go to ${item.title}`}
+                aria-current={index === active ? "page" : undefined}
+              >
+                <span className="page-rail-tooltip">{item.title}</span>
+              </button>
+            ))}
+          </div>
+          <span className="page-rail-total">{String(sections.length).padStart(2, "0")}</span>
         </div>
-      </div>
-
-      <motion.span className="header-page-line" animate={{ scaleX: (active + 1) / sections.length }} transition={{ duration: 0.32 }} />
-
-      <AnimatePresence>
-        {menuOpen && (
-          <motion.div className="header-mobile-menu" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-            <div className="mobile-menu-grid">
-              {sections.map((item, index) => (
-                <button key={item.id} type="button" className={index === active ? "active" : ""} onClick={() => navigate(index)}>
-                  <span>{String(index + 1).padStart(2, "0")}</span>{item.title}
-                </button>
-              ))}
-            </div>
-            <a href={githubUrl} target="_blank" rel="noreferrer"><Github size={17} /> View source on GitHub <ExternalLink size={14} /></a>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </header>
+      </nav>
+    </>
   );
 }
 
