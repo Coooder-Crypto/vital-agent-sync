@@ -1,630 +1,554 @@
+"use client";
+
+import { useEffect, useState, type ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
 import {
+  ArrowDown,
   ArrowRight,
   Bot,
   Check,
-  ChevronRight,
-  CircleDot,
-  Cpu,
+  Cloud,
+  Code2,
+  Copy,
   Database,
+  ExternalLink,
   Fingerprint,
   Github,
   HeartPulse,
-  ImageIcon,
-  Link2,
+  KeyRound,
   LockKeyhole,
-  Play,
+  Menu,
   QrCode,
-  ScanLine,
+  RefreshCw,
   Server,
   ShieldCheck,
-  Sparkles,
   Smartphone,
+  Sparkles,
   Terminal,
-  Video,
+  X,
   Zap,
 } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { usePageSnap, type SnapSection } from "./use-page-snap";
 
-const installCommand = "npx -y healthlink-local setup --agent hermes --service";
+const installCommand = "openclaw skills install @healthlink/healthlink-personal-context";
+const githubUrl = "https://github.com/Coooder-Crypto/health-link";
 
-const features = [
-  {
-    icon: HeartPulse,
-    title: "Health summaries, not raw exhaust",
-    body: "Sync compact daily context from Apple Health: sleep, recovery, activity, workouts, and freshness metadata.",
-  },
-  {
-    icon: LockKeyhole,
-    title: "Local-first by default",
-    body: "Your local receiver stores data in SQLite and exposes it through MCP. No HealthLink cloud is required.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Scoped and auditable access",
-    body: "Agents read through scoped tools, with source devices, revocation, and audit logs built into the gateway model.",
-  },
+const sections: SnapSection[] = [
+  { id: "overview", title: "Overview", theme: "light" },
+  { id: "first-run", title: "First run", theme: "light" },
+  { id: "agent-answer", title: "Agent answer", theme: "light" },
+  { id: "privacy", title: "Privacy boundary", theme: "dark" },
+  { id: "deploy", title: "Deployment", theme: "light" },
+  { id: "product", title: "Product", theme: "light" },
+  { id: "builders", title: "MCP tools", theme: "light" },
+  { id: "install-now", title: "Install", theme: "dark" },
 ];
 
-const steps = [
+const flowSteps = [
   {
+    number: "01",
     label: "Install",
-    title: "Start the local receiver",
-    body: "Run one command on the machine where your agent lives. HealthLink starts the service and prints a pairing QR.",
+    title: "Ask OpenClaw to set it up.",
+    body: "One Skill checks the local runtime, creates private keys, and prepares the local store.",
     icon: Terminal,
   },
   {
+    number: "02",
     label: "Pair",
-    title: "Scan from iPhone",
-    body: "Approve the server, choose health scopes, grant Apple permissions, then let the app keep summaries fresh.",
+    title: "Scan one onboarding code.",
+    body: "Your iPhone verifies the local fingerprint before any health summary can leave the device.",
     icon: QrCode,
   },
   {
+    number: "03",
+    label: "Sync",
+    title: "Only ciphertext crosses the relay.",
+    body: "Hosted or self-hosted, the relay delivers encrypted envelopes without seeing their contents.",
+    icon: LockKeyhole,
+  },
+  {
+    number: "04",
     label: "Ask",
-    title: "Give agents context",
-    body: "Hermes or any MCP-compatible agent can call HealthLink tools when you ask about energy, sleep, or readiness.",
+    title: "Your agent gets fresh, scoped context.",
+    body: "Decryption and MCP queries happen locally, with freshness and inference boundaries attached.",
     icon: Sparkles,
   },
 ];
 
-const toolRows = [
-  ["get_personal_context", "Best default for daily state, readiness, and broad health questions."],
-  ["get_sleep_trend", "Returns recent sleep duration and freshness for recovery analysis."],
-  ["get_workout_load", "Summarizes workout strain and activity load across recent days."],
-  ["get_recovery_signals", "Combines resting heart rate, HRV, sleep, and activity signals."],
+const questions = [
+  {
+    label: "Today",
+    question: "How ready am I for a hard workout today?",
+    answer:
+      "Your recovery signals look steady, but sleep was 38 minutes below your 7-day average. Keep intensity moderate and reassess after your warm-up.",
+    facts: ["Sleep 6h 42m", "HRV 42 ms", "Resting HR 61"],
+  },
+  {
+    label: "Sleep",
+    question: "What changed in my sleep this week?",
+    answer:
+      "Sleep duration improved across the last four nights, while bedtime moved 51 minutes later. Your strongest recovery days followed earlier bedtimes.",
+    facts: ["7-day avg 7h 08m", "+34m vs last week", "6 of 7 days synced"],
+  },
+  {
+    label: "Training",
+    question: "Summarize my training load before the weekend.",
+    answer:
+      "You logged three workouts and 142 exercise minutes. Load is above last week, with no matching drop in HRV or rise in resting heart rate.",
+    facts: ["3 workouts", "142 active min", "+12% weekly load"],
+  },
 ];
 
-const privacyPoints = [
-  "No cloud dependency for the default local mode.",
-  "Agents never talk to HealthKit directly.",
-  "Source devices and agent clients can be revoked.",
-  "Default MCP tools expose summaries, not raw samples.",
+const modes = [
+  {
+    label: "Hosted relay",
+    eyebrow: "Recommended",
+    icon: Cloud,
+    title: "The shortest private route.",
+    body: "HealthLink hosts delivery infrastructure that only sees encrypted envelopes. Your machine keeps the key.",
+    bullets: ["No inbound ports", "Outbound-only iPhone flow", "Portable MCP surface"],
+    path: ["iPhone", "Blind relay", "Your machine"],
+  },
+  {
+    label: "Self-hosted",
+    eyebrow: "Full ownership",
+    icon: Server,
+    title: "Own every network hop.",
+    body: "Run the same relay protocol on infrastructure you control while preserving local decryption.",
+    bullets: ["Docker-ready service", "Protocol compatible", "Your retention policy"],
+    path: ["iPhone", "Your relay", "Your machine"],
+  },
+  {
+    label: "Direct",
+    eyebrow: "Fully local",
+    icon: Database,
+    title: "Skip the relay entirely.",
+    body: "Send summaries to healthlink-local over LAN, Tailscale, or an HTTPS endpoint you operate.",
+    bullets: ["No hosted service", "Private network route", "Same local MCP tools"],
+    path: ["iPhone", "Private network", "Your machine"],
+  },
+];
+
+const tools = [
+  ["get_personal_context", "Daily state and readiness"],
+  ["get_sleep_trend", "Sleep duration and continuity"],
+  ["get_workout_load", "Recent activity and strain"],
+  ["get_recovery_signals", "HRV, heart rate, sleep, and freshness"],
 ];
 
 export default function Home() {
+  const reducedMotion = useReducedMotion();
+  const { activeSection, goToSection } = usePageSnap(sections, reducedMotion);
+  const [copied, setCopied] = useState(false);
+
+  async function copyInstallCommand() {
+    let didCopy = false;
+
+    try {
+      await navigator.clipboard.writeText(installCommand);
+      didCopy = true;
+    } catch {
+      const input = document.createElement("textarea");
+      input.value = installCommand;
+      input.setAttribute("readonly", "");
+      input.style.position = "fixed";
+      input.style.opacity = "0";
+      document.body.appendChild(input);
+      input.select();
+      didCopy = document.execCommand("copy");
+      input.remove();
+    }
+
+    if (didCopy) {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    }
+  }
+
   return (
-    <main className="relative overflow-hidden">
-      <div className="mesh-grid pointer-events-none absolute inset-x-0 top-0 h-[760px]" />
-      <SiteHeader />
-      <HeroSection />
-      <LogoStrip />
-      <FeatureHighlights />
-      <HowItWorks />
-      <MediaShowcase />
-      <Architecture />
-      <PrivacySection />
-      <ToolsSection />
-      <FinalCta />
-    </main>
+    <>
+      <PageHeader active={activeSection} onNavigate={goToSection} />
+      <main className="snap-site">
+        <HeroPage copied={copied} onCopy={copyInstallCommand} onNavigate={goToSection} />
+        <FirstRunPage />
+        <AgentAnswerPage />
+        <PrivacyPage />
+        <DeployPage />
+        <ProductPage />
+        <BuildersPage onNavigate={goToSection} />
+        <FinalPage copied={copied} onCopy={copyInstallCommand} onNavigate={goToSection} />
+      </main>
+    </>
   );
 }
 
-function SiteHeader() {
+function PageHeader({ active, onNavigate }: { active: number; onNavigate: (index: number) => void }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const section = sections[active];
+  const isDark = section.theme === "dark";
+
+  useEffect(() => setMenuOpen(false), [active]);
+
+  function navigate(index: number) {
+    setMenuOpen(false);
+    onNavigate(index);
+  }
+
   return (
-    <header className="relative z-20 mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8">
-      <a className="flex items-center gap-3" href="#">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-400 text-slate-950">
-          <HeartPulse size={20} strokeWidth={2.4} />
-        </span>
-        <span className="text-sm font-semibold tracking-wide text-white">HealthLink</span>
-      </a>
-      <nav className="hidden items-center gap-8 text-sm text-slate-300 md:flex">
-        <a className="transition hover:text-white" href="#flow">
-          Flow
-        </a>
-        <a className="transition hover:text-white" href="#architecture">
-          Architecture
-        </a>
-        <a className="transition hover:text-white" href="#privacy">
-          Privacy
-        </a>
-        <a className="transition hover:text-white" href="#tools">
-          MCP Tools
-        </a>
-      </nav>
-      <a
-        className="inline-flex h-10 items-center gap-2 rounded-lg border border-white/15 bg-white/8 px-4 text-sm font-medium text-white transition hover:bg-white/14"
-        href="https://github.com/Coooder-Crypto/health-link"
-      >
-        <Github size={16} />
-        GitHub
-      </a>
+    <header className={`global-header ${isDark ? "header-dark" : "header-light"}`}>
+      <div className="header-inner page-width">
+        <button type="button" className="header-brand" onClick={() => navigate(0)} aria-label="Go to HealthLink overview">
+          <span className="header-mark"><HeartPulse size={19} /><i /></span>
+          <span className="header-brand-copy"><strong>HealthLink</strong><small>Private health context</small></span>
+        </button>
+
+        <div className="header-progress" aria-live="polite" aria-label={`Section ${active + 1} of ${sections.length}: ${section.title}`}>
+          <span className="header-index">{String(active + 1).padStart(2, "0")}</span>
+          <div>
+            <strong>{section.title}</strong>
+            <nav aria-label="Page sections">
+              {sections.map((item, index) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={index === active ? "active" : ""}
+                  onClick={() => navigate(index)}
+                  aria-label={`Go to ${item.title}`}
+                  aria-current={index === active ? "page" : undefined}
+                  title={item.title}
+                />
+              ))}
+            </nav>
+          </div>
+          <span className="header-total">/ {String(sections.length).padStart(2, "0")}</span>
+        </div>
+
+        <div className="header-actions">
+          <a className="header-github" href={githubUrl} target="_blank" rel="noreferrer" aria-label="HealthLink on GitHub" title="GitHub">
+            <Github size={18} />
+          </a>
+          <button type="button" className="header-install" onClick={() => navigate(sections.length - 1)}>
+            <Terminal size={16} /><span>Install Skill</span>
+          </button>
+          <button type="button" className="header-menu-button" onClick={() => setMenuOpen((open) => !open)} aria-expanded={menuOpen} aria-label={menuOpen ? "Close section menu" : "Open section menu"}>
+            {menuOpen ? <X size={19} /> : <Menu size={19} />}
+          </button>
+        </div>
+      </div>
+
+      <motion.span className="header-page-line" animate={{ scaleX: (active + 1) / sections.length }} transition={{ duration: 0.32 }} />
+
+      <AnimatePresence>
+        {menuOpen && (
+          <motion.div className="header-mobile-menu" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+            <div className="mobile-menu-grid">
+              {sections.map((item, index) => (
+                <button key={item.id} type="button" className={index === active ? "active" : ""} onClick={() => navigate(index)}>
+                  <span>{String(index + 1).padStart(2, "0")}</span>{item.title}
+                </button>
+              ))}
+            </div>
+            <a href={githubUrl} target="_blank" rel="noreferrer"><Github size={17} /> View source on GitHub <ExternalLink size={14} /></a>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </header>
   );
 }
 
-function HeroSection() {
-  return (
-    <section className="relative z-10 mx-auto grid max-w-7xl items-center gap-12 px-5 pb-20 pt-10 sm:px-8 lg:grid-cols-[1fr_0.95fr] lg:pb-28 lg:pt-18">
-      <div className="min-w-0">
-        <div className="fade-up mb-7 inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1.5 text-sm text-emerald-100">
-          <CircleDot size={14} className="pulse-dot text-emerald-300" />
-          Private health context for local AI agents
-        </div>
-        <h1 className="fade-up max-w-4xl text-4xl font-semibold leading-[1.04] tracking-normal text-white sm:text-6xl lg:text-7xl">
-          Pair your iPhone once. Ask your agent anytime.
-        </h1>
-        <p className="fade-up mt-6 max-w-2xl text-lg leading-8 text-slate-300 sm:text-xl [animation-delay:110ms]">
-          HealthLink syncs authorized Apple Health summaries to your own local gateway,
-          then exposes fresh personal context through MCP tools your agent can understand.
-        </p>
-        <div className="fade-up mt-8 flex flex-col gap-3 sm:flex-row [animation-delay:180ms]">
-          <a
-            className="lift inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-emerald-300 px-5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200"
-            href="#install"
-          >
-            Start with one command
-            <ArrowRight size={16} />
-          </a>
-          <a
-            className="lift inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-white/14 bg-white/7 px-5 text-sm font-semibold text-white transition hover:bg-white/12"
-            href="#architecture"
-          >
-            See architecture
-            <ChevronRight size={16} />
-          </a>
-        </div>
-        <CommandCard />
-      </div>
-      <div className="min-w-0">
-        <ProductVisual />
-      </div>
-    </section>
-  );
-}
+function HeroPage({ copied, onCopy, onNavigate }: { copied: boolean; onCopy: () => void; onNavigate: (index: number) => void }) {
+  const reducedMotion = useReducedMotion();
+  const item = { hidden: { opacity: 0, y: reducedMotion ? 0 : 16 }, show: { opacity: 1, y: 0 } };
 
-function CommandCard() {
   return (
-    <div id="install" className="fade-up mt-9 max-w-2xl rounded-xl border border-white/12 bg-black/45 p-3 shadow-2xl [animation-delay:250ms]">
-      <div className="mb-3 flex items-center justify-between px-2 pt-1">
-        <div className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded-full bg-rose-400" />
-          <span className="h-3 w-3 rounded-full bg-amber-300" />
-          <span className="h-3 w-3 rounded-full bg-emerald-300" />
-        </div>
-        <span className="text-xs text-slate-500">local setup</span>
-      </div>
-      <div className="overflow-x-auto rounded-lg bg-slate-950/85 px-4 py-4">
-        <code className="whitespace-nowrap text-sm text-emerald-200 sm:text-base">
-          <span className="text-slate-500">$ </span>
-          {installCommand}
-        </code>
-      </div>
-    </div>
-  );
-}
-
-function ProductVisual() {
-  return (
-    <div className="hero-orbit float-panel relative mx-auto w-full max-w-xl">
-      <div className="absolute -inset-10 rounded-full bg-emerald-400/10 blur-3xl" />
-      <div className="absolute -right-8 top-12 h-40 w-40 rounded-full bg-violet-400/10 blur-3xl" />
-      <div className="screen-glow relative overflow-hidden rounded-[1.25rem] border border-white/10 bg-slate-950/86 p-4 backdrop-blur">
-        <div className="data-rail data-rail-a" />
-        <div className="data-rail data-rail-b" />
-        <div className="mb-5 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold text-white">Live pairing route</p>
-            <p className="mt-1 text-xs text-slate-500">Health summaries move through your machine.</p>
-          </div>
-          <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-medium text-emerald-100">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
-            local mode
-          </span>
+    <SnapPage id="overview" className="hero-page">
+      <div className="hero-rules" aria-hidden="true"><i /><i /><i /><i /></div>
+      <div className="hero-code" aria-hidden="true">HL/01</div>
+      <motion.div className="page-width hero-page-inner" initial="hidden" animate="show" variants={{ show: { transition: { staggerChildren: reducedMotion ? 0 : 0.07 } } }}>
+        <div className="hero-main">
+          <motion.p className="page-kicker" variants={item}><span /> HealthLink for OpenClaw</motion.p>
+          <motion.h1 variants={item}>Apple Health context.<strong>Private by design.</strong></motion.h1>
+          <motion.p className="hero-lede" variants={item}>Fresh Apple Health summaries become scoped context for your agent. Encrypted on iPhone, decrypted on your machine.</motion.p>
+          <motion.div className="hero-actions" variants={item}>
+            <button type="button" className="button button-dark" onClick={() => onNavigate(7)}>Install the Skill <ArrowRight size={17} /></button>
+            <button type="button" className="text-button" onClick={() => onNavigate(1)}>See the private route <ArrowDown size={16} /></button>
+          </motion.div>
+          <motion.div variants={item}><CommandBar copied={copied} onCopy={onCopy} /></motion.div>
         </div>
 
-        <div className="relative grid min-h-[520px] gap-4 lg:grid-cols-[0.72fr_0.56fr_0.9fr]">
-          <div className="device-frame relative z-10 self-center rounded-[1.75rem] border border-white/12 bg-black/50 p-3">
-            <div className="mx-auto mb-3 h-1.5 w-14 rounded-full bg-white/20" />
-            <div className="rounded-[1.35rem] border border-white/10 bg-slate-950 p-4">
-              <div className="mb-5 flex items-center justify-between">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-300 text-slate-950">
-                  <HeartPulse size={20} />
-                </div>
-                <ScanLine className="text-emerald-200" size={22} />
-              </div>
-              <p className="text-xs text-slate-500">HealthLink iOS</p>
-              <h3 className="mt-1 text-lg font-semibold text-white">Ready to sync</h3>
-              <div className="mt-5 space-y-3">
-                <MetricBar label="Sleep" value="6h 42m" tone="emerald" width="74%" />
-                <MetricBar label="Steps" value="8,420" tone="blue" width="82%" />
-                <MetricBar label="HRV" value="42 ms" tone="violet" width="58%" />
-              </div>
-              <div className="mt-5 rounded-xl border border-emerald-300/20 bg-emerald-300/10 p-3">
-                <QrCode className="mb-3 text-emerald-200" size={24} />
-                <p className="text-xs font-medium text-white">Pairing QR approved</p>
-                <p className="mt-1 text-xs leading-5 text-slate-400">Scopes selected on device.</p>
-              </div>
-            </div>
-          </div>
+        <motion.div className="hero-route" variants={item} aria-label="Encrypted route from Apple Health to your agent">
+          <RouteNode icon={Smartphone} label="Apple Health" detail="encrypted on iPhone" />
+          <RouteLine delay={false} />
+          <RouteNode icon={LockKeyhole} label="Blind relay" detail="ciphertext only" />
+          <RouteLine delay />
+          <RouteNode icon={Bot} label="Your agent" detail="decrypted locally" />
+        </motion.div>
+      </motion.div>
+      <div className="hero-trust page-width">
+        <span><LockKeyhole size={15} /> End-to-end encrypted</span>
+        <span><Code2 size={15} /> MCP native</span>
+        <span><Server size={15} /> Self-hostable</span>
+        <span><Fingerprint size={15} /> Source controlled</span>
+      </div>
+    </SnapPage>
+  );
+}
 
-          <div className="relative z-20 flex flex-col items-center justify-center gap-5 py-4">
-            <PipelineNode icon={Server} label="LAN receiver" tone="emerald" />
-            <div className="pipeline-spine" />
-            <PipelineNode icon={Database} label="SQLite" tone="blue" />
-            <div className="pipeline-spine" />
-            <PipelineNode icon={Cpu} label="MCP" tone="violet" />
-          </div>
+function FirstRunPage() {
+  const [active, setActive] = useState(0);
+  const reducedMotion = useReducedMotion();
+  const step = flowSteps[active];
 
-          <div className="relative z-10 self-center rounded-2xl border border-white/10 bg-black/45 p-4">
-            <div className="mb-4 flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-300/16 text-violet-100">
-                <Bot size={21} />
-              </span>
-              <div>
-                <p className="text-sm font-medium text-white">Agent context</p>
-                <p className="text-xs text-slate-500">freshness: 4 min</p>
-              </div>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-slate-950/80 p-4">
-              <p className="typing-line text-sm leading-6 text-slate-300">
-                You slept a little under baseline. Recovery signals are stable, so keep training moderate today.
-              </p>
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <SignalTile label="scope" value="health.daily" />
-              <SignalTile label="audit" value="recorded" />
-            </div>
-            <div className="mt-4 rounded-xl border border-amber-300/16 bg-amber-300/8 p-3">
-              <div className="flex items-center gap-2 text-xs font-medium text-amber-100">
-                <ShieldCheck size={15} />
-                Agent reads summaries, not raw HealthKit samples.
-              </div>
-            </div>
-          </div>
+  return (
+    <SnapPage id="first-run" className="flow-page">
+      <div className="page-width flow-page-inner">
+        <div className="page-title-row">
+          <PageTitle kicker="One guided first run" title="Install to answer, in four verified steps." />
+          <div className="page-stats"><span><strong>1</strong> Skill</span><span><strong>1</strong> Scan</span><span><strong>0</strong> Plaintext hops</span></div>
         </div>
-      </div>
-    </div>
-  );
-}
 
-function PipelineNode({
-  icon: Icon,
-  label,
-  tone,
-}: {
-  icon: typeof Server;
-  label: string;
-  tone: "emerald" | "blue" | "violet";
-}) {
-  const tones = {
-    emerald: "border-emerald-300/30 bg-emerald-300/12 text-emerald-100 shadow-emerald-300/20",
-    blue: "border-sky-300/30 bg-sky-300/12 text-sky-100 shadow-sky-300/20",
-    violet: "border-violet-300/30 bg-violet-300/12 text-violet-100 shadow-violet-300/20",
-  };
-
-  return (
-    <div className={`node-pulse flex h-20 w-20 flex-col items-center justify-center rounded-2xl border shadow-xl ${tones[tone]}`}>
-      <Icon size={22} />
-      <span className="mt-2 text-[10px] font-medium">{label}</span>
-    </div>
-  );
-}
-
-function MetricBar({
-  label,
-  value,
-  tone,
-  width,
-}: {
-  label: string;
-  value: string;
-  tone: "emerald" | "blue" | "violet";
-  width: string;
-}) {
-  const tones = {
-    emerald: "from-emerald-300 to-emerald-500",
-    blue: "from-sky-300 to-blue-500",
-    violet: "from-violet-300 to-fuchsia-500",
-  };
-
-  return (
-    <div>
-      <div className="mb-2 flex items-center justify-between text-xs">
-        <span className="text-slate-500">{label}</span>
-        <span className="font-medium text-white">{value}</span>
-      </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
-        <div className={`h-full rounded-full bg-gradient-to-r ${tones[tone]}`} style={{ width }} />
-      </div>
-    </div>
-  );
-}
-
-function SignalTile({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
-      <p className="text-[10px] uppercase text-slate-500">{label}</p>
-      <p className="mt-1 text-xs font-medium text-white">{value}</p>
-    </div>
-  );
-}
-
-function LogoStrip() {
-  return (
-    <section className="relative z-10 border-y border-white/10 bg-white/[0.03]">
-      <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-6 sm:px-8 md:flex-row md:items-center md:justify-between">
-        <p className="text-sm text-slate-400">Built for local-first agent workflows</p>
-        <div className="flex flex-wrap gap-3 text-sm text-slate-300">
-          {["Apple Health", "SQLite", "MCP", "Hermes", "OpenClaw", "Tailscale"].map((item) => (
-            <span key={item} className="lift rounded-lg border border-white/10 bg-black/20 px-3 py-1.5">
-              {item}
-            </span>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function FeatureHighlights() {
-  return (
-    <section className="relative z-10 mx-auto max-w-7xl px-5 py-20 sm:px-8">
-      <div className="grid gap-4 lg:grid-cols-3">
-        {features.map((feature) => (
-          <div key={feature.title} className="lift glass rounded-2xl p-6">
-            <feature.icon className="mb-8 text-emerald-200" size={26} />
-            <h3 className="text-xl font-semibold text-white">{feature.title}</h3>
-            <p className="mt-3 leading-7 text-slate-300">{feature.body}</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function HowItWorks() {
-  return (
-    <section id="flow" className="relative z-10 mx-auto max-w-7xl px-5 py-24 sm:px-8">
-      <SectionHeader
-        eyebrow="Launch flow"
-        title="The setup should feel boringly simple."
-        body="HealthLink hides HealthKit permissions, pairing, local storage, and MCP wiring behind a short path a real user can finish."
-      />
-      <div className="mt-12 grid gap-4 lg:grid-cols-3">
-        {steps.map((step, index) => (
-          <div key={step.title} className="lift glass rounded-2xl p-6">
-            <div className="mb-8 flex items-center justify-between">
-              <span className="rounded-full border border-white/12 bg-white/8 px-3 py-1 text-xs font-medium text-slate-300">
-                {step.label}
-              </span>
-              <step.icon className="text-emerald-200" size={24} />
-            </div>
-            <p className="text-sm text-slate-500">0{index + 1}</p>
-            <h3 className="mt-3 text-xl font-semibold text-white">{step.title}</h3>
-            <p className="mt-3 leading-7 text-slate-300">{step.body}</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function MediaShowcase() {
-  return (
-    <section className="relative z-10 mx-auto max-w-7xl px-5 py-16 sm:px-8">
-      <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr] lg:items-stretch">
-        <div className="glass rounded-2xl p-7 sm:p-9">
-          <SectionHeader
-            eyebrow="Product media"
-            title="Leave room for the real app story."
-            body="This section is ready for future device screenshots, pairing clips, or a short launch demo video. The placeholders keep the page complete until real assets are recorded."
-          />
-          <div className="mt-8 grid gap-3 sm:grid-cols-2">
-            <MediaSlot icon={Smartphone} label="iPhone screenshots" detail="Replace with Home, Sources, and Connection screens." />
-            <MediaSlot icon={Video} label="Demo video" detail="Drop in a 30-60 second setup walkthrough." />
-          </div>
-        </div>
-        <div className="grid gap-4 md:grid-cols-[0.72fr_1fr]">
-          <div className="device-frame lift min-h-[520px] rounded-[2rem] border border-white/12 bg-slate-950/80 p-4">
-            <div className="mx-auto mb-4 h-1.5 w-16 rounded-full bg-white/20" />
-            <div className="media-sheen flex h-full min-h-[455px] flex-col justify-between overflow-hidden rounded-[1.5rem] border border-white/10 bg-black/35 p-5">
-              <div>
-                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-300/14 text-emerald-200">
-                  <ImageIcon size={24} />
-                </div>
-                <p className="text-sm font-medium text-white">Future iPhone capture</p>
-                <p className="mt-2 text-sm leading-6 text-slate-400">
-                  Use this for a real HealthLink screen once the launch visuals are ready.
-                </p>
-              </div>
-              <div className="space-y-3">
-                <div className="h-20 rounded-xl border border-white/10 bg-white/[0.05]" />
-                <div className="h-14 rounded-xl border border-white/10 bg-white/[0.04]" />
-                <div className="h-24 rounded-xl border border-emerald-300/20 bg-emerald-300/8" />
-              </div>
-            </div>
-          </div>
-          <div className="video-frame lift relative min-h-[360px] overflow-hidden rounded-2xl border border-white/12 bg-slate-950/80 p-4 md:min-h-full">
-            <div className="media-sheen absolute inset-4 rounded-xl border border-white/10 bg-black/40" />
-            <div className="relative flex h-full min-h-[328px] flex-col justify-between rounded-xl p-6 md:min-h-[520px]">
-              <div className="flex items-center justify-between text-xs text-slate-500">
-                <span>healthlink-demo.mp4</span>
-                <span>placeholder</span>
-              </div>
-              <button className="lift mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur">
-                <Play size={28} fill="currentColor" />
+        <div className="flow-workbench">
+          <div className="flow-tabs" role="tablist" aria-label="HealthLink setup steps">
+            {flowSteps.map((item, index) => (
+              <button key={item.number} type="button" role="tab" aria-selected={active === index} onClick={() => setActive(index)}>
+                {active === index && <motion.i layoutId="flow-tab" />}
+                <span>{item.number}</span><item.icon size={17} /><div><small>{item.label}</small><strong>{item.title}</strong></div>
               </button>
-              <div>
-                <p className="text-lg font-semibold text-white">Setup walkthrough</p>
-                <p className="mt-2 max-w-md text-sm leading-6 text-slate-400">
-                  Later: record install, QR scan, first sync, and an agent question in one short clip.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function MediaSlot({
-  icon: Icon,
-  label,
-  detail,
-}: {
-  icon: typeof Smartphone;
-  label: string;
-  detail: string;
-}) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-      <Icon className="mb-4 text-emerald-200" size={22} />
-      <p className="text-sm font-medium text-white">{label}</p>
-      <p className="mt-2 text-xs leading-5 text-slate-400">{detail}</p>
-    </div>
-  );
-}
-
-function Architecture() {
-  return (
-    <section id="architecture" className="relative z-10 mx-auto max-w-7xl px-5 py-16 sm:px-8">
-      <div className="grid gap-10 lg:grid-cols-[0.85fr_1fr] lg:items-center">
-        <SectionHeader
-          eyebrow="Architecture"
-          title="A personal data gateway, not another health cloud."
-          body="The stable contract is scoped pairing, normalized summaries, local storage, and MCP query tools. Source apps and agent adapters sit around that core."
-        />
-        <div className="glass rounded-2xl p-5">
-          <div className="grid gap-3">
-            <FlowNode icon={HeartPulse} title="HealthLink iOS" body="Apple permissions, HealthKit collection, QR pairing." />
-            <FlowConnector />
-            <FlowNode icon={Server} title="healthlink-local" body="LAN receiver, pairing sessions, scoped ingest API." />
-            <FlowConnector />
-            <FlowNode icon={Database} title="Local SQLite store" body="Normalized summaries, source devices, audit logs." />
-            <FlowConnector />
-            <FlowNode icon={Link2} title="MCP tools" body="Fresh context for Hermes or any compatible agent." />
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function FlowNode({
-  icon: Icon,
-  title,
-  body,
-}: {
-  icon: typeof HeartPulse;
-  title: string;
-  body: string;
-}) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-slate-950/60 p-4">
-      <div className="flex items-start gap-4">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-emerald-300/12 text-emerald-200">
-          <Icon size={21} />
-        </span>
-        <div>
-          <h3 className="font-semibold text-white">{title}</h3>
-          <p className="mt-1 text-sm leading-6 text-slate-400">{body}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function FlowConnector() {
-  return <div className="panel-line mx-8 h-px" />;
-}
-
-function PrivacySection() {
-  return (
-    <section id="privacy" className="relative z-10 mx-auto max-w-7xl px-5 py-24 sm:px-8">
-      <div className="grid gap-6 lg:grid-cols-[1fr_0.9fr]">
-        <div className="glass rounded-2xl p-7 sm:p-9">
-          <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-300 text-slate-950">
-            <Fingerprint size={24} />
-          </div>
-          <h2 className="max-w-2xl text-3xl font-semibold leading-tight text-white sm:text-4xl">
-            Privacy is a product boundary, not a settings page.
-          </h2>
-          <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">
-            HealthLink is intentionally not an agent. It is a user-controlled connector that
-            lets agents read authorized context without owning the health data pipeline.
-          </p>
-        </div>
-        <div className="rounded-2xl border border-white/10 bg-slate-950/55 p-6">
-          <div className="space-y-4">
-            {privacyPoints.map((point) => (
-              <div key={point} className="flex gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-4">
-                <Check className="mt-0.5 shrink-0 text-emerald-300" size={18} />
-                <p className="leading-6 text-slate-300">{point}</p>
-              </div>
             ))}
           </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function ToolsSection() {
-  return (
-    <section id="tools" className="relative z-10 mx-auto max-w-7xl px-5 py-16 sm:px-8">
-      <SectionHeader
-        eyebrow="MCP tools"
-        title="Give agents the context layer they are missing."
-        body="The agent asks through HealthLink tools. HealthLink returns freshness-aware context and records access locally."
-      />
-      <div className="mt-12 overflow-hidden rounded-2xl border border-white/10 bg-black/45">
-        {toolRows.map(([name, description]) => (
-          <div key={name} className="grid gap-3 border-b border-white/10 p-5 last:border-b-0 md:grid-cols-[0.38fr_1fr]">
-            <code className="text-sm text-emerald-200">{name}</code>
-            <p className="text-sm leading-6 text-slate-300">{description}</p>
+          <div className="flow-window">
+            <div className="window-head"><span>OPENCLAW / HEALTHLINK</span><span><i /> {step.label.toUpperCase()}</span></div>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div className="flow-window-body" key={active} initial={{ opacity: 0, y: reducedMotion ? 0 : 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: reducedMotion ? 0 : -8 }} transition={{ duration: reducedMotion ? 0 : 0.25 }}>
+                <div className="flow-copy"><p>{step.number} / 04</p><h3>{step.title}</h3><span>{step.body}</span></div>
+                <div className="flow-visual"><FlowVisual index={active} /></div>
+              </motion.div>
+            </AnimatePresence>
           </div>
-        ))}
+        </div>
       </div>
-    </section>
+    </SnapPage>
   );
 }
 
-function FinalCta() {
-  return (
-    <section className="relative z-10 mx-auto max-w-7xl px-5 py-24 sm:px-8">
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.06] p-8 sm:p-10">
-        <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
-          <div>
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/12 bg-black/20 px-3 py-1.5 text-sm text-slate-300">
-              <Zap size={14} className="text-emerald-300" />
-              Ready for a developer-first launch
-            </div>
-            <h2 className="max-w-3xl text-3xl font-semibold leading-tight text-white sm:text-4xl">
-              Ship the connector first. Let the agent ecosystem meet it through MCP.
-            </h2>
-          </div>
-          <a
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-white px-5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-100"
-            href="#install"
-          >
-            Copy install command
-            <ArrowRight size={16} />
-          </a>
-        </div>
+function FlowVisual({ index }: { index: number }) {
+  if (index === 0) {
+    return (
+      <div className="terminal-visual">
+        <p><span>YOU</span>Install HealthLink and connect my iPhone.</p>
+        <p className="agent"><span>OPENCLAW</span><Check size={15} /> Skill installed</p>
+        <div><span><Check size={14} /> Runtime ready</span><span><Check size={14} /> Keys created</span><span><RefreshCw size={14} /> Awaiting iPhone</span></div>
       </div>
-      <footer className="flex flex-col gap-4 border-t border-white/10 py-8 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-        <p>HealthLink. User-owned personal context for AI agents.</p>
-        <div className="flex gap-5">
-          <a className="hover:text-white" href="https://github.com/Coooder-Crypto/health-link">
-            GitHub
-          </a>
-          <a className="hover:text-white" href="#privacy">
-            Privacy
-          </a>
-        </div>
-      </footer>
-    </section>
-  );
-}
+    );
+  }
 
-function SectionHeader({ eyebrow, title, body }: { eyebrow: string; title: string; body: string }) {
+  if (index === 1) {
+    return (
+      <div className="pair-visual">
+        <div className="qr-shell"><QrCode size={108} strokeWidth={1.2} /><i /></div>
+        <span>VERIFY ON BOTH DEVICES</span><code>9A:2F:71:C4</code>
+      </div>
+    );
+  }
+
+  if (index === 2) {
+    return (
+      <div className="relay-visual">
+        <RoutePoint icon={Smartphone} label="iPhone" />
+        <div className="encrypted-hop"><span><LockKeyhole size={13} /></span><i /></div>
+        <RoutePoint icon={Cloud} label="Relay" muted />
+        <div className="encrypted-hop"><span><LockKeyhole size={13} /></span><i /></div>
+        <RoutePoint icon={KeyRound} label="Local" />
+        <code>6d2f·a91c·88e0·4bf7</code>
+      </div>
+    );
+  }
+
   return (
-    <div>
-      <p className="mb-3 text-sm font-medium text-emerald-200">{eyebrow}</p>
-      <h2 className="max-w-3xl text-3xl font-semibold leading-tight text-white sm:text-4xl lg:text-5xl">
-        {title}
-      </h2>
-      <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">{body}</p>
+    <div className="answer-visual">
+      <p><span>YOU</span>How ready am I for a hard workout today?</p>
+      <p><span>HEALTHLINK</span>Your recovery looks steady. Keep today&apos;s intensity moderate.</p>
+      <div><span>Sleep 6h 42m</span><span>HRV 42 ms</span><span>Fresh 4m</span></div>
+      <small><ShieldCheck size={14} /> Observed data separated from inference</small>
     </div>
   );
+}
+
+function AgentAnswerPage() {
+  const [active, setActive] = useState(0);
+  const reducedMotion = useReducedMotion();
+  const question = questions[active];
+
+  return (
+    <SnapPage id="agent-answer" className="agent-page">
+      <div className="page-width agent-page-inner">
+        <div className="agent-copy">
+          <PageTitle kicker="Useful on day one" title="Ask naturally. Keep the evidence visible." body="The Skill checks freshness, queries only the context it needs, and marks the line between observed data and inference." />
+          <div className="segmented-tabs" role="tablist" aria-label="Health question examples">
+            {questions.map((item, index) => <button key={item.label} type="button" role="tab" aria-selected={active === index} onClick={() => setActive(index)}>{item.label}</button>)}
+          </div>
+        </div>
+
+        <div className="agent-console">
+          <div className="window-head"><span><Bot size={16} /> OPENCLAW / HEALTHLINK</span><span><i /> FRESH DATA</span></div>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div className="console-body" key={active} initial={{ opacity: 0, y: reducedMotion ? 0 : 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: reducedMotion ? 0 : -8 }} transition={{ duration: reducedMotion ? 0 : 0.24 }} aria-live="polite">
+              <div className="console-line"><span>YOU</span><p>{question.question}</p></div>
+              <div className="console-line answer"><span>HEALTHLINK</span><p>{question.answer}</p></div>
+              <div className="fact-row">{question.facts.map((fact) => <span key={fact}>{fact}</span>)}</div>
+            </motion.div>
+          </AnimatePresence>
+          <div className="console-foot"><span><ShieldCheck size={14} /> Observed data separated from inference</span><span>synced 4m ago</span></div>
+        </div>
+      </div>
+    </SnapPage>
+  );
+}
+
+function PrivacyPage() {
+  const ledger: [LucideIcon, string, string][] = [
+    [HeartPulse, "iPhone", "Summarizes and encrypts"],
+    [Cloud, "Relay", "Sees ciphertext and delivery metadata"],
+    [KeyRound, "Your machine", "Keeps keys, SQLite, and MCP"],
+    [ShieldCheck, "Your agent", "Gets scoped summaries only"],
+  ];
+
+  return (
+    <SnapPage id="privacy" className="privacy-page">
+      <div className="privacy-word" aria-hidden="true">CIPHERTEXT</div>
+      <div className="page-width privacy-page-inner">
+        <div className="privacy-copy">
+          <PageTitle kicker="The trust boundary" title="The cloud can forward it. The cloud cannot read it." body="Encrypted envelopes may wait in the relay. Decryption, normalized storage, and agent access stay in your local runtime." light />
+          <div className="privacy-proof"><LockKeyhole size={18} /><span><strong>Private key location</strong>Your machine, always</span></div>
+        </div>
+        <div className="privacy-ledger">
+          {ledger.map(([Icon, label, value], index) => <div className="ledger-row" key={label}><span>{String(index + 1).padStart(2, "0")}</span><i><Icon size={18} /></i><strong>{label}</strong><p>{value}</p></div>)}
+        </div>
+      </div>
+    </SnapPage>
+  );
+}
+
+function DeployPage() {
+  const [active, setActive] = useState(0);
+  const reducedMotion = useReducedMotion();
+  const mode = modes[active];
+
+  return (
+    <SnapPage id="deploy" className="deploy-page">
+      <div className="page-width deploy-page-inner">
+        <div className="page-title-row compact"><PageTitle kicker="One protocol, three modes" title="Start simple. Keep the exit door open." body="Change the network route without changing what your agent sees." /></div>
+        <div className="deploy-tabs" role="tablist" aria-label="Deployment mode">
+          {modes.map((item, index) => (
+            <button key={item.label} type="button" role="tab" aria-selected={active === index} onClick={() => setActive(index)}>
+              {active === index && <motion.i layoutId="deploy-tab" transition={{ duration: reducedMotion ? 0 : 0.24 }} />}
+              <item.icon size={17} /><span>{item.label}</span>
+            </button>
+          ))}
+        </div>
+        <div className="deploy-panel">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div className="deploy-copy" key={active} initial={{ opacity: 0, x: reducedMotion ? 0 : 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: reducedMotion ? 0 : -10 }} transition={{ duration: reducedMotion ? 0 : 0.22 }}>
+              <p>{mode.eyebrow}</p><h3>{mode.title}</h3><span>{mode.body}</span>
+              <ul>{mode.bullets.map((bullet) => <li key={bullet}><Check size={14} />{bullet}</li>)}</ul>
+            </motion.div>
+          </AnimatePresence>
+          <div className="deploy-route">
+            {mode.path.map((point, index) => <div key={point}><span>{String(index + 1).padStart(2, "0")}</span><strong>{point}</strong>{index < mode.path.length - 1 && <i />}</div>)}
+            <p><LockKeyhole size={15} /> Private key remains on your machine</p>
+          </div>
+        </div>
+      </div>
+    </SnapPage>
+  );
+}
+
+function ProductPage() {
+  return (
+    <SnapPage id="product" className="product-page">
+      <div className="page-width product-page-inner">
+        <div className="product-copy">
+          <PageTitle kicker="Product surface" title="A calm interface for a sensitive data path." body="Live iPhone and agent captures will replace these frames during beta." />
+          <div className="product-caption"><span>PRODUCT FILM / 00:45</span><strong>Install. Scan. Ask.</strong><p>Capture slot reserved for the beta first-run flow.</p></div>
+        </div>
+        <div className="product-composite">
+          <div className="report-frame">
+            <div className="window-head"><span>HEALTHLINK / CONTEXT</span><span><i /> LOCAL</span></div>
+            <div className="report-body">
+              <div className="report-heading"><span>FRIDAY, JUL 11</span><h3>Morning context</h3></div>
+              <div className="report-score"><strong>82</strong><span>Recovery<br />steady</span></div>
+              <div className="report-chart" aria-hidden="true">{[48, 58, 54, 67, 63, 78, 72, 84, 79, 88, 82].map((height, index) => <i key={index} style={{ height: `${height}%` }} />)}</div>
+              <div className="report-metrics"><span><small>SLEEP</small><strong>6h 42m</strong><em>-38m avg</em></span><span><small>HRV</small><strong>42 ms</strong><em>steady</em></span><span><small>LOAD</small><strong>Moderate</strong><em>3 workouts</em></span></div>
+            </div>
+          </div>
+          <div className="phone-frame">
+            <i className="phone-island" />
+            <div className="phone-head"><span><HeartPulse size={16} /></span><strong>HealthLink</strong><small>Secure</small></div>
+            <div className="phone-sync"><span><Check size={28} /></span><h3>Sync complete</h3><p>Today&apos;s summary is encrypted and ready for your agent.</p></div>
+            <div className="phone-meta"><span><small>ROUTE</small><strong>E2EE relay</strong></span><span><small>UPDATED</small><strong>Just now</strong></span></div>
+          </div>
+        </div>
+      </div>
+    </SnapPage>
+  );
+}
+
+function BuildersPage({ onNavigate }: { onNavigate: (index: number) => void }) {
+  return (
+    <SnapPage id="builders" className="builders-page">
+      <div className="page-width builders-page-inner">
+        <div className="builders-copy">
+          <PageTitle kicker="Portable by design" title="OpenClaw first. MCP underneath." body="The Skill guides setup and good agent behavior. HealthLink keeps crypto, storage, and health semantics in a portable local runtime." />
+          <div className="builder-links"><a href={githubUrl} target="_blank" rel="noreferrer">Explore the repository <ExternalLink size={15} /></a><button type="button" onClick={() => onNavigate(4)}>Compare deployment modes <ArrowRight size={15} /></button></div>
+          <div className="builder-facts"><span><ShieldCheck size={15} /> Scoped by default</span><span><Zap size={15} /> Freshness attached</span></div>
+        </div>
+        <div className="tool-table">
+          <div className="tool-head"><span>MCP tool</span><span>Returns</span></div>
+          {tools.map(([name, description]) => <div className="tool-row" key={name}><code>{name}</code><span>{description}</span></div>)}
+          <div className="tool-foot"><Zap size={14} /> Every relevant response includes freshness metadata.</div>
+        </div>
+      </div>
+    </SnapPage>
+  );
+}
+
+function FinalPage({ copied, onCopy, onNavigate }: { copied: boolean; onCopy: () => void; onNavigate: (index: number) => void }) {
+  return (
+    <SnapPage id="install-now" className="final-page">
+      <div className="final-code" aria-hidden="true">HL/08</div>
+      <div className="page-width final-page-inner">
+        <p className="page-kicker light"><span /> Give your agent better context</p>
+        <h2>Start with one Skill.</h2>
+        <p>OpenClaw takes it from install to your first private health answer.</p>
+        <CommandBar copied={copied} onCopy={onCopy} inverse />
+        <button type="button" className="back-to-top" onClick={() => onNavigate(0)}>Back to overview <ArrowRight size={15} /></button>
+      </div>
+      <footer className="page-width final-footer"><span><HeartPulse size={17} /> HealthLink</span><p>Private Apple Health context for MCP-compatible agents.</p><div><a href={githubUrl}>GitHub</a><button type="button" onClick={() => onNavigate(3)}>Privacy</button><button type="button" onClick={() => onNavigate(4)}>Self-host</button></div></footer>
+    </SnapPage>
+  );
+}
+
+function SnapPage({ id, className, children }: { id: string; className: string; children: ReactNode }) {
+  return <section className={`snap-page ${className}`} id={id} data-snap-section>{children}</section>;
+}
+
+function PageTitle({ kicker, title, body, light = false }: { kicker: string; title: string; body?: string; light?: boolean }) {
+  return <div className={`page-title ${light ? "light" : ""}`}><p className="page-kicker"><span />{kicker}</p><h2>{title}</h2>{body && <p>{body}</p>}</div>;
+}
+
+function CommandBar({ copied, onCopy, inverse = false }: { copied: boolean; onCopy: () => void; inverse?: boolean }) {
+  return <div className={`command-bar ${inverse ? "inverse" : ""}`}><span>$</span><code>{installCommand}</code><button type="button" onClick={onCopy} aria-label="Copy Skill install command">{copied ? <Check size={17} /> : <Copy size={17} />}<strong>{copied ? "Copied" : "Copy"}</strong></button></div>;
+}
+
+function RouteNode({ icon: Icon, label, detail }: { icon: LucideIcon; label: string; detail: string }) {
+  return <div className="route-node"><span><Icon size={18} /></span><div><strong>{label}</strong><small>{detail}</small></div></div>;
+}
+
+function RouteLine({ delay }: { delay: boolean }) {
+  return <div className="route-line" aria-hidden="true"><span className={delay ? "delay" : ""} /></div>;
+}
+
+function RoutePoint({ icon: Icon, label, muted = false }: { icon: LucideIcon; label: string; muted?: boolean }) {
+  return <div className={`route-point ${muted ? "muted" : ""}`}><span><Icon size={20} /></span><strong>{label}</strong></div>;
 }
