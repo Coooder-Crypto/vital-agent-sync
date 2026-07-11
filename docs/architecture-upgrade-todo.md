@@ -2,7 +2,7 @@
 
 This document tracks the architecture upgrade from the current local iOS + Hermes MVP to a multi-source, multi-agent, multi-transport personal data gateway.
 
-Implementation guidance for the remaining adapter work lives in [architecture-adapter-design.md](architecture-adapter-design.md). Common deployment methods are tracked separately in [deployment-methods.md](deployment-methods.md), so deployment choices and Agent runtime choices can evolve independently.
+Implementation guidance for the remaining adapter work lives in [architecture-adapter-design.md](architecture-adapter-design.md). Common deployment methods are tracked separately in [deployment-methods.md](deployment-methods.md), so deployment choices and Agent runtime choices can evolve independently. The next E2EE relay route, including hosted relay, self-hosted relay, OpenClaw skill onboarding, and mobile deep-link triggers, is defined in [e2ee-relay-technical-route.md](e2ee-relay-technical-route.md).
 
 ## Target
 
@@ -21,10 +21,12 @@ HealthLink should support:
 - multiple connection modes:
   - LAN
   - Tailscale
+  - hosted E2EE relay
+  - self-hosted E2EE relay
   - tunnel providers such as Cloudflare Tunnel or ngrok
   - public HTTPS / self-hosted server
 
-The first deployment pass should stay focused on Mac local mode, home server / NAS / N100 mode, and user-owned VPS / public HTTPS mode. Agent-specific setup belongs to the Agent adapter work.
+The first deployment pass should stay focused on Mac local mode, home server / NAS / N100 mode, and user-owned VPS / public HTTPS mode. The next productized setup path should add E2EE relay mode as the default no-inbound-ports UX while preserving direct local gateway modes. Agent-specific setup belongs to the Agent adapter work.
 
 The product promise remains:
 

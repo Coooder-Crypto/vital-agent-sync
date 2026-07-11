@@ -1,8 +1,9 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
 export const HEALTHLINK_SKILL_NAME = "healthlink-personal-context";
+export const HEALTHLINK_SKILL_VERSION = "0.2.0";
 
 export type SkillInstallOptions = {
   hermesHome?: string;
@@ -14,15 +15,43 @@ export type SkillInstallResult = {
   backupPath?: string;
 };
 
-export function buildHealthLinkSkillMarkdown(): string {
+export type SkillPackageOptions = HealthLinkSkillOptions & {
+  outputDir: string;
+};
+
+export type SkillPackageResult = {
+  packageDir: string;
+  skillPath: string;
+  readmePath: string;
+};
+
+export type HealthLinkSkillOptions = {
+  agent?: "generic" | "hermes" | "openclaw" | "workbuddy";
+};
+
+export function buildHealthLinkSkillMarkdown(options: HealthLinkSkillOptions = {}): string {
+  const agent = options.agent ?? "generic";
+  const targetAgent = agent !== "generic" ? `\nTarget agent: ${agentDisplayName(agent)}.\n` : "";
+  const agentSubject = agent === "generic" ? "the user's MCP-compatible Agent" : agentDisplayName(agent);
+  const triggerSource = agent === "generic" ? "agent" : agent;
   return `---
 name: ${HEALTHLINK_SKILL_NAME}
 description: Use HealthLink MCP for personal health, recovery, and activity context.
-version: 0.1.0
-author: HealthLink
-license: MIT
-platforms: [linux, macos, windows]
+version: ${HEALTHLINK_SKILL_VERSION}
 metadata:
+  openclaw:
+    requires:
+      bins:
+        - healthlink-local
+    install:
+      - kind: node
+        package: healthlink-local@^${HEALTHLINK_SKILL_VERSION}
+        bins:
+          - healthlink-local
+    os:
+      - macos
+      - linux
+      - windows
   hermes:
     tags: [healthlink, mcp, personal-context, health]
 ---
@@ -32,6 +61,7 @@ metadata:
 ## Overview
 
 Use this skill when the user asks about their personal status, energy, recovery, sleep, workout readiness, or recent activity. HealthLink is a user-controlled data gateway, not a medical provider.
+${targetAgent}
 
 HealthLink data comes from MCP tools. Do not invent health, sleep, workout, or recovery facts that are not present in tool output.
 
@@ -58,6 +88,106 @@ Do not use this skill for diagnosis, prescriptions, emergency advice, or unsuppo
    - \`record_feedback\` only when the user explicitly gives feedback, a correction, or a preference that should improve future HealthLink analysis.
 3. Mention data freshness before analysis when the answer depends on recency.
 4. If the latest sync is stale or missing, say that plainly and suggest syncing HealthLink.
+5. In relay mode, call or suggest \`healthlink-local pull\` before freshness-sensitive analysis when \`healthlink_status.relay.suggested_next_action\` indicates a pull is needed.
+
+## Agent Relay Setup Flow
+
+When the user asks ${agentSubject} to install or connect HealthLink, keep the core logic in \`healthlink-local\`. Do not implement crypto, parse private keys, or store health data inside the skill.
+
+Preferred hosted relay path:
+
+1. Check whether the relay-capable local runtime is installed:
+   \`\`\`bash
+   healthlink-local --version
+   \`\`\`
+   If the command is missing or older than 0.2.0, ask the user to approve installation, then run:
+   \`\`\`bash
+   npm install -g healthlink-local@^0.2.0
+   \`\`\`
+2. Check the local runtime and MCP config:
+   \`\`\`bash
+   healthlink-local doctor --agent ${agent}
+   \`\`\`
+3. Resolve the hosted relay URL from installed product configuration or the user's relay operator. It must use HTTPS. Never invent a relay domain. If \`HEALTHLINK_HOSTED_RELAY_URL\` is not already configured, pass the approved URL explicitly:
+   \`\`\`bash
+   healthlink-local setup --transport relay --relay-url https://HOSTED-RELAY --agent ${agent}
+   \`\`\`
+4. Present the onboarding QR directly to the user without quoting, transcribing, summarizing, or storing the onboarding code in Agent messages. If the user needs it again, run:
+   \`\`\`bash
+   healthlink-local print-onboarding --transport relay
+   \`\`\`
+5. Ask the user to scan the onboarding payload in HealthLink iOS or a compatible mobile app, grant Apple Health access, and run Sync.
+6. Pull encrypted relay envelopes into the local MCP database:
+   \`\`\`bash
+   healthlink-local pull
+   \`\`\`
+7. Use \`healthlink_status\` and then \`get_personal_context\` to confirm freshness before answering health questions.
+
+Recurring pull:
+
+- Relay setup installs the platform's \`relay-pull\` background service when launchd or systemd is available. Check it with \`healthlink-local service status --mode relay-pull\`.
+- Suggest an Agent CronJob or external scheduler only when the user asks for scheduled reports or the platform service is unavailable. The scheduled command should run \`healthlink-local pull --once\`; health analysis must still use MCP tools after the pull.
+
+Self-hosted relay path:
+
+1. Generate and start the relay Compose file when the user wants a self-owned relay:
+   \`\`\`bash
+   healthlink-local print-relay-docker-compose > docker-compose.relay.yml
+   docker compose -f docker-compose.relay.yml up -d
+   \`\`\`
+2. Initialize the local runtime with the iPhone-reachable relay URL:
+   \`\`\`bash
+   healthlink-local setup --transport self-hosted-relay --relay-url http://HOST:8790 --agent ${agent}
+   \`\`\`
+3. After the user syncs from iOS, run \`healthlink-local pull\`, then query MCP.
+
+Direct local gateway path:
+
+- If the user prefers LAN/Tailscale/public HTTPS direct sync instead of relay, use \`healthlink-local setup --agent ${agent} --transport lan\` or the appropriate direct transport. Do not mix direct pairing QR codes with relay onboarding payloads.
+
+## Relay And Privacy Guardrails
+
+- Never print, request, summarize, or copy files under \`~/.healthlink/secrets\`.
+- Do not ask the user to paste private keys into an Agent chat.
+- Treat the complete onboarding QR, deep link, and text code as credentials. They contain \`upload_auth_secret\`, \`relay_access_token\`, and sometimes \`relay_api_token\`; show them only to the user for transfer to the intended HealthLink source device, and never paste them into Agent chat, logs, memory, tool arguments, issue trackers, or support messages.
+- Hosted and self-hosted relays should contain encrypted envelopes plus minimal hashed tenant/revocation metadata; relay operators should not be able to decrypt health payloads.
+- Treat \`~/.healthlink/config.json\`, \`~/.healthlink/healthlink.sqlite\`, generated reports, and exported summaries as sensitive local state.
+- Do not dump raw health tables or long metric histories unless the user explicitly asks for that detail.
+- If \`healthlink_status\` shows stale or missing data, suggest \`healthlink-local pull\` for relay mode or ask the user to sync from iOS. When mobile deep-link support is available, suggest \`healthlink://sync?source=${triggerSource}&request_id=...\`; do not put health plaintext in callback URLs.
+- If \`healthlink-local pull\` reports a failed envelope, tell the user the envelope was not acknowledged and point them to \`healthlink-local relay status\` or \`healthlink-local doctor --agent ${agent}\`.
+
+## Unlink, Rotation, And Reset
+
+Run lifecycle commands only after the user explicitly confirms the action:
+
+- \`healthlink-local relay unlink --yes\` blocks the current source device at the relay and purges its queued envelopes. Reconnecting requires credential rotation and fresh iOS onboarding.
+- \`healthlink-local relay rotate --yes\` preserves the relay user and source IDs, purges envelopes encrypted with the old key, replaces local encryption/authentication credentials, and requires fresh iOS onboarding.
+- \`healthlink-local relay reset --yes\` revokes and purges the old relay user, creates new user/device IDs and credentials, resets the local cursor, and requires fresh iOS onboarding.
+- \`healthlink-local relay migrate --yes --transport self-hosted-relay --relay-url <target>\` revokes the old identity, preserves local SQLite health history, creates fresh credentials for the target relay, and requires fresh iOS onboarding.
+
+Do not run these commands as an automatic troubleshooting step. Explain that queued-but-unpulled envelopes are deleted and stop the workflow if the user does not confirm.
+
+## Report Templates
+
+Use these templates when the user asks for a concise daily or weekly health report. Keep the report grounded in MCP output and omit sections when supporting data is missing.
+
+Daily report:
+
+1. Freshness: latest source generated time, latest local sync or relay pull time, and missing metrics.
+2. Today snapshot: sleep, steps, active energy, workouts, and any available heart or recovery signals.
+3. Interpretation: separate observed data from inference; note confidence when metrics are sparse.
+4. Suggested plan: practical activity, recovery, and work pacing suggestions within non-medical boundaries.
+5. Next sync action: relay pull, iOS sync deep link, or direct gateway pairing action only when needed.
+
+Weekly report:
+
+1. Freshness and coverage: number of covered days, source devices, missing metrics, and stale-data warning if relevant.
+2. Sleep pattern: total/average sleep and notable low or high days.
+3. Activity load: total steps, active energy, exercise/workout minutes, and trend direction.
+4. Recovery signals: resting heart rate, HRV, oxygen, respiratory, temperature, and workout load only when present.
+5. User-facing conclusion: one concise summary, practical next actions, and uncertainty boundaries.
+
+Do not save reports to files unless the user explicitly asks. Treat generated reports as sensitive local health summaries.
 
 ## Response Boundaries
 
@@ -71,8 +201,27 @@ Do not use this skill for diagnosis, prescriptions, emergency advice, or unsuppo
 
 - [ ] HealthLink MCP tool output was used for health claims.
 - [ ] Data freshness or missing data was surfaced.
+- [ ] Relay mode used \`healthlink-local pull\` before MCP analysis when fresh data was needed.
+- [ ] Private keys and raw local state were not exposed.
+- [ ] Onboarding credentials were not copied into Agent messages, logs, memory, or tool arguments.
 - [ ] Medical-safety boundaries were respected.
 `;
+}
+
+export function exportHealthLinkSkillPackage(options: SkillPackageOptions): SkillPackageResult {
+  const packageDir = resolveHomePath(options.outputDir);
+  const agent = options.agent ?? "openclaw";
+  const skillPath = join(packageDir, "SKILL.md");
+  const readmePath = join(packageDir, "README.md");
+  mkdirSync(packageDir, { recursive: true });
+  rmSync(join(packageDir, "clawhub.json"), { force: true });
+  writeFileSync(skillPath, buildHealthLinkSkillMarkdown({ agent }), "utf8");
+  writeFileSync(readmePath, buildSkillPackageReadme(agent), "utf8");
+  return {
+    packageDir,
+    skillPath,
+    readmePath
+  };
 }
 
 export function installHermesHealthLinkSkill(options: SkillInstallOptions = {}): SkillInstallResult {
@@ -84,7 +233,7 @@ export function installHermesHealthLinkSkill(options: SkillInstallOptions = {}):
     copyFileSync(skillPath, backupPath);
   }
 
-  writeFileSync(skillPath, buildHealthLinkSkillMarkdown(), "utf8");
+  writeFileSync(skillPath, buildHealthLinkSkillMarkdown({ agent: "hermes" }), "utf8");
 
   return {
     skillPath,
@@ -135,4 +284,60 @@ function uniqueBackupPath(skillPath: string): string {
 export function readInstalledHermesSkill(options: SkillInstallOptions = {}): string | undefined {
   const skillPath = getHermesSkillPath(options);
   return existsSync(skillPath) ? readFileSync(skillPath, "utf8") : undefined;
+}
+
+function buildSkillPackageReadme(agent: NonNullable<HealthLinkSkillOptions["agent"]>): string {
+  return `# HealthLink Personal Context Skill
+
+Target agent: ${agentDisplayName(agent)}.
+
+This package contains a HealthLink skill for agent-guided setup, E2EE relay onboarding, freshness checks, and MCP-based personal health context. The skill delegates all local runtime, crypto, storage, and MCP behavior to \`healthlink-local\`.
+
+Package contents:
+
+- \`SKILL.md\`: the skill prompt, ClawHub metadata, runtime requirements, and operating rules.
+- \`README.md\`: this file.
+
+Before publishing, verify:
+
+- \`healthlink-local print-skill --agent openclaw\` matches \`SKILL.md\`.
+- Private files under \`~/.healthlink/secrets\` are never copied into the package.
+- The package contains no health data, SQLite files, relay envelopes, tokens, or local user IDs.
+- The skill still points agents to MCP tools instead of embedding health data or crypto.
+
+ClawHub publishes skills under MIT-0. Do not add a conflicting per-skill license.
+
+Validate the package before publication:
+
+\`\`\`bash
+npm i -g clawhub
+clawhub login
+clawhub whoami
+clawhub skill publish . \\
+  --slug ${HEALTHLINK_SKILL_NAME} \\
+  --name "HealthLink Personal Context" \\
+  --version ${HEALTHLINK_SKILL_VERSION} \\
+  --changelog "Initial E2EE relay release" \\
+  --dry-run
+\`\`\`
+
+After publication, install the final owner/slug from a clean OpenClaw environment:
+
+\`\`\`bash
+openclaw skills install <owner-or-final-slug>
+\`\`\`
+`;
+}
+
+function agentDisplayName(agent: NonNullable<HealthLinkSkillOptions["agent"]>): string {
+  switch (agent) {
+  case "hermes":
+    return "Hermes";
+  case "openclaw":
+    return "OpenClaw";
+  case "workbuddy":
+    return "WorkBuddy";
+  case "generic":
+    return "Generic MCP Agent";
+  }
 }

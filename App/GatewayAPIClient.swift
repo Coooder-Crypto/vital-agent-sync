@@ -20,6 +20,41 @@ final class GatewayAPIClient {
         try await post(payload, path: "/health/sync")
     }
 
+    static func uploadRelayEnvelope(
+        _ envelope: RelayEncryptedEnvelope,
+        relayURL: URL,
+        relayAccessToken: String,
+        relayAPIToken: String?
+    ) async throws -> RelayEnvelopePostResponse {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let body = try encoder.encode(envelope)
+        var request = URLRequest(url: endpoint(baseURL: relayURL, path: "/v1/envelopes"))
+        request.httpMethod = "POST"
+        request.httpBody = body
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(relayAccessToken)", forHTTPHeaderField: "Authorization")
+        if let relayAPIToken = relayAPIToken?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !relayAPIToken.isEmpty {
+            request.setValue(relayAPIToken, forHTTPHeaderField: "X-HealthLink-Relay-API-Key")
+        }
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch let error as URLError {
+            throw GatewayError.fromURL(error)
+        }
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw GatewayError.invalidServerResponse(-1)
+        }
+        guard 200..<300 ~= httpResponse.statusCode else {
+            throw GatewayError.invalidServerResponse(httpResponse.statusCode)
+        }
+        return try JSONDecoder().decode(RelayEnvelopePostResponse.self, from: data)
+    }
+
     func revokeDevice(deviceID: String) async throws -> DeviceRevokeResponse {
         struct EmptyPayload: Encodable {}
         return try await post(EmptyPayload(), path: "/devices/\(deviceID)/revoke")

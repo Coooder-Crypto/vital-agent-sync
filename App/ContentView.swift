@@ -52,6 +52,21 @@ struct ContentView: View {
                 }
             )
         }
+        .sheet(item: $settings.pendingRelayOnboarding) { preview in
+            RelayOnboardingConfirmationView(
+                preview: preview,
+                isPairing: settings.isPairing,
+                onCancel: {
+                    settings.cancelPendingRelayOnboarding()
+                },
+                onConfirm: {
+                    let paired = settings.confirmRelayOnboarding(preview)
+                    if paired {
+                        Task { await sync.attemptAutoSync(settings: settings, reason: "relay_onboarding") }
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -900,9 +915,12 @@ struct ConnectionStatusPanel: View {
 
     private var detail: String {
         if settings.isPaired {
+            if settings.usesRelayTransport {
+                return settings.serverURLText.isEmpty ? "Relay connected" : "Relay \(settings.serverURLText)"
+            }
             return settings.serverURLText.isEmpty ? "Connected" : settings.serverURLText
         }
-        return "Scan a HealthLink pairing QR to connect this iPhone."
+        return "Scan a HealthLink pairing or relay onboarding QR to connect this iPhone."
     }
 
     private var badgeTitle: LocalizedStringKey {
@@ -942,7 +960,7 @@ struct PairingPanel: View {
                 .tint(GatewayStyle.primary)
                 .disabled(settings.isPairing)
 
-                TextField("healthlink://pair?server=...&code=...", text: $settings.pairingURLText)
+                TextField("Pairing link or relay onboarding code", text: $settings.pairingURLText)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .keyboardType(.URL)
@@ -962,6 +980,10 @@ struct PairingPanel: View {
                 if settings.isPaired {
                     LabeledContent("Device", value: settings.pairedDeviceID.map(shortDeviceID) ?? "-")
                         .font(.footnote)
+                    if settings.usesRelayTransport {
+                        LabeledContent("Transport", value: "E2EE relay")
+                            .font(.footnote)
+                    }
                 }
             }
             .padding(14)
@@ -1006,6 +1028,11 @@ struct AdvancedConnectionPanel: View {
                     LabeledContent("Agent", value: settings.pairedAgentName ?? "Local Agent")
                     LabeledContent("Device", value: settings.pairedDeviceID ?? "-")
                     LabeledContent("Scopes", value: settings.acceptedScopes.joined(separator: ", "))
+                    if let relay = settings.relayOnboarding {
+                        LabeledContent("Transport", value: relay.mode == "hosted_relay" ? "Hosted E2EE relay" : "Self-hosted E2EE relay")
+                        LabeledContent("Relay", value: relay.relay_url)
+                        LabeledContent("Fingerprint", value: relay.fingerprint)
+                    }
                 }
 
                 Button {
@@ -1076,6 +1103,61 @@ struct PairingConfirmationView: View {
                             Text("Pairing")
                         } else {
                             Text("Pair")
+                        }
+                    }
+                    .disabled(isPairing)
+                }
+            }
+        }
+    }
+}
+
+struct RelayOnboardingConfirmationView: View {
+    let preview: RelayOnboardingPreview
+    let isPairing: Bool
+    let onCancel: () -> Void
+    let onConfirm: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Relay") {
+                    LabeledContent("Agent", value: preview.payload.agent_name)
+                    LabeledContent("Relay", value: preview.payload.relay_url)
+                    LabeledContent("Mode", value: preview.payload.mode == "hosted_relay" ? "Hosted relay" : "Self-hosted relay")
+                    LabeledContent("Fingerprint", value: preview.payload.fingerprint)
+                    LabeledContent("Source", value: preview.payload.source_device_id)
+                }
+
+                Section("Data Access") {
+                    ForEach(preview.payload.requested_scopes, id: \.self) { scope in
+                        Label(scope, systemImage: "checkmark.circle")
+                    }
+                }
+
+                Section("Privacy Boundary") {
+                    Label("Health summaries are encrypted before they are sent to the relay.", systemImage: "lock")
+                    Label("The relay stores encrypted envelopes. Your local runtime decrypts them after healthlink-local pull.", systemImage: "tray.and.arrow.down")
+                    Label("This onboarding code contains access credentials. HealthLink stores them in Keychain.", systemImage: "key")
+                    Label("Do not share your local ~/.healthlink/secrets folder.", systemImage: "exclamationmark.shield")
+                }
+                .font(.footnote)
+            }
+            .navigationTitle("Confirm Relay")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", action: onCancel)
+                        .disabled(isPairing)
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        onConfirm()
+                    } label: {
+                        if isPairing {
+                            Text("Connecting")
+                        } else {
+                            Text("Connect")
                         }
                     }
                     .disabled(isPairing)

@@ -7,7 +7,7 @@ settings:
   base:
     SWIFT_VERSION: "5.0"
     CURRENT_PROJECT_VERSION: "1"
-    MARKETING_VERSION: "0.1.0"
+    MARKETING_VERSION: "0.2.0"
     DEVELOPMENT_TEAM: ""
 targets:
   HealthLink:
@@ -21,6 +21,7 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: HealthLink
+        CFBundleShortVersionString: $(MARKETING_VERSION)
         LSRequiresIPhoneOS: true
         NSHealthShareUsageDescription: HealthLink reads selected Apple Health data to sync daily summaries to your authorized agent server.
         NSCameraUsageDescription: HealthLink scans pairing QR codes shown by your local Agent server.
@@ -29,6 +30,10 @@ targets:
           NSAllowsLocalNetworking: true
         BGTaskSchedulerPermittedIdentifiers:
           - app.healthlink.ios.autosync
+        CFBundleURLTypes:
+          - CFBundleURLName: app.healthlink.ios
+            CFBundleURLSchemes:
+              - healthlink
         UILaunchScreen: {}
         UIBackgroundModes:
           - fetch

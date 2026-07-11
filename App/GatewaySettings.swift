@@ -48,6 +48,7 @@ final class GatewaySettings: ObservableObject {
     @Published private(set) var acceptedScopes: [String]
     @Published private(set) var isPairing = false
     @Published var pendingPairing: PairingPreview?
+    @Published var pendingRelayOnboarding: RelayOnboardingPreview?
     @Published var pairingMessage: String?
     @Published var uploadHealthEnabled: Bool
     @Published var autoSyncEnabled: Bool
@@ -61,6 +62,7 @@ final class GatewaySettings: ObservableObject {
     @Published var appTheme: AppTheme
     @Published var appLanguage: AppLanguage
     @Published var lastSavedMessage: String?
+    @Published private(set) var relayOnboarding: RelayOnboardingPayload?
 
     private let defaults = UserDefaults.standard
     private let keychain = KeychainStore.shared
@@ -82,6 +84,11 @@ final class GatewaySettings: ObservableObject {
         static let syncHistory = "gateway.syncHistory"
         static let appTheme = "gateway.appTheme"
         static let appLanguage = "gateway.appLanguage"
+        static let relayOnboarding = "gateway.relayOnboarding"
+        static let relayUploadAuthSecret = "gateway.relayUploadAuthSecret"
+        static let relayAccessToken = "gateway.relayAccessToken"
+        static let relayAPIToken = "gateway.relayAPIToken"
+        static let relayEnvelopeSequence = "gateway.relayEnvelopeSequence"
     }
 
     private static let maxSyncHistoryCount = 20
@@ -108,6 +115,7 @@ final class GatewaySettings: ObservableObject {
         self.syncHistory = Self.loadSyncHistory(from: defaults)
         self.appTheme = AppTheme(rawValue: defaults.string(forKey: Keys.appTheme) ?? "") ?? .system
         self.appLanguage = AppLanguage(rawValue: defaults.string(forKey: Keys.appLanguage) ?? "") ?? .system
+        self.relayOnboarding = Self.loadRelayOnboarding(from: defaults, keychain: keychain)
     }
 
     var serverURL: URL? {
@@ -119,7 +127,27 @@ final class GatewaySettings: ObservableObject {
     }
 
     var isPaired: Bool {
-        pairedDeviceID != nil && !apiTokenText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        if relayOnboarding != nil {
+            return true
+        }
+        return pairedDeviceID != nil && !apiTokenText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var usesRelayTransport: Bool {
+        relayOnboarding != nil
+    }
+
+    var relayUploadAuthSecret: String? {
+        try? keychain.get(account: Keys.relayUploadAuthSecret)
+    }
+
+    func nextRelayEnvelopeSequence(now: Date = Date()) -> Int {
+        let wallClockSequence = max(1, Int(now.timeIntervalSince1970 * 1_000))
+        let previous = (defaults.object(forKey: Keys.relayEnvelopeSequence) as? NSNumber)?.intValue ?? 0
+        let incremented = previous == Int.max ? Int.max : previous + 1
+        let next = max(wallClockSequence, incremented)
+        defaults.set(next, forKey: Keys.relayEnvelopeSequence)
+        return next
     }
 
     var autoSyncMinimumInterval: TimeInterval {
@@ -143,6 +171,11 @@ final class GatewaySettings: ObservableObject {
         defer { isPairing = false }
 
         do {
+            if let relayPayload = try? RelayOnboardingPayload(rawValue: rawValue) {
+                pendingRelayOnboarding = RelayOnboardingPreview(payload: relayPayload)
+                pairingMessage = nil
+                return
+            }
             let link = try PairingLink(rawValue: rawValue)
             let status = try await GatewayAPIClient.getPairingStatus(link: link)
             guard status.status == "pending" else {
@@ -185,6 +218,27 @@ final class GatewaySettings: ObservableObject {
 
     func cancelPendingPairing() {
         pendingPairing = nil
+    }
+
+    func cancelPendingRelayOnboarding() {
+        pendingRelayOnboarding = nil
+    }
+
+    func confirmRelayOnboarding(_ preview: RelayOnboardingPreview) -> Bool {
+        isPairing = true
+        pairingMessage = nil
+        defer { isPairing = false }
+
+        do {
+            try saveRelayOnboarding(preview.payload)
+            pairingURLText = ""
+            pendingRelayOnboarding = nil
+            pairingMessage = "Relay connected"
+            return true
+        } catch {
+            pairingMessage = error.localizedDescription
+            return false
+        }
     }
 
     func disconnect(revokeRemote: Bool = true) async {
@@ -322,6 +376,7 @@ final class GatewaySettings: ObservableObject {
     }
 
     private func savePairing(serverURL: URL, agentName: String, deviceID: String, deviceToken: String, acceptedScopes: [String]) {
+        clearRelayOnboarding()
         serverURLText = serverURL.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         apiTokenText = deviceToken
         pairedDeviceID = deviceID
@@ -352,6 +407,56 @@ final class GatewaySettings: ObservableObject {
         defaults.set(data, forKey: Keys.syncHistory)
     }
 
+    private func saveRelayOnboarding(_ payload: RelayOnboardingPayload) throws {
+        var sanitized = payload
+        sanitized = RelayOnboardingPayload(
+            protocolVersion: payload.protocolVersion,
+            mode: payload.mode,
+            relay_url: payload.relay_url,
+            user_id: payload.user_id,
+            source_device_id: payload.source_device_id,
+            agent_name: payload.agent_name,
+            encryption_public_key: payload.encryption_public_key,
+            encryption_public_key_x25519: payload.encryption_public_key_x25519,
+            signing_public_key: payload.signing_public_key,
+            upload_auth_secret: "",
+            relay_access_token: "",
+            relay_api_token: nil,
+            fingerprint: payload.fingerprint,
+            requested_scopes: payload.requested_scopes,
+            created_at: payload.created_at
+        )
+        let data = try JSONEncoder().encode(sanitized)
+        defaults.set(data, forKey: Keys.relayOnboarding)
+        try keychain.set(payload.upload_auth_secret, for: Keys.relayUploadAuthSecret)
+        try keychain.set(payload.relay_access_token, for: Keys.relayAccessToken)
+        if let relayAPIToken = payload.relay_api_token?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !relayAPIToken.isEmpty {
+            try keychain.set(relayAPIToken, for: Keys.relayAPIToken)
+        } else {
+            try? keychain.delete(account: Keys.relayAPIToken)
+        }
+        relayOnboarding = payload
+        serverURLText = payload.relay_url.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        apiTokenText = ""
+        pairedDeviceID = payload.source_device_id
+        pairedAgentName = payload.agent_name
+        acceptedScopes = payload.requested_scopes
+        defaults.set(serverURLText, forKey: Keys.serverURL)
+        defaults.set(payload.source_device_id, forKey: Keys.pairedDeviceID)
+        defaults.set(payload.agent_name, forKey: Keys.pairedAgentName)
+        defaults.set(payload.requested_scopes, forKey: Keys.acceptedScopes)
+        try keychain.delete(account: Keys.apiToken)
+    }
+
+    private func clearRelayOnboarding() {
+        relayOnboarding = nil
+        defaults.removeObject(forKey: Keys.relayOnboarding)
+        try? keychain.delete(account: Keys.relayUploadAuthSecret)
+        try? keychain.delete(account: Keys.relayAccessToken)
+        try? keychain.delete(account: Keys.relayAPIToken)
+    }
+
     private static func loadSyncHistory(from defaults: UserDefaults) -> [LastSyncDetail] {
         guard let data = defaults.data(forKey: Keys.syncHistory),
               let history = try? JSONDecoder().decode([LastSyncDetail].self, from: data) else {
@@ -360,11 +465,42 @@ final class GatewaySettings: ObservableObject {
         return Array(history.prefix(maxSyncHistoryCount))
     }
 
+    private static func loadRelayOnboarding(from defaults: UserDefaults, keychain: KeychainStore) -> RelayOnboardingPayload? {
+        guard let data = defaults.data(forKey: Keys.relayOnboarding),
+              var payload = try? JSONDecoder().decode(RelayOnboardingPayload.self, from: data),
+              let secret = try? keychain.get(account: Keys.relayUploadAuthSecret),
+              !secret.isEmpty,
+              let relayAccessToken = try? keychain.get(account: Keys.relayAccessToken),
+              !relayAccessToken.isEmpty else {
+            return nil
+        }
+        let relayAPIToken = try? keychain.get(account: Keys.relayAPIToken)
+        payload = RelayOnboardingPayload(
+            protocolVersion: payload.protocolVersion,
+            mode: payload.mode,
+            relay_url: payload.relay_url,
+            user_id: payload.user_id,
+            source_device_id: payload.source_device_id,
+            agent_name: payload.agent_name,
+            encryption_public_key: payload.encryption_public_key,
+            encryption_public_key_x25519: payload.encryption_public_key_x25519,
+            signing_public_key: payload.signing_public_key,
+            upload_auth_secret: secret,
+            relay_access_token: relayAccessToken,
+            relay_api_token: relayAPIToken,
+            fingerprint: payload.fingerprint,
+            requested_scopes: payload.requested_scopes,
+            created_at: payload.created_at
+        )
+        return payload
+    }
+
     private func clearPairing() throws {
         apiTokenText = ""
         pairedDeviceID = nil
         pairedAgentName = nil
         acceptedScopes = Self.defaultAcceptedScopes
+        clearRelayOnboarding()
         clearSyncHistory()
         defaults.removeObject(forKey: Keys.pairedDeviceID)
         defaults.removeObject(forKey: Keys.pairedAgentName)

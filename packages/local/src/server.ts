@@ -7,8 +7,7 @@ import {
   HealthIngestError,
   authenticateDevice,
   getHealthStatus,
-  ingestHealthSync,
-  parseHealthSyncPayload
+  ingestValidatedHealthSync
 } from "./health-ingest.js";
 import { PairingError, PairingStore } from "./pairing.js";
 import { SOURCE_PLATFORMS, listSourceDevices, revokeSourceDevice } from "./source-devices.js";
@@ -117,8 +116,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
   app.post("/health/sync", async (request, reply) => {
     try {
       const device = authenticateDevice(database, request.headers.authorization);
-      const payload = parseHealthSyncPayload(request.body);
-      return ingestHealthSync(database, device, payload);
+      return ingestValidatedHealthSync(database, device, request.body);
     } catch (error) {
       return sendHealthIngestError(reply, error);
     }

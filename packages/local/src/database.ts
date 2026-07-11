@@ -1,5 +1,5 @@
 import SqliteDatabase from "better-sqlite3";
-import { mkdirSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -20,19 +20,45 @@ export function getDefaultDatabasePath(): string {
 }
 
 export function openHealthLinkDatabase(config: Partial<DatabaseConfig> = {}): HealthLinkDatabase {
+  const usesDefaultPath = config.path === undefined;
   const databasePath = expandHomePath(config.path ?? getDefaultDatabasePath());
-  mkdirSync(dirname(databasePath), { recursive: true });
+  const databaseDir = dirname(databasePath);
+  mkdirSync(databaseDir, { recursive: true, mode: usesDefaultPath ? 0o700 : undefined });
+  if (usesDefaultPath) {
+    chmodIfPossible(databaseDir, 0o700);
+  }
 
   const sqlite = new SqliteDatabase(databasePath);
   sqlite.pragma("journal_mode = WAL");
   sqlite.pragma("foreign_keys = ON");
   migrate(sqlite);
+  hardenSqliteFiles(databasePath);
 
   return {
     path: databasePath,
     sqlite,
-    close: () => sqlite.close()
+    close: () => {
+      hardenSqliteFiles(databasePath);
+      sqlite.close();
+      hardenSqliteFiles(databasePath);
+    }
   };
+}
+
+function hardenSqliteFiles(databasePath: string): void {
+  for (const path of [databasePath, `${databasePath}-wal`, `${databasePath}-shm`]) {
+    if (existsSync(path)) {
+      chmodIfPossible(path, 0o600);
+    }
+  }
+}
+
+function chmodIfPossible(path: string, mode: number): void {
+  try {
+    chmodSync(path, mode);
+  } catch {
+    // Windows and some filesystems may not support POSIX modes.
+  }
 }
 
 function migrate(sqlite: BetterSqliteDatabase): void {

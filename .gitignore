@@ -11,6 +11,15 @@ DerivedData/
 *.dSYM.zip
 *.dSYM
 
+# Deployment secrets
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+!**/.env.*.example
+
 # HealthLink local runtime
 .healthlink/
 *.sqlite
