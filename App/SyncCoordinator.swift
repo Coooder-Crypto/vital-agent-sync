@@ -9,6 +9,7 @@ final class SyncCoordinator: ObservableObject {
     var latestHealthSummary: DailyHealthSummary? { state.latestHealthSummary }
 
     private let healthService = HealthKitService()
+    private var contextGeneration = UUID()
 
     enum SyncTrigger {
         case manual
@@ -47,14 +48,24 @@ final class SyncCoordinator: ObservableObject {
         settings.recordSyncAttempt()
         let syncError: String?
         let attemptedAt = Date()
+        var attemptedContext: SyncRequestContext?
+        let operationGeneration = contextGeneration
 
         do {
             let context = try SyncRequestContext(settings: settings, daysBack: daysBack)
+            attemptedContext = context
             beginOperation()
 
             let healthSummaries = try await buildHealthSummaries(context: context)
+            guard operationGeneration == contextGeneration else {
+                return false
+            }
             let request = try makeHealthSyncRequest(healthSummaries, context: context, settings: settings)
-            let response = try await uploadHealthSyncRequest(request)
+            let uploadResult = try await uploadHealthSyncRequest(request)
+            guard operationGeneration == contextGeneration else {
+                return false
+            }
+            let response = uploadResult.response
             let latestSummary = healthSummaries.last
             let syncedAt = Date()
             let detail = LastSyncDetail(
@@ -67,6 +78,7 @@ final class SyncCoordinator: ObservableObject {
                 uploadedDayCount: response.health_daily_count,
                 acceptedSyncID: response.accepted_sync_id,
                 isIdempotent: response.idempotent,
+                deliveryState: uploadResult.deliveryState,
                 failureCategory: nil,
                 failureMessage: nil
             )
@@ -76,24 +88,32 @@ final class SyncCoordinator: ObservableObject {
                     state.latestHealthSummary = latestSummary
                     state.status.lastHealthSyncAt = syncedAt
                 }
-                state.status.lastSuccessMessage = self.successMessage(response: response, trigger: trigger)
+                state.status.lastSuccessMessage = self.successMessage(
+                    response: response,
+                    trigger: trigger,
+                    deliveryState: uploadResult.deliveryState
+                )
                 state.status.lastSyncDetail = detail
             }
             settings.recordSyncDetail(detail)
             syncError = nil
         } catch {
+            guard operationGeneration == contextGeneration else {
+                return false
+            }
             let category = Self.failureCategory(for: error)
             let message = error.localizedDescription
             let detail = LastSyncDetail(
                 attemptedAt: attemptedAt,
                 completedAt: nil,
                 trigger: trigger.displayName,
-                serverURL: settings.serverURL?.absoluteString,
-                agentName: settings.pairedAgentName,
-                requestedDateRange: nil,
+                serverURL: attemptedContext?.displayServerURL ?? settings.serverURL?.absoluteString,
+                agentName: attemptedContext?.agentName ?? settings.pairedAgentName,
+                requestedDateRange: attemptedContext?.dateRangeDescription,
                 uploadedDayCount: 0,
                 acceptedSyncID: nil,
                 isIdempotent: nil,
+                deliveryState: nil,
                 failureCategory: category,
                 failureMessage: message
             )
@@ -113,6 +133,11 @@ final class SyncCoordinator: ObservableObject {
         }
 
         return syncError == nil
+    }
+
+    func reset() {
+        contextGeneration = UUID()
+        state = SyncCoordinatorState()
     }
 
     func attemptAutoSync(settings: GatewaySettings, reason: String) async {
@@ -198,10 +223,13 @@ final class SyncCoordinator: ObservableObject {
         return .direct(client: GatewayAPIClient(serverURL: serverURL, apiToken: apiToken), payload: payload)
     }
 
-    private func uploadHealthSyncRequest(_ request: HealthSyncRequest) async throws -> HealthSyncResponse {
+    private func uploadHealthSyncRequest(_ request: HealthSyncRequest) async throws -> SyncUploadResult {
         switch request {
         case .direct(let client, let payload):
-            return try await client.uploadHealthSync(payload)
+            return SyncUploadResult(
+                response: try await client.uploadHealthSync(payload),
+                deliveryState: .receiverAccepted
+            )
         case .relay(let relayURL, let relayAccessToken, let relayAPIToken, let envelope, let localResponse):
             _ = try await GatewayAPIClient.uploadRelayEnvelope(
                 envelope,
@@ -209,19 +237,40 @@ final class SyncCoordinator: ObservableObject {
                 relayAccessToken: relayAccessToken,
                 relayAPIToken: relayAPIToken
             )
-            return localResponse
+            return SyncUploadResult(response: localResponse, deliveryState: .relayQueued)
         }
     }
 
-    private func successMessage(response: HealthSyncResponse, trigger: SyncTrigger) -> String {
-        let prefix: String
-        switch trigger {
-        case .manual:
-            prefix = "Uploaded"
-        case .automatic(let reason):
-            prefix = "Auto sync (\(reason)) uploaded"
+    private func successMessage(
+        response: HealthSyncResponse,
+        trigger: SyncTrigger,
+        deliveryState: SyncDeliveryState
+    ) -> String {
+        let count = response.health_daily_count
+        switch (trigger, deliveryState) {
+        case (.manual, .receiverAccepted):
+            return String.localizedStringWithFormat(
+                NSLocalizedString("Receiver accepted %lld Health summaries", comment: ""),
+                count
+            )
+        case (.manual, .relayQueued):
+            return String.localizedStringWithFormat(
+                NSLocalizedString("Relay queued %lld encrypted Health summaries", comment: ""),
+                count
+            )
+        case (.automatic(let reason), .receiverAccepted):
+            return String.localizedStringWithFormat(
+                NSLocalizedString("Auto sync (%@): receiver accepted %lld Health summaries", comment: ""),
+                reason,
+                count
+            )
+        case (.automatic(let reason), .relayQueued):
+            return String.localizedStringWithFormat(
+                NSLocalizedString("Auto sync (%@): relay queued %lld encrypted Health summaries", comment: ""),
+                reason,
+                count
+            )
         }
-        return "\(prefix) \(response.health_daily_count) health"
     }
 
     private func beginOperation() {
@@ -326,6 +375,11 @@ final class SyncCoordinator: ObservableObject {
             envelope: RelayEncryptedEnvelope,
             localResponse: HealthSyncResponse
         )
+    }
+
+    private struct SyncUploadResult {
+        let response: HealthSyncResponse
+        let deliveryState: SyncDeliveryState
     }
 }
 

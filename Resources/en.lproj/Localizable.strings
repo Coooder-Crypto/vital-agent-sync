@@ -142,8 +142,10 @@
 "Agent removed" = "Agent removed";
 "Removed locally. Receiver revoke failed: %@" = "Removed locally. Receiver revoke failed: %@";
 "Health permission request completed" = "Health permission request completed";
-"Uploaded %lld health" = "Uploaded %lld health";
-"Auto sync (%@) uploaded %lld health" = "Auto sync (%@) uploaded %lld health";
+"Receiver accepted %lld Health summaries" = "Receiver accepted %lld Health summaries";
+"Relay queued %lld encrypted Health summaries" = "Relay queued %lld encrypted Health summaries";
+"Auto sync (%@): receiver accepted %lld Health summaries" = "Auto sync (%@): receiver accepted %lld Health summaries";
+"Auto sync (%@): relay queued %lld encrypted Health summaries" = "Auto sync (%@): relay queued %lld encrypted Health summaries";
 
 "First Sync" = "First Sync";
 "Grant Health access" = "Grant Health access";
@@ -155,7 +157,11 @@
 "Allow Health" = "Allow Health";
 "Sync Now" = "Sync Now";
 "Syncing" = "Syncing";
-"Agent received sync" = "Agent received sync";
+"Receiver accepted sync" = "Receiver accepted sync";
+"Encrypted sync queued" = "Encrypted sync queued";
+"Sync accepted" = "Sync accepted";
+"The paired receiver stored this sync for Agent tools." = "The paired receiver stored this sync for Agent tools.";
+"The relay accepted the encrypted envelope. Your Agent can read it after HealthLink Local pulls it." = "The relay accepted the encrypted envelope. Your Agent can read it after HealthLink Local pulls it.";
 "Sync failed" = "Sync failed";
 "Latest sync completed." = "Latest sync completed.";
 "Trigger" = "Trigger";
@@ -165,6 +171,7 @@
 "Uploaded" = "Uploaded";
 "Accepted ID" = "Accepted ID";
 "Duplicate" = "Duplicate";
+"Delivery" = "Delivery";
 "Receiver" = "Receiver";
 "Agent" = "Agent";
 "Failure" = "Failure";
@@ -192,4 +199,3 @@
 "Recent Sync Attempts" = "Recent Sync Attempts";
 "No sync attempts yet" = "No sync attempts yet";
 "Sync history appears here after the first attempt." = "Sync history appears here after the first attempt.";
-"Sync succeeded" = "Sync succeeded";

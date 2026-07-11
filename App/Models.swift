@@ -109,6 +109,29 @@ enum SyncFailureCategory: String, Codable {
     }
 }
 
+enum SyncDeliveryState: String, Codable {
+    case receiverAccepted
+    case relayQueued
+
+    var title: String {
+        switch self {
+        case .receiverAccepted:
+            return String(localized: "Receiver accepted sync")
+        case .relayQueued:
+            return String(localized: "Encrypted sync queued")
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .receiverAccepted:
+            return String(localized: "The paired receiver stored this sync for Agent tools.")
+        case .relayQueued:
+            return String(localized: "The relay accepted the encrypted envelope. Your Agent can read it after HealthLink Local pulls it.")
+        }
+    }
+}
+
 struct LastSyncDetail: Codable, Identifiable {
     let attemptedAt: Date
     let completedAt: Date?
@@ -119,6 +142,7 @@ struct LastSyncDetail: Codable, Identifiable {
     let uploadedDayCount: Int
     let acceptedSyncID: String?
     let isIdempotent: Bool?
+    let deliveryState: SyncDeliveryState?
     let failureCategory: SyncFailureCategory?
     let failureMessage: String?
 

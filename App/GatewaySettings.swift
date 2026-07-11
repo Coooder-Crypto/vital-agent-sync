@@ -137,6 +137,14 @@ final class GatewaySettings: ObservableObject {
         relayOnboarding != nil
     }
 
+    var latestSyncDetail: LastSyncDetail? {
+        syncHistory.first
+    }
+
+    var latestSuccessfulSyncDetail: LastSyncDetail? {
+        syncHistory.first { $0.succeeded }
+    }
+
     var relayUploadAuthSecret: String? {
         try? keychain.get(account: Keys.relayUploadAuthSecret)
     }
@@ -390,6 +398,7 @@ final class GatewaySettings: ObservableObject {
 
         do {
             try keychain.set(deviceToken, for: Keys.apiToken)
+            resetSyncTracking()
             lastSavedMessage = "Paired"
         } catch {
             pairingMessage = error.localizedDescription
@@ -436,6 +445,7 @@ final class GatewaySettings: ObservableObject {
         } else {
             try? keychain.delete(account: Keys.relayAPIToken)
         }
+        resetSyncTracking()
         relayOnboarding = payload
         serverURLText = payload.relay_url.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         apiTokenText = ""
@@ -501,10 +511,24 @@ final class GatewaySettings: ObservableObject {
         pairedAgentName = nil
         acceptedScopes = Self.defaultAcceptedScopes
         clearRelayOnboarding()
-        clearSyncHistory()
+        resetSyncTracking()
         defaults.removeObject(forKey: Keys.pairedDeviceID)
         defaults.removeObject(forKey: Keys.pairedAgentName)
         defaults.removeObject(forKey: Keys.acceptedScopes)
         try keychain.delete(account: Keys.apiToken)
+    }
+
+    private func resetSyncTracking() {
+        lastAutoSyncAt = nil
+        lastManualSyncAt = nil
+        lastSyncAttemptAt = nil
+        lastSyncError = nil
+        lastBackgroundScheduleError = nil
+        clearSyncHistory()
+        defaults.removeObject(forKey: Keys.lastAutoSyncAt)
+        defaults.removeObject(forKey: Keys.lastManualSyncAt)
+        defaults.removeObject(forKey: Keys.lastSyncAttemptAt)
+        defaults.removeObject(forKey: Keys.lastSyncError)
+        defaults.removeObject(forKey: Keys.lastBackgroundScheduleError)
     }
 }
