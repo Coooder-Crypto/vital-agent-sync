@@ -2488,6 +2488,7 @@ test("launchd service plist uses daemon command and expected keepalive settings"
     assert.match(plist, /<key>KeepAlive<\/key>\s*<true\/>/);
 
     const status = installLaunchdService({
+      platform: "darwin",
       homeDir: tempDir,
       cliCommand: "/tmp/healthlink-local",
       databasePath: join(tempDir, "healthlink.sqlite"),
@@ -2676,6 +2677,7 @@ test("launchd service log reader tails stdout and stderr logs", () => {
     assert.equal(missing.path, paths.stderrPath);
 
     installLaunchdService({
+      platform: "darwin",
       homeDir: tempDir,
       cliCommand: "/tmp/healthlink-local",
       databasePath: join(tempDir, "healthlink.sqlite"),

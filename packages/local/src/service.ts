@@ -215,7 +215,7 @@ export function buildRelayPullProgramArguments(options: LaunchdServiceOptions, d
 }
 
 export function installLaunchdService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
-  assertMacOSLaunchd();
+  assertMacOSLaunchd(options.platform);
   const paths = getLaunchdServicePaths(options);
   mkdirSync(dirname(paths.plistPath), { recursive: true });
   mkdirSync(paths.logDir, { recursive: true });
@@ -224,7 +224,7 @@ export function installLaunchdService(options: LaunchdServiceOptions): HealthLin
 }
 
 export function startLaunchdService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
-  assertMacOSLaunchd();
+  assertMacOSLaunchd(options.platform);
   const paths = getLaunchdServicePaths(options);
   const label = serviceLaunchdLabel(options.mode ?? "receiver");
   if (!existsSync(paths.plistPath)) {
@@ -236,13 +236,13 @@ export function startLaunchdService(options: LaunchdServiceOptions): HealthLinkS
 }
 
 export function stopLaunchdService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
-  assertMacOSLaunchd();
+  assertMacOSLaunchd(options.platform);
   runLaunchctl(["bootout", launchdDomain(), getLaunchdServicePaths(options).plistPath], { allowFailure: true });
   return getLaunchdServiceStatus(options);
 }
 
 export function uninstallLaunchdService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
-  assertMacOSLaunchd();
+  assertMacOSLaunchd(options.platform);
   const paths = getLaunchdServicePaths(options);
   stopLaunchdService(options);
   if (existsSync(paths.plistPath)) {
@@ -469,8 +469,8 @@ function isSystemdServiceRunning(mode: HealthLinkServiceMode): boolean {
   }
 }
 
-function assertMacOSLaunchd(): void {
-  if (process.platform !== "darwin") {
+function assertMacOSLaunchd(platform: NodeJS.Platform = process.platform): void {
+  if (platform !== "darwin") {
     throw new Error("HealthLink service install/start/stop/uninstall currently supports macOS launchd only. Use healthlink-local daemon with systemd, Docker, PM2, or another process manager on remote hosts.");
   }
 }
