@@ -12,6 +12,7 @@
     "dev:www": "npm run dev --workspace @healthlink/www",
     "build:www": "npm run build --workspace @healthlink/www",
     "typecheck:www": "npm run typecheck --workspace @healthlink/www",
+    "test:ios": "node scripts/ios-unit-tests.mjs",
     "dev:local": "npm run dev --workspace healthlink-local",
     "build:local": "npm run build --workspace healthlink-local",
     "test:local": "npm run test --workspace healthlink-local",

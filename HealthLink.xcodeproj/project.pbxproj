@@ -3,39 +3,52 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 54;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		172C68AE36D740A91CED1305 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4873A62EA7906736C2554781 /* KeychainStore.swift */; };
-		2E7F5422A9B640C2A31F3D5A /* BackgroundSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81C5730DA6AE4E4190F2E7B6 /* BackgroundSyncManager.swift */; };
+		4405A11B3CB0681EB4E95B7D /* TestFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59D5FFA329423AA9DF037508 /* TestFixtures.swift */; };
+		51AE44DB96C7B16CDF242C9C /* BackgroundSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 526FDB06E2E1221B21B06B32 /* BackgroundSyncManager.swift */; };
 		56EA2FEB8F496F7A04F96C7C /* HealthKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA3D4F339843410296079D12 /* HealthKitService.swift */; };
+		5A1C36A04628C9023BF1F6AD /* GatewaySettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 882D9D4F6D83DBB3D2B573E0 /* GatewaySettingsTests.swift */; };
 		5DB901C8D2A0D3BCEEBC92BC /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59FD2EA38EE5225C199F26D8 /* ContentView.swift */; };
 		79FD7264F0FA917BD7934AA8 /* GatewayAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4454AFE84260B3EDE5DCA50C /* GatewayAPIClient.swift */; };
-		9F0B00C12FFA812300000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 80B3FC3C2FFA80EC0060B42A /* Assets.xcassets */; };
-		9F0B00D12FFA812300000001 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 9F0B00D02FFA812300000001 /* Localizable.strings */; };
-		9F0B00D22FFA812300000001 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 9F0B00D32FFA812300000001 /* InfoPlist.strings */; };
+		A156B67000102A3D9D44FD9C /* PairingAndPayloadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86A285D6696D50AE6DA8A84A /* PairingAndPayloadTests.swift */; };
 		BA1C5B2933A4E0C2EBD4C94C /* GatewaySettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1C6F1A1FAA888F221804AF5 /* GatewaySettings.swift */; };
+		C721A596941EFEFA5FC51A7D /* GatewayErrorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48F6EFCB6B2F7B464EC2C06E /* GatewayErrorTests.swift */; };
 		CF0FB2B1ED604D32596BED7B /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9040B578069F229843B3A050 /* Models.swift */; };
+		EA0CB7609AEBB1121EDEFB6D /* SyncModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 076E23F524B751D22221DAF5 /* SyncModelTests.swift */; };
 		F46BE2D17D13CDF6EC7D495A /* PairingScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB5D6C5DE291A51AA923E2AC /* PairingScannerView.swift */; };
 		FD40C06DAB74A78A0DAEF4D5 /* HealthLinkApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F4F265F7CEDBBF53FF2072F /* HealthLinkApp.swift */; };
 		FF46C4E141F6C96D353939A8 /* SyncCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D55DC3DE3C31DBE09ACF67B /* SyncCoordinator.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		5472F58056270E11B84E3473 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 90028C6B12FDCFD8C8973478 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CC253E6BE18A77DF054490D7;
+			remoteInfo = HealthLink;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
-		2E114C35134BA31E653A9000 /* HealthLink.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HealthLink.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		0118B3FB65FCF5F6B37345E6 /* HealthLinkTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = HealthLinkTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		076E23F524B751D22221DAF5 /* SyncModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncModelTests.swift; sourceTree = "<group>"; };
+		2E114C35134BA31E653A9000 /* HealthLink.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = HealthLink.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3D55DC3DE3C31DBE09ACF67B /* SyncCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncCoordinator.swift; sourceTree = "<group>"; };
 		4454AFE84260B3EDE5DCA50C /* GatewayAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayAPIClient.swift; sourceTree = "<group>"; };
 		4873A62EA7906736C2554781 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
+		48F6EFCB6B2F7B464EC2C06E /* GatewayErrorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayErrorTests.swift; sourceTree = "<group>"; };
 		4DF53C058557834D8F0959C4 /* HealthLink.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HealthLink.entitlements; sourceTree = "<group>"; };
+		526FDB06E2E1221B21B06B32 /* BackgroundSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundSyncManager.swift; sourceTree = "<group>"; };
+		59D5FFA329423AA9DF037508 /* TestFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestFixtures.swift; sourceTree = "<group>"; };
 		59FD2EA38EE5225C199F26D8 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		80B3FC3C2FFA80EC0060B42A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		81C5730DA6AE4E4190F2E7B6 /* BackgroundSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundSyncManager.swift; sourceTree = "<group>"; };
+		86A285D6696D50AE6DA8A84A /* PairingAndPayloadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingAndPayloadTests.swift; sourceTree = "<group>"; };
+		882D9D4F6D83DBB3D2B573E0 /* GatewaySettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewaySettingsTests.swift; sourceTree = "<group>"; };
 		9040B578069F229843B3A050 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
-		9F0B00D42FFA812300000001 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
-		9F0B00D52FFA812300000001 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
-		9F0B00D62FFA812300000001 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
-		9F0B00D72FFA812300000001 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		9F4F265F7CEDBBF53FF2072F /* HealthLinkApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthLinkApp.swift; sourceTree = "<group>"; };
 		E1C6F1A1FAA888F221804AF5 /* GatewaySettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewaySettings.swift; sourceTree = "<group>"; };
 		E8849F1ACC6835C607C52862 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -48,6 +61,7 @@
 			isa = PBXGroup;
 			children = (
 				2E114C35134BA31E653A9000 /* HealthLink.app */,
+				0118B3FB65FCF5F6B37345E6 /* HealthLinkTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -55,7 +69,7 @@
 		8C1EBA22457D26B555C7FAA7 /* App */ = {
 			isa = PBXGroup;
 			children = (
-				81C5730DA6AE4E4190F2E7B6 /* BackgroundSyncManager.swift */,
+				526FDB06E2E1221B21B06B32 /* BackgroundSyncManager.swift */,
 				59FD2EA38EE5225C199F26D8 /* ContentView.swift */,
 				4454AFE84260B3EDE5DCA50C /* GatewayAPIClient.swift */,
 				E1C6F1A1FAA888F221804AF5 /* GatewaySettings.swift */,
@@ -71,21 +85,24 @@
 			path = App;
 			sourceTree = "<group>";
 		};
-		9F0B00C02FFA812300000001 /* Resources */ = {
+		A2E0B5F2878D7AFF60D57EF5 /* HealthLinkTests */ = {
 			isa = PBXGroup;
 			children = (
-				80B3FC3C2FFA80EC0060B42A /* Assets.xcassets */,
-				9F0B00D02FFA812300000001 /* Localizable.strings */,
-				9F0B00D32FFA812300000001 /* InfoPlist.strings */,
+				48F6EFCB6B2F7B464EC2C06E /* GatewayErrorTests.swift */,
+				882D9D4F6D83DBB3D2B573E0 /* GatewaySettingsTests.swift */,
+				86A285D6696D50AE6DA8A84A /* PairingAndPayloadTests.swift */,
+				076E23F524B751D22221DAF5 /* SyncModelTests.swift */,
+				59D5FFA329423AA9DF037508 /* TestFixtures.swift */,
 			);
-			path = Resources;
+			name = HealthLinkTests;
+			path = Tests/HealthLinkTests;
 			sourceTree = "<group>";
 		};
 		F37E5F8532B7632891C86B30 = {
 			isa = PBXGroup;
 			children = (
 				8C1EBA22457D26B555C7FAA7 /* App */,
-				9F0B00C02FFA812300000001 /* Resources */,
+				A2E0B5F2878D7AFF60D57EF5 /* HealthLinkTests */,
 				36FA1D9EA85381448EF97FD8 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -93,12 +110,27 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		08A71FCC7376DA18CE0EDC91 /* HealthLinkTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 40BAD6DCBD34DE176A0F2F58 /* Build configuration list for PBXNativeTarget "HealthLinkTests" */;
+			buildPhases = (
+				95B62EE09B09BEEB8535F060 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				9002D7F47EA1767498773BFF /* PBXTargetDependency */,
+			);
+			name = HealthLinkTests;
+			productName = HealthLinkTests;
+			productReference = 0118B3FB65FCF5F6B37345E6 /* HealthLinkTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		CC253E6BE18A77DF054490D7 /* HealthLink */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 788C5F0B72EA6BB40238AE00 /* Build configuration list for PBXNativeTarget "HealthLink" */;
 			buildPhases = (
 				BCB9F1E23A9A5D6CDC8C2116 /* Sources */,
-				9F0B00C32FFA812300000001 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -118,7 +150,11 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					08A71FCC7376DA18CE0EDC91 = {
+						DevelopmentTeam = "";
+					};
 					CC253E6BE18A77DF054490D7 = {
+						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -130,57 +166,35 @@
 			knownRegions = (
 				Base,
 				en,
-				"zh-Hans",
 			);
 			mainGroup = F37E5F8532B7632891C86B30;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				CC253E6BE18A77DF054490D7 /* HealthLink */,
+				08A71FCC7376DA18CE0EDC91 /* HealthLinkTests */,
 			);
 		};
 /* End PBXProject section */
 
-/* Begin PBXResourcesBuildPhase section */
-		9F0B00C32FFA812300000001 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
+/* Begin PBXSourcesBuildPhase section */
+		95B62EE09B09BEEB8535F060 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9F0B00C12FFA812300000001 /* Assets.xcassets in Resources */,
-				9F0B00D12FFA812300000001 /* Localizable.strings in Resources */,
-				9F0B00D22FFA812300000001 /* InfoPlist.strings in Resources */,
+				C721A596941EFEFA5FC51A7D /* GatewayErrorTests.swift in Sources */,
+				5A1C36A04628C9023BF1F6AD /* GatewaySettingsTests.swift in Sources */,
+				A156B67000102A3D9D44FD9C /* PairingAndPayloadTests.swift in Sources */,
+				EA0CB7609AEBB1121EDEFB6D /* SyncModelTests.swift in Sources */,
+				4405A11B3CB0681EB4E95B7D /* TestFixtures.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-/* End PBXResourcesBuildPhase section */
-
-/* Begin PBXVariantGroup section */
-		9F0B00D02FFA812300000001 /* Localizable.strings */ = {
-			isa = PBXVariantGroup;
-			children = (
-				9F0B00D42FFA812300000001 /* en */,
-				9F0B00D52FFA812300000001 /* zh-Hans */,
-			);
-			name = Localizable.strings;
-			sourceTree = "<group>";
-		};
-		9F0B00D32FFA812300000001 /* InfoPlist.strings */ = {
-			isa = PBXVariantGroup;
-			children = (
-				9F0B00D62FFA812300000001 /* en */,
-				9F0B00D72FFA812300000001 /* zh-Hans */,
-			);
-			name = InfoPlist.strings;
-			sourceTree = "<group>";
-		};
-/* End PBXVariantGroup section */
-
-/* Begin PBXSourcesBuildPhase section */
 		BCB9F1E23A9A5D6CDC8C2116 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2E7F5422A9B640C2A31F3D5A /* BackgroundSyncManager.swift in Sources */,
+				51AE44DB96C7B16CDF242C9C /* BackgroundSyncManager.swift in Sources */,
 				5DB901C8D2A0D3BCEEBC92BC /* ContentView.swift in Sources */,
 				79FD7264F0FA917BD7934AA8 /* GatewayAPIClient.swift in Sources */,
 				BA1C5B2933A4E0C2EBD4C94C /* GatewaySettings.swift in Sources */,
@@ -194,6 +208,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		9002D7F47EA1767498773BFF /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CC253E6BE18A77DF054490D7 /* HealthLink */;
+			targetProxy = 5472F58056270E11B84E3473 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		220233F7254DE6C3DD7E43EE /* Release */ = {
@@ -255,6 +277,23 @@
 			};
 			name = Release;
 		};
+		2F550EB0D68FD2E46F8D5458 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.healthlink.ios.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/HealthLink.app/HealthLink";
+			};
+			name = Release;
+		};
 		37F204B84B410DF469312E63 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -263,7 +302,6 @@
 				CODE_SIGN_ENTITLEMENTS = App/HealthLink.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = A947TJV48Y;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -274,6 +312,23 @@
 				PRODUCT_NAME = HealthLink;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		756405527F6B907A0B7AE3C6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.healthlink.ios.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/HealthLink.app/HealthLink";
 			};
 			name = Debug;
 		};
@@ -351,7 +406,6 @@
 				CODE_SIGN_ENTITLEMENTS = App/HealthLink.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = A947TJV48Y;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -373,6 +427,15 @@
 			buildConfigurations = (
 				794089C5D66C20ECA35B6750 /* Debug */,
 				220233F7254DE6C3DD7E43EE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		40BAD6DCBD34DE176A0F2F58 /* Build configuration list for PBXNativeTarget "HealthLinkTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				756405527F6B907A0B7AE3C6 /* Debug */,
+				2F550EB0D68FD2E46F8D5458 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

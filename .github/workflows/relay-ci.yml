@@ -6,11 +6,13 @@ on:
       - .github/workflows/relay-ci.yml
       - App/**
       - HealthLink.xcodeproj/**
+      - Tests/**
       - deploy/relay/**
       - packages/local/**
       - scripts/agent-adapter-audit.mjs
       - scripts/e2ee-relay-*.mjs
       - scripts/ios-relay-crypto-fixture.swift
+      - scripts/ios-unit-tests.mjs
       - scripts/npm-release-preflight.mjs
       - scripts/release-secret-scan.mjs
       - package.json
@@ -23,11 +25,13 @@ on:
       - .github/workflows/relay-ci.yml
       - App/**
       - HealthLink.xcodeproj/**
+      - Tests/**
       - deploy/relay/**
       - packages/local/**
       - scripts/agent-adapter-audit.mjs
       - scripts/e2ee-relay-*.mjs
       - scripts/ios-relay-crypto-fixture.swift
+      - scripts/ios-unit-tests.mjs
       - scripts/npm-release-preflight.mjs
       - scripts/release-secret-scan.mjs
       - package.json
@@ -114,6 +118,9 @@ jobs:
 
       - name: Install locked dependencies
         run: npm ci
+
+      - name: Run focused iOS unit tests
+        run: npm run test:ios
 
       - name: Audit local relay and iOS interoperability
         run: npm run audit:relay-local
