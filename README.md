@@ -4,7 +4,7 @@ HealthLink is a private iOS data gateway for agent systems. The MVP reads user-a
 
 It is intentionally not an agent. It is a user-controlled data connector.
 
-For the broader product plan covering local daemon, MCP, pairing, scopes, and packaging, see [docs/product-plan.md](docs/product-plan.md). For common deployment methods, see [docs/deployment-methods.md](docs/deployment-methods.md). For the target "install, scan QR, sync, agent reads data" UX, see [docs/agent-connection.md](docs/agent-connection.md). For the multi-source, multi-agent, multi-transport upgrade TODO, see [docs/architecture-upgrade-todo.md](docs/architecture-upgrade-todo.md).
+For the broader product plan covering local daemon, MCP, pairing, scopes, and packaging, see [docs/product-plan.md](docs/product-plan.md). For common deployment methods, see [docs/deployment-methods.md](docs/deployment-methods.md). For the target "install, scan QR, sync, agent reads data" UX, see [docs/agent-connection.md](docs/agent-connection.md). For the multi-source, multi-agent, multi-transport upgrade TODO, see [docs/architecture-upgrade-todo.md](docs/architecture-upgrade-todo.md). For the E2EE relay, self-hosted relay, OpenClaw skill, mobile deep-link route, and beta release gate, see [docs/e2ee-relay-technical-route.md](docs/e2ee-relay-technical-route.md), [docs/e2ee-relay-protocol-v1.md](docs/e2ee-relay-protocol-v1.md), [docs/e2ee-relay-implementation-plan.md](docs/e2ee-relay-implementation-plan.md), [docs/e2ee-relay-threat-model.md](docs/e2ee-relay-threat-model.md), [docs/e2ee-relay-privacy-boundary.md](docs/e2ee-relay-privacy-boundary.md), [docs/e2ee-relay-data-retention-policy.md](docs/e2ee-relay-data-retention-policy.md), [docs/e2ee-relay-hosted-runbook.md](docs/e2ee-relay-hosted-runbook.md), [docs/e2ee-relay-release-audit.md](docs/e2ee-relay-release-audit.md), [docs/e2ee-relay-hosted-to-self-hosted-migration.md](docs/e2ee-relay-hosted-to-self-hosted-migration.md), and [docs/e2ee-relay-mode-comparison.md](docs/e2ee-relay-mode-comparison.md).
 
 ## Scope
 
@@ -145,6 +145,11 @@ Release check for the local package:
 ```bash
 npm run typecheck --workspace healthlink-local
 npm run test --workspace healthlink-local
+npm run audit:relay-local
+npm run audit:agent-adapters
+npm run audit:dependencies
+npm run audit:secrets
+npm run release:npm-preflight -- --local
 npm run pack:check --workspace healthlink-local
 ```
 
