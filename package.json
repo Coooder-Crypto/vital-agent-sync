@@ -20,6 +20,7 @@
     "audit:relay-package": "node scripts/e2ee-relay-package-audit.mjs",
     "audit:agent-adapters": "node scripts/agent-adapter-audit.mjs",
     "audit:dependencies": "npm audit --omit=dev --workspace healthlink-local",
+    "audit:www-dependencies": "npm audit --omit=dev --workspace @healthlink/www",
     "audit:secrets": "node scripts/release-secret-scan.mjs",
     "audit:relay-hosted": "node scripts/e2ee-relay-hosted-audit.mjs",
     "preflight:relay-production": "node scripts/e2ee-relay-production-preflight.mjs",
@@ -28,5 +29,8 @@
   },
   "engines": {
     "node": ">=22"
+  },
+  "overrides": {
+    "postcss": "8.5.16"
   }
 }
