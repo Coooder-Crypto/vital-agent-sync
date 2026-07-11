@@ -1,0 +1,80 @@
+name: healthlink-relay-production
+
+services:
+  healthlink-relay:
+    build:
+      context: ../..
+      dockerfile: deploy/relay/Dockerfile
+    image: ${HEALTHLINK_RELAY_IMAGE:-healthlink-relay:0.2.0}
+    restart: unless-stopped
+    init: true
+    expose:
+      - "8790"
+    volumes:
+      - healthlink-relay-data:/data
+    environment:
+      HEALTHLINK_RELAY_HOST: 0.0.0.0
+      HEALTHLINK_RELAY_PORT: "8790"
+      HEALTHLINK_RELAY_DB: /data/relay.sqlite
+      HEALTHLINK_RELAY_RETENTION_DAYS: "30"
+      HEALTHLINK_RELAY_MAX_ENVELOPE_BYTES: "524288"
+      HEALTHLINK_RELAY_MAX_UPLOADS_PER_MINUTE: "120"
+      HEALTHLINK_RELAY_MAX_QUEUED_ENVELOPES_PER_USER: "1000"
+      HEALTHLINK_RELAY_MAX_DEVICES_PER_USER: "5"
+      HEALTHLINK_RELAY_TRUST_PROXY: "true"
+      HEALTHLINK_RELAY_API_TOKEN: ${HEALTHLINK_RELAY_API_TOKEN:?Set a random deployment API token}
+      HEALTHLINK_RELAY_METRICS_TOKEN: ${HEALTHLINK_RELAY_METRICS_TOKEN:?Set a separate random metrics token}
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:8790/v1/status').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  caddy:
+    image: caddy:2.11.4-alpine
+    restart: unless-stopped
+    depends_on:
+      healthlink-relay:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      HEALTHLINK_RELAY_DOMAIN: ${HEALTHLINK_RELAY_DOMAIN:?Set the public relay DNS name}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+volumes:
+  healthlink-relay-data:
+  caddy-data:
+  caddy-config:
