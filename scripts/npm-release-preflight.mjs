@@ -43,8 +43,8 @@ try {
 }
 
 function assertReleaseManifest(value) {
-  if (value.name !== "healthlink-local" || value.version !== "0.2.0") {
-    throw new Error("Expected the release manifest to be healthlink-local@0.2.0.");
+  if (value.name !== "healthlink-local" || value.version !== "0.3.0") {
+    throw new Error("Expected the release manifest to be healthlink-local@0.3.0.");
   }
   if (value.private === true || value.publishConfig?.access !== "public") {
     throw new Error("healthlink-local must be a public publishable package.");

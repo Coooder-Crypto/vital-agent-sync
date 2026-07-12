@@ -3,7 +3,26 @@ import {
   formatStandardMcpConfig,
   buildHealthLinkMcpServerConfig
 } from "./mcp-config.js";
+import { createInterface } from "node:readline/promises";
+import { stdin as input, stdout as output } from "node:process";
 import { detectPreferredAgentAdapter, getAgentAdapter, isAgentAdapterId, type AgentAdapterId } from "./agents.js";
+import {
+  BOOTSTRAP_SCHEMA_VERSION,
+  bootstrapStageComplete,
+  classifyBootstrapError,
+  createBootstrapState,
+  failBootstrapState,
+  markBootstrapStage,
+  readBootstrapState,
+  runBootstrapWorkflow,
+  safeErrorMessage,
+  sanitizeAgentOutput,
+  withBootstrapLock,
+  writeBootstrapState,
+  type BootstrapConfig,
+  type BootstrapOutput,
+  type BootstrapState
+} from "./bootstrap.js";
 import { openHealthLinkDatabase } from "./database.js";
 import { buildDockerComposeYaml, buildRelayDockerComposeYaml } from "./docker-compose.js";
 import { getHealthStatus } from "./health-ingest.js";
@@ -44,6 +63,7 @@ import { runServiceEnsureWorkflow, runServiceSetupWorkflow } from "./setup.js";
 import { buildHealthLinkSkillMarkdown, exportHealthLinkSkillPackage } from "./skill.js";
 import { listSourceDevices } from "./source-devices.js";
 import { renderTerminalQr } from "./terminal-qr.js";
+import { writeRelayOnboardingArtifact } from "./onboarding-artifact.js";
 import { createTransportProvider, getServerUrlDiagnostics, isContainerRuntime, isTransportProviderId, type TransportProviderId } from "./transports.js";
 
 type CliOptions = {
@@ -104,6 +124,9 @@ type CliOptions = {
   hermesSkillPath?: string;
   openclawConfigPath?: string;
   yes: boolean;
+  resume: boolean;
+  outputFormat: "text" | "json";
+  onboardingFormat: "qr" | "deeplink" | "text";
 };
 
 function parseArgs(argv: string[]): CliOptions {
@@ -144,7 +167,10 @@ function parseArgs(argv: string[]): CliOptions {
     serviceManager: "auto",
     serviceMode: "receiver",
     databasePathProvided: false,
-    yes: false
+    yes: false,
+    resume: false,
+    outputFormat: "text",
+    onboardingFormat: "qr"
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -329,10 +355,21 @@ function parseArgs(argv: string[]): CliOptions {
       index += 1;
     } else if (arg === "--format") {
       const value = argv[index + 1];
-      if (value !== "markdown") {
-        throw new Error("Expected --format markdown.");
+      if (value === "qr" || value === "deeplink" || value === "text") {
+        options.onboardingFormat = value;
+      } else if (value !== "markdown") {
+        throw new Error("Expected --format to be one of: markdown, qr, deeplink, text.");
       }
       index += 1;
+    } else if (arg === "--output") {
+      const value = requiredOptionValue(argv, index, arg);
+      if (value !== "text" && value !== "json") {
+        throw new Error("Expected --output to be one of: text, json.");
+      }
+      options.outputFormat = value;
+      index += 1;
+    } else if (arg === "--resume") {
+      options.resume = true;
     } else if (arg === "--hermes" || arg === "--install-hermes") {
       options.installHermes = true;
       options.agentId = "hermes";
@@ -433,7 +470,7 @@ async function main(): Promise<void> {
   }
 
   if (options.command === "version") {
-    console.log("healthlink-local 0.2.0");
+    console.log("healthlink-local 0.3.0");
     return;
   }
 
@@ -497,7 +534,7 @@ async function main(): Promise<void> {
   }
 
   if (options.command === "print-onboarding") {
-    printRelayOnboarding(options);
+    await printRelayOnboarding(options);
     return;
   }
 
@@ -641,15 +678,16 @@ async function main(): Promise<void> {
 }
 
 function buildCliHelp(): string {
-  return `HealthLink Local 0.2.0
+  return `HealthLink Local 0.3.0
 
 Usage:
   healthlink-local <command> [options]
 
 Core setup:
-  setup --transport lan --agent <generic|hermes|openclaw|workbuddy>
-  setup --transport relay --relay-url https://HOSTED-RELAY --agent <agent>
+  setup --transport lan --agent <generic|hermes|openclaw|workbuddy> [--output json]
+  setup --transport relay --relay-url https://HOSTED-RELAY --agent <agent> [--output json]
   setup --transport self-hosted-relay --relay-url http://HOST:8790 --agent <agent>
+  setup --resume --yes [--output json]
   pair
   status
   doctor --agent <agent>
@@ -664,7 +702,7 @@ Relay:
   relay fixture [--date YYYY-MM-DD] [--steps N]
   relay unlink|rotate|reset --yes
   relay migrate --yes --transport <hosted-relay|self-hosted-relay> --relay-url <url>
-  print-onboarding --transport <relay|self-hosted-relay> [--relay-url <url>]
+  print-onboarding --transport <relay|self-hosted-relay> [--relay-url <url>] [--format qr|deeplink|text] [--output json]
   print-relay-docker-compose
 
 Agent integration:
@@ -683,6 +721,8 @@ Service:
 Global:
   --db <path>        HealthLink SQLite path
   --state-dir <path> Relay runtime state directory
+  --output text|json Versioned Agent-safe command output
+  --yes              Apply a reviewed setup plan
   --version, -v      Print version
   --help, -h         Show this help
 `;
@@ -719,69 +759,339 @@ async function runServiceCommand(options: CliOptions): Promise<void> {
 }
 
 async function runSetup(options: CliOptions): Promise<void> {
-  if (options.transportId === "relay" || options.transportId === "self_hosted_relay") {
-    runRelaySetup(options);
-    return;
+  const requested = options.resume
+    ? restoreBootstrapOptions(options)
+    : await prepareNewBootstrapOptions(options);
+  let state = options.resume
+    ? requireBootstrapState(requested)
+    : createAndPersistBootstrapState(requested);
+
+  if (!options.yes) {
+    printBootstrapPlan(state, requested);
+    if (requested.outputFormat === "json" || !input.isTTY) {
+      return;
+    }
+    if (!await confirmBootstrapPlan()) {
+      console.log("Setup cancelled before persistent changes.");
+      return;
+    }
   }
 
-  const setupOptions = await resolveAutoServicePort(options);
-  const agentId = resolveSetupAgentId(options);
-  const effectiveOptions = {
-    ...setupOptions,
-    agentId
+  try {
+    await withBootstrapLock({ stateDir: requested.stateDir }, async () => {
+      state = readBootstrapState({ stateDir: requested.stateDir }) ?? state;
+      try {
+        state = await executeBootstrapSetup(state, requested);
+        printBootstrapResult(state, requested);
+      } catch (error) {
+        state = failBootstrapState(state, error, { stateDir: requested.stateDir });
+        if (requested.outputFormat === "json") {
+          printJson(buildBootstrapOutput(state, requested));
+          process.exitCode = 1;
+          return;
+        }
+        throw error;
+      }
+    });
+  } catch (error) {
+    if (requested.outputFormat !== "json") {
+      throw error;
+    }
+    printJson({
+      schema_version: BOOTSTRAP_SCHEMA_VERSION,
+      command: "setup",
+      status: "failed",
+      setup_id: state.setup_id,
+      current_stage: state.current_stage,
+      completed_stages: state.completed_stages,
+      next_action: {
+        type: "retry",
+        command: "healthlink-local setup --resume --yes --output json"
+      },
+      error: {
+        code: classifyBootstrapError(error),
+        message: safeErrorMessage(error)
+      }
+    } satisfies BootstrapOutput);
+    process.exitCode = 1;
+  }
+}
+
+async function prepareNewBootstrapOptions(options: CliOptions): Promise<CliOptions> {
+  const resolved = options.transportId === "relay" || options.transportId === "self_hosted_relay"
+    ? options
+    : await resolveAutoServicePort(options);
+  const agentId = resolveSetupAgentId(resolved);
+  const serviceMode = resolved.transportId === "relay" || resolved.transportId === "self_hosted_relay"
+    ? "relay_pull"
+    : "receiver";
+  return {
+    ...resolved,
+    agentId,
+    agentAuto: false,
+    serviceMode
   };
-  const shouldInstallSkill = options.installSkill || agentId === "hermes";
-  if (shouldInstallSkill && agentId !== "hermes") {
+}
+
+function createAndPersistBootstrapState(options: CliOptions): BootstrapState {
+  const shouldInstallSkill = options.installSkill || options.agentId === "hermes";
+  if (shouldInstallSkill && options.agentId !== "hermes") {
     throw new Error("--install-skill currently supports --agent hermes only.");
   }
+  const config = toBootstrapConfig(options, shouldInstallSkill);
+  const existing = readBootstrapState({ stateDir: options.stateDir });
+  if (existing && JSON.stringify(existing.config) === JSON.stringify(config)) {
+    return existing;
+  }
+  if (existing && existing.status !== "complete") {
+    throw new Error("An unfinished HealthLink setup already exists with different options. Resume it with setup --resume, or finish it before starting a different setup plan.");
+  }
+  const state = createBootstrapState(config);
+  return writeBootstrapState(state, { stateDir: options.stateDir });
+}
 
-  const agent = getAgentAdapter(agentId);
-  console.log(`Setting up HealthLink for ${agent.displayName}`);
-  printAgentAutoDetectSummary(options, agentId);
-  await runServiceSetupWorkflow({
-    installAgent: () => {
-      if (agentId === "generic") {
-        console.log("Agent config: generic MCP config will be printed on request.");
+function restoreBootstrapOptions(options: CliOptions): CliOptions {
+  const state = requireBootstrapState(options);
+  const config = state.config;
+  return {
+    ...options,
+    agentId: config.agent_id,
+    agentAuto: false,
+    transportId: config.transport_id,
+    transportProvided: true,
+    serviceManager: config.service_manager,
+    serviceMode: config.service_mode,
+    host: config.host,
+    hostProvided: true,
+    port: config.port,
+    portProvided: true,
+    pullIntervalSeconds: config.pull_interval_seconds,
+    installSkill: config.install_skill,
+    databasePath: config.database_path,
+    databasePathProvided: config.database_path !== undefined,
+    serverUrl: config.server_url,
+    relayUrl: config.relay_url,
+    stateDir: config.state_dir ?? options.stateDir,
+    tailscaleName: config.tailscale_name,
+    agentName: config.agent_name,
+    hermesConfigPath: config.hermes_config_path,
+    hermesSkillPath: config.hermes_skill_path,
+    openclawConfigPath: config.openclaw_config_path
+  };
+}
+
+function requireBootstrapState(options: Pick<CliOptions, "stateDir">): BootstrapState {
+  const state = readBootstrapState({ stateDir: options.stateDir });
+  if (!state) {
+    throw new Error("No resumable HealthLink setup was found. Run healthlink-local setup with the desired Agent and transport first.");
+  }
+  return state;
+}
+
+function toBootstrapConfig(options: CliOptions, installSkill: boolean): BootstrapConfig {
+  return {
+    agent_id: options.agentId,
+    transport_id: options.transportId,
+    service_manager: options.serviceManager,
+    service_mode: options.serviceMode,
+    host: options.host,
+    port: options.port,
+    pull_interval_seconds: options.pullIntervalSeconds,
+    install_skill: installSkill,
+    database_path: options.databasePath,
+    server_url: options.serverUrl,
+    relay_url: options.relayUrl,
+    state_dir: options.stateDir,
+    tailscale_name: options.tailscaleName,
+    agent_name: options.agentName,
+    hermes_config_path: options.hermesConfigPath,
+    hermes_skill_path: options.hermesSkillPath,
+    openclaw_config_path: options.openclawConfigPath
+  };
+}
+
+async function confirmBootstrapPlan(): Promise<boolean> {
+  const readline = createInterface({ input, output });
+  try {
+    const answer = await readline.question("Apply these persistent changes? [y/N] ");
+    return answer.trim().toLowerCase() === "y" || answer.trim().toLowerCase() === "yes";
+  } finally {
+    readline.close();
+  }
+}
+
+function printBootstrapPlan(state: BootstrapState, options: CliOptions): void {
+  if (options.outputFormat === "json") {
+    printJson(buildBootstrapOutput(state, options));
+    return;
+  }
+  console.log(`HealthLink setup plan for ${getAgentAdapter(state.config.agent_id).displayName}`);
+  for (const [index, item] of state.plan.entries()) {
+    console.log(`${index + 1}. ${item.description}${item.persistent_change ? " (persistent change)" : ""}`);
+  }
+  console.log("");
+}
+
+async function executeBootstrapSetup(state: BootstrapState, options: CliOptions): Promise<BootstrapState> {
+  const relayMode = options.transportId === "relay" || options.transportId === "self_hosted_relay";
+  let effectiveOptions = options;
+  let relayConfig: ReturnType<typeof initializeRelayRuntime> | undefined;
+  const agent = getAgentAdapter(options.agentId);
+  if (state.initial_sync_count === undefined) {
+    const database = openHealthLinkDatabase({ path: options.databasePath });
+    try {
+      state = writeBootstrapState({
+        ...state,
+        initial_sync_count: getHealthStatus(database).sync_count
+      }, { stateDir: options.stateDir });
+    } finally {
+      database.close();
+    }
+  }
+  return runBootstrapWorkflow(state, {
+    runtime_initialized: () => {
+      if (relayMode) {
+        const mode = options.transportId === "relay" ? "hosted_relay" : "self_hosted_relay";
+        const relayUrl = resolveDefaultRelayUrl({ mode, relayUrl: options.relayUrl });
+        relayConfig = initializeRelayRuntime({
+          stateDir: options.stateDir,
+          relayUrl,
+          relayApiToken: options.relayApiToken,
+          agentName: options.agentName ?? defaultAgentName(options.agentId),
+          mode
+        });
+        effectiveOptions = { ...options, relayUrl: relayConfig.relay_url };
         return;
       }
-      const agentInstall = agent.installMcp({
-        databasePath: setupOptions.databasePath
-      }, {
-        hermesConfigPath: setupOptions.hermesConfigPath,
-        openclawConfigPath: setupOptions.openclawConfigPath
+      const database = openHealthLinkDatabase({ path: options.databasePath });
+      database.close();
+    },
+    agent_configured: () => {
+      const detected = agent.detect({
+        hermesConfigPath: effectiveOptions.hermesConfigPath,
+        openclawConfigPath: effectiveOptions.openclawConfigPath
       });
-      console.log(`Agent config: ${agentInstall.message}`);
-      if (agentInstall.backupPath) {
-        console.log(`Agent backup: ${agentInstall.backupPath}`);
+      if (effectiveOptions.agentId !== "generic" && !detected.installed) {
+        agent.installMcp({ databasePath: effectiveOptions.databasePath }, {
+          hermesConfigPath: effectiveOptions.hermesConfigPath,
+          openclawConfigPath: effectiveOptions.openclawConfigPath
+        });
+      }
+      if (state.config.install_skill) {
+        agent.installSkill?.({ hermesSkillPath: effectiveOptions.hermesSkillPath });
       }
     },
-    installSkill: () => {
-      const skillInstall = agent.installSkill?.({
-        hermesSkillPath: options.hermesSkillPath
-      });
-      if (skillInstall) {
-        console.log(`Agent skill: HealthLink skill installed at ${skillInstall.skillPath}`);
+    service_installed: () => {
+      const serviceOptions = toServiceOptions(effectiveOptions);
+      if (!getHealthLinkServiceStatus(serviceOptions).installed) {
+        installHealthLinkService(serviceOptions);
       }
     },
-    installService: () => {
-      const status = installHealthLinkService(toServiceOptions(effectiveOptions));
-      console.log(`Service manager:   ${status.manager}`);
-      console.log(`Service installed: ${status.configPath}`);
-      console.log(`Service logs:      ${status.stdoutPath}`);
-      console.log(`Service errors:    ${status.stderrPath}`);
+    service_started: async () => {
+      const serviceOptions = toServiceOptions(effectiveOptions);
+      if (!getHealthLinkServiceStatus(serviceOptions).running) {
+        startHealthLinkService(serviceOptions);
+      }
+      if (!relayMode) {
+        await waitForLocalReceiver(effectiveOptions);
+      }
     },
-    startService: () => {
-      startHealthLinkService(toServiceOptions(effectiveOptions));
-      console.log("Service start requested.");
+    onboarding_created: async () => {
+      if (relayMode) {
+        relayConfig ??= readRelayRuntimeConfig({ stateDir: effectiveOptions.stateDir });
+        effectiveOptions = { ...effectiveOptions, relayUrl: relayConfig.relay_url };
+        const artifact = await writeRelayOnboardingArtifact({
+          config: relayConfig,
+          stateDir: effectiveOptions.stateDir,
+          format: effectiveOptions.onboardingFormat
+        });
+        return { onboarding_url: artifact.local_url };
+      }
+      return { onboarding_url: `http://127.0.0.1:${effectiveOptions.port}/pair` };
     },
-    waitForReady: () => waitForLocalReceiver(effectiveOptions),
-    pair: () => printPairingSession(effectiveOptions),
-    printReloadHint: () => {
-      printSetupNextSteps(agent, resolveServiceManagerIdForCli(setupOptions));
+    first_sync_observed: () => {
+      const database = openHealthLinkDatabase({ path: effectiveOptions.databasePath });
+      try {
+        return getHealthStatus(database).sync_count > (state.initial_sync_count ?? 0);
+      } finally {
+        database.close();
+      }
     }
-  }, {
-    installSkill: shouldInstallSkill
-  });
+  }, { stateDir: options.stateDir });
+}
+
+function buildBootstrapOutput(state: BootstrapState, options: CliOptions): BootstrapOutput {
+  if (state.status === "awaiting_consent") {
+    return sanitizeAgentOutput({
+      schema_version: BOOTSTRAP_SCHEMA_VERSION,
+      command: "setup",
+      status: state.status,
+      setup_id: state.setup_id,
+      current_stage: state.current_stage,
+      completed_stages: state.completed_stages,
+      plan: state.plan,
+      next_action: {
+        type: "confirm",
+        command: "healthlink-local setup --resume --yes --output json"
+      }
+    });
+  }
+  const database = openHealthLinkDatabase({ path: options.databasePath ?? state.config.database_path });
+  try {
+    const health = getHealthStatus(database);
+    const relay = getRelayLocalStatus({ stateDir: options.stateDir });
+    const nextAction = state.status === "awaiting_first_sync"
+        ? { type: "sync_ios" as const, url: state.onboarding_url, command: "healthlink-local setup --resume --yes --output json" }
+        : state.status === "complete"
+          ? { type: "ask_agent" as const, suggested_prompt: "How am I doing today?" }
+          : state.status === "failed"
+            ? { type: "retry" as const, command: "healthlink-local setup --resume --yes --output json" }
+            : undefined;
+    return sanitizeAgentOutput({
+      schema_version: BOOTSTRAP_SCHEMA_VERSION,
+      command: "setup",
+      status: state.status,
+      setup_id: state.setup_id,
+      current_stage: state.current_stage,
+      completed_stages: state.completed_stages,
+      next_action: nextAction,
+      freshness: {
+        source_count: health.device_count,
+        sync_count: health.sync_count,
+        last_sync_at: health.last_sync_at,
+        relay_last_pull_at: relay.last_successful_pull_at
+      },
+      error: state.last_error_code ? {
+        code: state.last_error_code,
+        message: state.last_error_message ?? "HealthLink setup failed."
+      } : undefined
+    });
+  } finally {
+    database.close();
+  }
+}
+
+function printBootstrapResult(state: BootstrapState, options: CliOptions): void {
+  if (options.outputFormat === "json") {
+    printJson(buildBootstrapOutput(state, options));
+    return;
+  }
+  const agent = getAgentAdapter(state.config.agent_id);
+  console.log(`HealthLink setup status: ${state.status}`);
+  if (state.onboarding_url && state.status !== "complete") {
+    console.log(`Open this local onboarding page: ${state.onboarding_url}`);
+    console.log("This page contains credentials. Do not upload or paste it into an Agent chat.");
+  }
+  if (state.status === "awaiting_first_sync") {
+    console.log("Next: connect HealthLink iOS, run the first sync, then run healthlink-local setup --resume --yes.");
+  } else if (state.status === "complete") {
+    console.log("First sync observed. Verify freshness with healthlink_status, then ask: How am I doing today?");
+    console.log(agent.reloadHint());
+  }
+}
+
+function printJson(value: unknown): void {
+  process.stdout.write(`${JSON.stringify(sanitizeAgentOutput(value), null, 2)}\n`);
 }
 
 async function runEnsure(options: CliOptions): Promise<void> {
@@ -837,11 +1147,13 @@ async function resolveAutoServicePort(options: CliOptions): Promise<CliOptions> 
   }
 
   const listener = describePortListeners(options.port);
-  console.log(`Port ${options.port} is already in use; using ${selected.port} for HealthLink.`);
-  if (listener) {
-    console.log(`Current listener: ${listener}`);
+  if (options.outputFormat === "text") {
+    console.log(`Port ${options.port} is already in use; using ${selected.port} for HealthLink.`);
+    if (listener) {
+      console.log(`Current listener: ${listener}`);
+    }
+    console.log("Pass --port to choose a specific port.");
   }
-  console.log("Pass --port to choose a specific port.");
   return {
     ...options,
     port: selected.port
@@ -1084,17 +1396,42 @@ function runRelaySetup(options: CliOptions): void {
   console.log("  5. Use healthlink-local status and healthlink-local logs --mode relay-pull to inspect freshness.");
 }
 
-function printRelayOnboarding(options: CliOptions): void {
+async function printRelayOnboarding(options: CliOptions): Promise<void> {
   const requestedMode = options.transportId === "relay" ? "hosted_relay" : "self_hosted_relay";
-  const config = initializeRelayRuntime({
+  const config = readRelayRuntimeConfig({ stateDir: options.stateDir });
+  if (options.transportProvided && config.relay_mode !== requestedMode) {
+    throw new Error(`Existing runtime uses ${config.relay_mode}; run healthlink-local setup to review and approve a transport change.`);
+  }
+  if (options.relayUrl && normalizeRelayUrlForMode(options.relayUrl, config.relay_mode) !== config.relay_url) {
+    throw new Error("Existing runtime uses a different relay URL; run healthlink-local setup to review and approve the change.");
+  }
+  const mode = config.relay_mode;
+  const artifact = await writeRelayOnboardingArtifact({
+    config: { ...config, relay_mode: mode },
     stateDir: options.stateDir,
-    relayUrl: options.relayUrl,
-    relayApiToken: options.relayApiToken,
-    agentName: options.agentName ?? defaultAgentName(options.agentId),
-    mode: options.transportProvided ? requestedMode : undefined
+    format: options.onboardingFormat
   });
-  const mode = options.transportProvided ? requestedMode : config.relay_mode;
-  process.stdout.write(formatRelayOnboarding(config, { mode }));
+  if (options.outputFormat === "json") {
+    printJson({
+      schema_version: BOOTSTRAP_SCHEMA_VERSION,
+      command: "print-onboarding",
+      status: "awaiting_ios",
+      next_action: {
+        type: "open_local_onboarding",
+        url: artifact.local_url
+      },
+      details: {
+        format: artifact.format,
+        relay_mode: mode,
+        relay_url: config.relay_url,
+        sensitive_local_artifact: true
+      }
+    } satisfies BootstrapOutput);
+    return;
+  }
+  console.log("HealthLink relay onboarding is ready.");
+  console.log(`Open this local credential-bearing page: ${artifact.local_url}`);
+  console.log("Do not upload, paste, or attach this page in an Agent chat.");
 }
 
 async function runRelayPull(options: CliOptions): Promise<void> {
@@ -1267,6 +1604,38 @@ function printStatus(options: CliOptions): void {
     const status = getHealthStatus(database);
     const sourceDevices = listSourceDevices(database);
     const relay = getRelayLocalStatus({ stateDir: options.stateDir });
+    const bootstrap = readBootstrapState({ stateDir: options.stateDir });
+    if (options.outputFormat === "json") {
+      printJson({
+        schema_version: BOOTSTRAP_SCHEMA_VERSION,
+        command: "status",
+        status: bootstrap?.status ?? (status.sync_count > 0 ? "complete" : "awaiting_ios"),
+        setup_id: bootstrap?.setup_id,
+        current_stage: bootstrap?.current_stage,
+        completed_stages: bootstrap?.completed_stages,
+        next_action: status.sync_count > 0
+          ? { type: "ask_agent", suggested_prompt: "How am I doing today?" }
+          : { type: "sync_ios", url: bootstrap?.onboarding_url },
+        freshness: {
+          source_count: status.device_count,
+          sync_count: status.sync_count,
+          last_sync_at: status.last_sync_at,
+          relay_last_pull_at: relay.last_successful_pull_at
+        },
+        details: {
+          transport: relay.transport_mode,
+          relay_initialized: relay.initialized,
+          source_devices: sourceDevices.map((device) => ({
+            id: device.source_device_id,
+            platform: device.platform,
+            state: device.revoked_at ? "revoked" : "active",
+            sync_count: device.sync_count,
+            last_sync_at: device.last_sync_at
+          }))
+        }
+      } satisfies BootstrapOutput);
+      return;
+    }
     console.log("HealthLink Local status");
     console.log(`Database:   ${database.path}`);
     console.log(`Sources:    ${status.device_count}`);
@@ -1430,12 +1799,27 @@ async function printDoctor(options: CliOptions): Promise<void> {
     });
   }
 
-  console.log("HealthLink doctor");
-  for (const result of results) {
-    console.log(`[${result.status}] ${result.label}: ${result.detail}`);
+  const hasFailure = results.some((result) => result.status === "FAIL");
+  if (options.outputFormat === "json") {
+    printJson({
+      schema_version: BOOTSTRAP_SCHEMA_VERSION,
+      command: "doctor",
+      status: hasFailure ? "failed" : "complete",
+      details: {
+        checks: results
+      },
+      error: hasFailure ? {
+        code: "doctor_failed",
+        message: "One or more HealthLink diagnostic checks failed."
+      } : undefined
+    } satisfies BootstrapOutput);
+  } else {
+    console.log("HealthLink doctor");
+    for (const result of results) {
+      console.log(`[${result.status}] ${result.label}: ${result.detail}`);
+    }
   }
 
-  const hasFailure = results.some((result) => result.status === "FAIL");
   if (hasFailure) {
     process.exitCode = 1;
   }
@@ -1510,12 +1894,26 @@ function isReceiverHealthStatus(value: unknown): value is {
 }
 
 main().catch((error: unknown) => {
+  const outputIndex = process.argv.indexOf("--output");
+  if (outputIndex >= 0 && process.argv[outputIndex + 1] === "json") {
+    printJson({
+      schema_version: BOOTSTRAP_SCHEMA_VERSION,
+      command: process.argv[2] ?? "unknown",
+      status: "failed",
+      error: {
+        code: classifyBootstrapError(error),
+        message: safeErrorMessage(error)
+      }
+    });
+    process.exitCode = 1;
+    return;
+  }
   console.error(formatCliError(error));
   process.exitCode = 1;
 });
 
 function formatCliError(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = safeErrorMessage(error);
   if (message.includes("EADDRINUSE")) {
     const portMatch = message.match(/:(\d+)\b/);
     const port = portMatch?.[1] ?? "8787";

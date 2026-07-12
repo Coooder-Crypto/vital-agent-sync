@@ -120,6 +120,7 @@ The POSIX installer owns only package availability:
 - detect macOS, Linux, and WSL
 - verify a supported Node.js/npm environment, or explain the missing prerequisite
 - install `healthlink-local` into a user-writable prefix without `sudo`
+- use `~/.healthlink/npm-global` by default and support a pinned package version
 - update a supported shell profile idempotently, without replacing unrelated content
 - support a pinned package version
 - print the exact next command
@@ -175,6 +176,23 @@ detect
 
 Each completed stage is persisted without storing plaintext tokens in logs. Re-running setup continues from the first incomplete stage unless the user explicitly requests reset or migration.
 
+The implemented contract uses `schema_version: 1` and stores non-secret progress in `~/.healthlink/setup/state-v1.json` with user-only permissions. Persisted stages are:
+
+```text
+environment_checked
+plan_created
+consent_received
+runtime_initialized
+agent_configured
+service_installed
+service_started
+onboarding_created
+first_sync_observed
+complete
+```
+
+Setup records the database sync count after consent and only marks `first_sync_observed` when the count increases, so existing history cannot be mistaken for the first sync from a new onboarding flow.
+
 ## CLI Contract
 
 The existing interactive command remains the human fallback:
@@ -187,8 +205,8 @@ The target Agent-facing contract should add stable non-interactive and machine-r
 
 ```bash
 healthlink-local setup --agent auto --transport relay --output json
-healthlink-local setup --resume --output json
-healthlink-local print-onboarding --format qr
+healthlink-local setup --resume --yes --output json
+healthlink-local print-onboarding --format qr --output json
 healthlink-local pull --once
 healthlink-local status --output json
 ```
@@ -228,7 +246,7 @@ V1 rules:
 
 Target follow-up:
 
-- introduce a short-lived, single-use onboarding ticket before making in-chat QR/deep-link handoff the universal default
+- introduce a short-lived, single-use onboarding ticket before making in-chat QR/deep-link handoff the universal default ([issue #70](https://github.com/Coooder-Crypto/health-link/issues/70))
 - bind the ticket to the intended user/source identity
 - exchange it for device credentials once, then invalidate it
 - keep long-lived relay and upload credentials out of conversation history
@@ -309,4 +327,4 @@ This milestone does not:
 4. **Website entry**: platform-aware fallback commands and links to Agent-specific entry points.
 5. **Secure handoff follow-up**: short-lived, single-use onboarding tickets for safe in-chat QR/deep-link delivery.
 
-The first two slices belong to issue #54. OpenClaw marketplace publication remains isolated in issue #57 so the Agent-neutral product does not depend on ClawHub.
+Slices 1–4 belong to issue #54. Slice 5 is tracked in issue #70. OpenClaw marketplace publication remains isolated in issue #57 so the Agent-neutral product does not depend on ClawHub.

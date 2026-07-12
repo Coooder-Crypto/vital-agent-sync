@@ -129,8 +129,11 @@ function runHostedSetupFailClosedCheck() {
       "relay",
       "--agent",
       "generic",
+      "--yes",
       "--state-dir",
-      stateDir
+      stateDir,
+      "--output",
+      "json"
     ], {
       cwd: root,
       env,
@@ -139,7 +142,9 @@ function runHostedSetupFailClosedCheck() {
     if (result.error) {
       throw result.error;
     }
-    if (result.status === 0 || !result.stderr.includes("Hosted HealthLink relay URL is not configured")) {
+    const output = result.stdout.trim() ? JSON.parse(result.stdout) : {};
+    if (result.status === 0 || output.error?.code !== "relay_url_invalid" ||
+        !output.error?.message?.includes("Hosted HealthLink relay URL is not configured")) {
       process.stderr.write(result.stdout);
       process.stderr.write(result.stderr);
       throw new Error("Hosted relay setup did not fail with the expected missing-URL error.");
@@ -201,16 +206,38 @@ function runSavedRelayModeCheck() {
   console.log("\n==> compiled onboarding saved-mode inheritance");
   const tempDir = mkdtempSync(join(tmpdir(), "healthlink-onboarding-mode-audit-"));
   const stateDir = join(tempDir, "state");
+  const databasePath = join(tempDir, "healthlink.sqlite");
   try {
-    const initialize = spawnSync("node", [
+    const plan = spawnSync("node", [
       "packages/local/dist/cli.js",
-      "print-onboarding",
+      "setup",
       "--transport",
       "relay",
       "--relay-url",
       "https://relay.example.test",
+      "--manager",
+      "manual",
       "--state-dir",
-      stateDir
+      stateDir,
+      "--db",
+      databasePath,
+      "--output",
+      "json"
+    ], {
+      cwd: root,
+      encoding: "utf8"
+    });
+    const consentedSetup = spawnSync("node", [
+      "packages/local/dist/cli.js",
+      "setup",
+      "--resume",
+      "--yes",
+      "--state-dir",
+      stateDir,
+      "--db",
+      databasePath,
+      "--output",
+      "json"
     ], {
       cwd: root,
       encoding: "utf8"
@@ -219,23 +246,31 @@ function runSavedRelayModeCheck() {
       "packages/local/dist/cli.js",
       "print-onboarding",
       "--state-dir",
-      stateDir
+      stateDir,
+      "--output",
+      "json"
     ], {
       cwd: root,
       encoding: "utf8"
     });
-    if (initialize.error) {
-      throw initialize.error;
+    if (plan.error) {
+      throw plan.error;
+    }
+    if (consentedSetup.error) {
+      throw consentedSetup.error;
     }
     if (repeat.error) {
       throw repeat.error;
     }
-    if (initialize.status !== 0 || repeat.status !== 0 ||
-        !initialize.stdout.includes("Mode:        hosted_relay") ||
-        !repeat.stdout.includes("Mode:        hosted_relay")) {
-      process.stderr.write(initialize.stderr);
+    const planOutput = plan.status === 0 ? JSON.parse(plan.stdout) : {};
+    const repeatOutput = repeat.status === 0 ? JSON.parse(repeat.stdout) : {};
+    if (plan.status !== 0 || planOutput.status !== "awaiting_consent" ||
+        consentedSetup.status !== 1 || repeat.status !== 0 ||
+        repeatOutput.details?.relay_mode !== "hosted_relay") {
+      process.stderr.write(plan.stderr);
+      process.stderr.write(consentedSetup.stderr);
       process.stderr.write(repeat.stderr);
-      throw new Error("print-onboarding did not inherit the saved hosted relay mode.");
+      throw new Error("Consented setup did not preserve the hosted relay mode for print-onboarding.");
     }
   } finally {
     rmSync(tempDir, { recursive: true, force: true });

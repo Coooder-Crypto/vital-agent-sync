@@ -10,6 +10,7 @@ const tempDir = mkdtempSync(join(tmpdir(), "healthlink-package-audit-"));
 const packDir = join(tempDir, "pack");
 const installPrefix = join(tempDir, "prefix");
 const npmCache = join(tempDir, "npm-cache");
+const isolatedHome = join(tempDir, "home");
 const stateDir = join(tempDir, "state");
 const databasePath = join(tempDir, "healthlink.sqlite");
 const relayDatabasePath = join(tempDir, "relay.sqlite");
@@ -18,6 +19,7 @@ const relayApiToken = randomBytes(32).toString("base64url");
 const metricsToken = randomBytes(32).toString("base64url");
 const npmEnv = {
   ...process.env,
+  HOME: isolatedHome,
   npm_config_audit: "false",
   npm_config_cache: npmCache,
   npm_config_fetch_retries: "2",
@@ -33,6 +35,7 @@ let relayLogs = "";
 let cleaning = false;
 
 mkdirSync(packDir, { recursive: true });
+mkdirSync(isolatedHome, { recursive: true });
 
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.once(signal, async () => {
@@ -43,6 +46,7 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 
 try {
   const tarballPath = packHealthLinkLocal();
+  verifyPinnedNpxFallback(tarballPath);
   await installTarball(tarballPath);
   const binaryPath = resolveInstalledBinary();
   verifyInstalledCli(binaryPath);
@@ -52,6 +56,38 @@ try {
   console.log("\nHealthLink relay package audit passed.");
 } finally {
   await cleanup();
+}
+
+function verifyPinnedNpxFallback(tarballPath) {
+  console.log("\n==> pinned npx-compatible cold invocation");
+  const version = capture("npm", [
+    "exec",
+    "--yes",
+    "--package",
+    tarballPath,
+    "--",
+    "healthlink-local",
+    "--version"
+  ], { cwd: tempDir, env: npmEnv, timeoutMs: 5 * 60_000 }).trim();
+  assert(version === "healthlink-local 0.3.0", "Pinned npm exec fallback reports the wrong version.");
+  console.log(version);
+  const status = JSON.parse(capture("npm", [
+    "exec",
+    "--yes",
+    "--package",
+    tarballPath,
+    "--",
+    "healthlink-local",
+    "status",
+    "--state-dir",
+    join(tempDir, "npx-state"),
+    "--db",
+    join(tempDir, "npx-healthlink.sqlite"),
+    "--output",
+    "json"
+  ], { cwd: tempDir, env: npmEnv, timeoutMs: 5 * 60_000 }));
+  assert(status.schema_version === 1, "Pinned npm exec fallback did not emit versioned JSON.");
+  assert(status.command === "status", "Pinned npm exec fallback ran the wrong command.");
 }
 
 function packHealthLinkLocal() {
@@ -67,7 +103,7 @@ function packHealthLinkLocal() {
   const packed = JSON.parse(output);
   const artifact = packed[0];
   assert(artifact?.name === "healthlink-local", "npm pack returned the wrong package name.");
-  assert(artifact.version === "0.2.0", "npm pack returned the wrong package version.");
+  assert(artifact.version === "0.3.0", "npm pack returned the wrong package version.");
   assert(Array.isArray(artifact.files), "npm pack did not report package files.");
   const packagePaths = artifact.files.map((entry) => entry.path);
   for (const required of [
@@ -123,7 +159,7 @@ function resolveInstalledBinary() {
 function verifyInstalledCli(binaryPath) {
   console.log("\n==> isolated installed CLI");
   const version = capture(binaryPath, ["--version"], { cwd: tempDir, env: npmEnv }).trim();
-  assert(version === "healthlink-local 0.2.0", "Installed CLI reports the wrong version.");
+  assert(version === "healthlink-local 0.3.0", "Installed CLI reports the wrong version.");
   const help = capture(binaryPath, ["--help"], { cwd: tempDir, env: npmEnv });
   for (const expected of [
     "setup --transport relay",
@@ -265,8 +301,8 @@ function verifyInstalledSkillExport(binaryPath) {
   const readme = readFileSync(join(skillDir, "README.md"), "utf8");
   for (const expected of [
     "name: healthlink-personal-context",
-    "version: 0.2.0",
-    "healthlink-local@^0.2.0",
+    "version: 0.3.0",
+    "healthlink-local@0.3.0",
     "healthlink-local pull"
   ]) {
     assert(skill.includes(expected), `Installed CLI skill export is missing: ${expected}.`);
@@ -276,7 +312,7 @@ function verifyInstalledSkillExport(binaryPath) {
   for (const forbidden of [relayApiToken, metricsToken, "BEGIN PRIVATE KEY"]) {
     assert(!exported.includes(forbidden), "Installed CLI skill export contains sensitive runtime material.");
   }
-  console.log(JSON.stringify({ files: ["README.md", "SKILL.md"], version: "0.2.0" }));
+  console.log(JSON.stringify({ files: ["README.md", "SKILL.md"], version: "0.3.0" }));
 }
 
 function verifyRelayLogs() {
@@ -421,7 +457,8 @@ function capture(command, args, options = {}) {
   const result = spawnSync(command, args, {
     cwd: options.cwd ?? root,
     env: options.env ?? process.env,
-    encoding: "utf8"
+    encoding: "utf8",
+    timeout: options.timeoutMs
   });
   if (result.error) {
     throw result.error;
