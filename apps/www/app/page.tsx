@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -14,7 +15,6 @@ import {
   ExternalLink,
   Fingerprint,
   Github,
-  HeartPulse,
   KeyRound,
   LockKeyhole,
   Menu,
@@ -29,6 +29,7 @@ import {
   Zap,
 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import appIcon from "../../../Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png";
 import { usePageSnap, type SnapSection } from "./use-page-snap";
 
 const installCommand = "npx -y healthlink-local setup";
@@ -207,7 +208,7 @@ function PageHeader({ active, onNavigate }: { active: number; onNavigate: (index
       <header className={`global-header ${isDark ? "header-dark" : "header-light"}`}>
         <div className="header-inner page-width">
           <button type="button" className="header-brand" onClick={() => navigate(0)} aria-label="Go to HealthLink overview">
-            <span className="header-mark"><HeartPulse size={18} /><i /></span>
+            <BrandMark className="header-mark" priority />
             <span className="header-brand-copy"><strong>HealthLink</strong><small>Private health context</small></span>
           </button>
 
@@ -438,7 +439,7 @@ function AgentAnswerPage() {
 
 function PrivacyPage() {
   const ledger: [LucideIcon, string, string][] = [
-    [HeartPulse, "iPhone", "Summarizes and encrypts"],
+    [Smartphone, "iPhone", "Summarizes and encrypts"],
     [Cloud, "Relay", "Sees ciphertext and delivery metadata"],
     [KeyRound, "Your machine", "Keeps keys, SQLite, and MCP"],
     [ShieldCheck, "Your agent", "Gets scoped summaries only"],
@@ -514,7 +515,7 @@ function ProductPage() {
           </div>
           <div className="phone-frame">
             <i className="phone-island" />
-            <div className="phone-head"><span><HeartPulse size={16} /></span><strong>HealthLink</strong><small>Secure</small></div>
+            <div className="phone-head"><BrandMark className="phone-brand-mark" /><strong>HealthLink</strong><small>Secure</small></div>
             <div className="phone-sync"><span><Check size={28} /></span><h3>Sync complete</h3><p>Today&apos;s summary is encrypted and ready for your agent.</p></div>
             <div className="phone-meta"><span><small>ROUTE</small><strong>E2EE relay</strong></span><span><small>UPDATED</small><strong>Just now</strong></span></div>
           </div>
@@ -554,7 +555,7 @@ function FinalPage({ copied, onCopy, onNavigate }: { copied: boolean; onCopy: ()
         <CommandBar copied={copied} onCopy={onCopy} inverse />
         <button type="button" className="back-to-top" onClick={() => onNavigate(0)}>Back to overview <ArrowRight size={15} /></button>
       </div>
-      <footer className="page-width final-footer"><span><HeartPulse size={17} /> HealthLink</span><p>Private Apple Health context for MCP-compatible agents.</p><div><a href={githubUrl}>GitHub</a><button type="button" onClick={() => onNavigate(3)}>Privacy</button><button type="button" onClick={() => onNavigate(4)}>Self-host</button></div></footer>
+      <footer className="page-width final-footer"><span><BrandMark className="footer-brand-mark" /> HealthLink</span><p>Private Apple Health context for MCP-compatible agents.</p><div><a href={githubUrl}>GitHub</a><button type="button" onClick={() => onNavigate(3)}>Privacy</button><button type="button" onClick={() => onNavigate(4)}>Self-host</button></div></footer>
     </SnapPage>
   );
 }
@@ -569,6 +570,10 @@ function PageTitle({ kicker, title, body, light = false }: { kicker: string; tit
 
 function CommandBar({ copied, onCopy, inverse = false }: { copied: boolean; onCopy: () => void; inverse?: boolean }) {
   return <div className={`command-bar ${inverse ? "inverse" : ""}`}><span>$</span><code>{installCommand}</code><button type="button" onClick={onCopy} aria-label="Copy HealthLink setup command">{copied ? <Check size={17} /> : <Copy size={17} />}<strong>{copied ? "Copied" : "Copy"}</strong></button></div>;
+}
+
+function BrandMark({ className, priority = false }: { className: string; priority?: boolean }) {
+  return <span className={`brand-mark ${className}`} aria-hidden="true"><Image src={appIcon} alt="" width={64} height={64} priority={priority} /></span>;
 }
 
 function RouteNode({ icon: Icon, label, detail }: { icon: LucideIcon; label: string; detail: string }) {
