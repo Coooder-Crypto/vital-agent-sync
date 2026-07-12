@@ -120,7 +120,7 @@ function verifyRuntimeImage() {
     "packages/local/dist/cli.js",
     "--version"
   ]).trim();
-  assert(version === "healthlink-local 0.2.0", "Relay image contains the wrong healthlink-local version.");
+  assert(version === "healthlink-local 0.3.0", "Relay image contains the wrong healthlink-local version.");
   console.log(version);
 }
 

@@ -80,6 +80,23 @@ Current portable CLI fallback:
 npx -y healthlink-local setup
 ```
 
+Supported Agents can use the Skill-first flow instead: the generated HealthLink Skill requests a redacted setup plan, asks for consent, resumes the shared `healthlink-local` bootstrap, presents one private local onboarding page, and verifies the first sync through MCP. The Skill never owns keys, relay crypto, SQLite, or a separate health query path. See [docs/agent-first-onboarding.md](docs/agent-first-onboarding.md).
+
+Portable no-sudo installer fallback:
+
+```bash
+curl -fsSL https://<healthlink-domain>/install.sh | sh
+healthlink-local setup
+```
+
+Agent-safe setup commands:
+
+```bash
+healthlink-local setup --agent auto --transport relay --output json
+healthlink-local setup --resume --yes --output json
+healthlink-local status --output json
+```
+
 Development pairing loop:
 
 ```bash

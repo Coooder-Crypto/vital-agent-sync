@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
 export const HEALTHLINK_SKILL_NAME = "healthlink-personal-context";
-export const HEALTHLINK_SKILL_VERSION = "0.2.0";
+export const HEALTHLINK_SKILL_VERSION = "0.3.0";
 
 export type SkillInstallOptions = {
   hermesHome?: string;
@@ -45,7 +45,7 @@ metadata:
         - healthlink-local
     install:
       - kind: node
-        package: healthlink-local@^${HEALTHLINK_SKILL_VERSION}
+        package: healthlink-local@${HEALTHLINK_SKILL_VERSION}
         bins:
           - healthlink-local
     os:
@@ -64,6 +64,20 @@ Use this skill when the user asks about their personal status, energy, recovery,
 ${targetAgent}
 
 HealthLink data comes from MCP tools. Do not invent health, sleep, workout, or recovery facts that are not present in tool output.
+
+## After Skill Installation
+
+Proactively offer to initialize HealthLink. Do not wait for the user to discover setup commands.
+
+1. Explain that HealthLink will create private local state, configure one shared MCP server, install a receiver or relay-pull user service, and create one iOS onboarding action.
+2. Ask whether the user wants to review the setup plan.
+3. Run the machine-readable setup command without \`--yes\`. Summarize only the returned redacted \`plan\` entries.
+4. After explicit approval, resume with \`--yes\`.
+5. Present only the safe local onboarding URL in \`next_action.url\`. Never decode the credential payload.
+6. After the first iOS sync, resume setup and verify freshness through \`healthlink_status\`.
+7. When setup is complete, call \`get_personal_context\` and offer the first useful health answer.
+
+The Skill is an orchestration layer. Removing or upgrading it must not remove \`~/.healthlink\`, rotate runtime identity, delete local history, or break generic MCP.
 
 ## When to Use
 
@@ -96,32 +110,37 @@ When the user asks ${agentSubject} to install or connect HealthLink, keep the co
 
 Preferred hosted relay path:
 
-1. Check whether the relay-capable local runtime is installed:
+1. Check whether a compatible relay-capable local runtime is installed:
    \`\`\`bash
    healthlink-local --version
    \`\`\`
-   If the command is missing or older than 0.2.0, ask the user to approve installation, then run:
+   If the command is missing or outside the compatible 0.3.x range, use the pinned package fallback for this Skill version:
    \`\`\`bash
-   npm install -g healthlink-local@^0.2.0
+   npx -y healthlink-local@0.3.0 --version
    \`\`\`
-2. Check the local runtime and MCP config:
+   Select one runtime command for the whole flow: use \`healthlink-local\` when the installed version is compatible; otherwise prefix every local CLI invocation below with \`npx -y healthlink-local@0.3.0\`. Do not switch runners midway through setup, and do not use an unpinned \`npx\` package.
+   Do not use \`sudo npm install -g\`.
+2. Resolve the hosted relay URL from installed product configuration or the user's relay operator. It must use HTTPS. Never invent a relay domain. Request a redacted setup plan:
    \`\`\`bash
-   healthlink-local doctor --agent ${agent}
+   healthlink-local setup --transport relay --relay-url https://HOSTED-RELAY --agent ${agent} --output json
    \`\`\`
-3. Resolve the hosted relay URL from installed product configuration or the user's relay operator. It must use HTTPS. Never invent a relay domain. If \`HEALTHLINK_HOSTED_RELAY_URL\` is not already configured, pass the approved URL explicitly:
+3. Explain the returned plan and obtain explicit approval. Then resume the shared bootstrap:
    \`\`\`bash
-   healthlink-local setup --transport relay --relay-url https://HOSTED-RELAY --agent ${agent}
+   healthlink-local setup --resume --yes --output json
    \`\`\`
-4. Present the onboarding QR directly to the user without quoting, transcribing, summarizing, or storing the onboarding code in Agent messages. If the user needs it again, run:
+4. Open or present only the local URL in \`next_action.url\`. Do not quote, transcribe, summarize, attach, or store the underlying onboarding code in Agent messages. If the user needs it again, run:
    \`\`\`bash
-   healthlink-local print-onboarding --transport relay
+   healthlink-local print-onboarding --transport relay --format qr --output json
    \`\`\`
 5. Ask the user to scan the onboarding payload in HealthLink iOS or a compatible mobile app, grant Apple Health access, and run Sync.
-6. Pull encrypted relay envelopes into the local MCP database:
+6. Pull encrypted relay envelopes into the shared local MCP database:
    \`\`\`bash
    healthlink-local pull
    \`\`\`
-7. Use \`healthlink_status\` and then \`get_personal_context\` to confirm freshness before answering health questions.
+7. Resume setup to observe the first ingest, then use \`healthlink_status\` and \`get_personal_context\`:
+   \`\`\`bash
+   healthlink-local setup --resume --yes --output json
+   \`\`\`
 
 Recurring pull:
 
@@ -137,13 +156,14 @@ Self-hosted relay path:
    \`\`\`
 2. Initialize the local runtime with the iPhone-reachable relay URL:
    \`\`\`bash
-   healthlink-local setup --transport self-hosted-relay --relay-url http://HOST:8790 --agent ${agent}
+   healthlink-local setup --transport self-hosted-relay --relay-url http://HOST:8790 --agent ${agent} --output json
    \`\`\`
-3. After the user syncs from iOS, run \`healthlink-local pull\`, then query MCP.
+3. Explain the plan, obtain consent, and run \`healthlink-local setup --resume --yes --output json\`.
+4. After the user syncs from iOS, run \`healthlink-local pull\`, resume setup, then query MCP.
 
 Direct local gateway path:
 
-- If the user prefers LAN/Tailscale/public HTTPS direct sync instead of relay, use \`healthlink-local setup --agent ${agent} --transport lan\` or the appropriate direct transport. Do not mix direct pairing QR codes with relay onboarding payloads.
+- If the user prefers LAN/Tailscale/public HTTPS direct sync instead of relay, request a plan with \`healthlink-local setup --agent ${agent} --transport lan --output json\`, explain it, obtain consent, and resume with \`healthlink-local setup --resume --yes --output json\`. Do not mix direct pairing QR codes with relay onboarding payloads.
 
 ## Relay And Privacy Guardrails
 

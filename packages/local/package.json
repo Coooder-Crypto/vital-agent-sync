@@ -1,6 +1,6 @@
 {
   "name": "healthlink-local",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Local HealthLink Agent server for pairing, ingest, storage, and MCP tools.",
   "license": "MIT",
   "type": "module",

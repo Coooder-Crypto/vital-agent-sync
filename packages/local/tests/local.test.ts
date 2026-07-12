@@ -10,7 +10,8 @@ import {
   randomBytes,
   sign
 } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createServer, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -23,6 +24,17 @@ import {
   recordAgentRead
 } from "../src/agent-audit.js";
 import { detectPreferredAgentAdapter, getAgentAdapter } from "../src/agents.js";
+import {
+  bootstrapStageComplete,
+  buildBootstrapPlan,
+  createBootstrapState,
+  markBootstrapStage,
+  readBootstrapState,
+  runBootstrapWorkflow,
+  sanitizeAgentOutput,
+  withBootstrapLock,
+  writeBootstrapState
+} from "../src/bootstrap.js";
 import { openHealthLinkDatabase } from "../src/database.js";
 import { listDevices, revokeDevice } from "../src/devices.js";
 import { buildDockerComposeYaml, buildRelayDockerComposeYaml } from "../src/docker-compose.js";
@@ -36,8 +48,9 @@ import {
   getWeeklySummary,
   getWorkoutLoad
 } from "../src/health-query.js";
-import { getHermesMcpInstallStatus, installHermesMcpConfig } from "../src/mcp-config.js";
+import { buildHealthLinkMcpServerConfig, getHermesMcpInstallStatus, installHermesMcpConfig } from "../src/mcp-config.js";
 import { requestPairingSession } from "../src/pairing-client.js";
+import { writeRelayOnboardingArtifact } from "../src/onboarding-artifact.js";
 import { PairingStore } from "../src/pairing.js";
 import { findAvailableTcpPort, parseLsofListenOutput } from "../src/port-diagnostics.js";
 import { auditRelayDeployment } from "../src/relay-audit.js";
@@ -2032,7 +2045,14 @@ test("HealthLink skill can be printed and installed for Hermes", () => {
     assert.match(openclawMarkdown, /Target agent: OpenClaw/);
     assert.match(openclawMarkdown, /healthlink-local setup --transport relay --relay-url https:\/\/HOSTED-RELAY --agent openclaw/);
     assert.match(openclawMarkdown, /Never invent a relay domain/);
-    assert.match(openclawMarkdown, /npm install -g healthlink-local@\^0\.2\.0/);
+    assert.match(openclawMarkdown, /npx -y healthlink-local@0\.3\.0 --version/);
+    assert.match(openclawMarkdown, /prefix every local CLI invocation below with `npx -y healthlink-local@0\.3\.0`/);
+    assert.match(openclawMarkdown, /Do not switch runners midway through setup/);
+    assert.match(openclawMarkdown, /setup --resume --yes --output json/);
+    assert.match(openclawMarkdown, /next_action\.url/);
+    assert.match(openclawMarkdown, /Removing or upgrading it must not remove/);
+    assert.match(openclawMarkdown, /Do not use `sudo npm install -g`/);
+    assert.doesNotMatch(openclawMarkdown, /^\s*sudo npm install -g/m);
     assert.match(openclawMarkdown, /healthlink-local pull/);
     assert.match(openclawMarkdown, /Daily report:/);
     assert.match(openclawMarkdown, /Weekly report:/);
@@ -2046,6 +2066,16 @@ test("HealthLink skill can be printed and installed for Hermes", () => {
     assert.match(openclawMarkdown, /healthlink-local relay reset --yes/);
     assert.match(openclawMarkdown, /healthlink-local relay migrate --yes/);
     assert.match(openclawMarkdown, /Agent CronJob or external scheduler/);
+
+    const planIndex = openclawMarkdown.indexOf("setup --transport relay");
+    const consentIndex = openclawMarkdown.indexOf("obtain explicit approval");
+    const resumeIndex = openclawMarkdown.indexOf("setup --resume --yes --output json", consentIndex);
+    const onboardingIndex = openclawMarkdown.indexOf("next_action.url", resumeIndex);
+    const firstSyncIndex = openclawMarkdown.indexOf("healthlink_status", onboardingIndex);
+    const firstAnswerIndex = openclawMarkdown.indexOf("get_personal_context", firstSyncIndex);
+    assert.ok(planIndex >= 0 && planIndex < consentIndex);
+    assert.ok(consentIndex < resumeIndex && resumeIndex < onboardingIndex);
+    assert.ok(onboardingIndex < firstSyncIndex && firstSyncIndex < firstAnswerIndex);
 
     const first = installHermesHealthLinkSkill({ skillPath });
     const second = installHermesHealthLinkSkill({ skillPath });
@@ -2092,12 +2122,12 @@ test("HealthLink skill can be exported as an OpenClaw package", () => {
     assert.equal(result.packageDir, packageDir);
     assert.deepEqual(readdirSync(packageDir).sort(), ["README.md", "SKILL.md"]);
     assert.equal(frontmatter.name, "healthlink-personal-context");
-    assert.equal(frontmatter.version, "0.2.0");
+    assert.equal(frontmatter.version, "0.3.0");
     assert.equal(frontmatter.license, undefined);
     assert.deepEqual(frontmatter.metadata.openclaw.requires.bins, ["healthlink-local"]);
     assert.deepEqual(frontmatter.metadata.openclaw.install, [{
       kind: "node",
-      package: "healthlink-local@^0.2.0",
+      package: "healthlink-local@0.3.0",
       bins: ["healthlink-local"]
     }]);
     assert.deepEqual(frontmatter.metadata.openclaw.os, ["macos", "linux", "windows"]);
@@ -2110,6 +2140,40 @@ test("HealthLink skill can be exported as an OpenClaw package", () => {
     assert.match(readme, /MIT-0/);
     assert.doesNotMatch(skill, /BEGIN PRIVATE KEY/);
     assert.doesNotMatch(readme, /healthlink\.sqlite/);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("removing or upgrading a Skill preserves runtime identity, history, and generic MCP", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-skill-isolation-test-"));
+  try {
+    const stateDir = join(tempDir, ".healthlink");
+    const databasePath = join(stateDir, "healthlink.sqlite");
+    const skillPath = join(tempDir, "agent", "skills", "healthlink-personal-context", "SKILL.md");
+    const runtime = initializeRelayRuntime({
+      stateDir,
+      relayUrl: "http://127.0.0.1:8790",
+      mode: "self_hosted_relay"
+    });
+    const database = openHealthLinkDatabase({ path: databasePath });
+    database.close();
+    const genericMcpBefore = buildHealthLinkMcpServerConfig({ databasePath });
+
+    installHermesHealthLinkSkill({ skillPath });
+    installHermesHealthLinkSkill({ skillPath });
+    rmSync(dirname(skillPath), { recursive: true, force: true });
+
+    const preserved = readRelayRuntimeConfig({ stateDir });
+    const genericMcpAfter = buildHealthLinkMcpServerConfig({ databasePath });
+    assert.equal(preserved.user_id, runtime.user_id);
+    assert.equal(preserved.source_device_id, runtime.source_device_id);
+    assert.equal(preserved.encryption_public_key_x25519, runtime.encryption_public_key_x25519);
+    assert.equal(preserved.relay_access_token, runtime.relay_access_token);
+    assert.equal(existsSync(databasePath), true);
+    assert.deepEqual(genericMcpAfter, genericMcpBefore);
+    const reopened = openHealthLinkDatabase({ path: databasePath });
+    reopened.close();
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
@@ -2720,7 +2784,7 @@ test("local package manifest is ready for public npm packing", () => {
   };
 
   assert.equal(manifest.name, "healthlink-local");
-  assert.equal(manifest.version, "0.2.0");
+  assert.equal(manifest.version, "0.3.0");
   assert.equal(manifest.private, undefined);
   assert.equal(manifest.license, "MIT");
   assert.equal(manifest.bin?.["healthlink-local"], "./dist/cli.js");
@@ -2822,7 +2886,7 @@ test("root package exposes repeatable relay release audit gates", () => {
   assert.match(auditScript, /Unknown option/);
   assert.match(auditScript, /requires a value/);
   assert.match(auditScript, /compiled onboarding saved-mode inheritance/);
-  assert.match(auditScript, /Mode:        hosted_relay/);
+  assert.match(auditScript, /details\?\.relay_mode/);
   assert.match(containerAuditScript, /Docker daemon is unavailable/);
   assert.match(containerAuditScript, /--project-name/);
   assert.match(containerAuditScript, /--read-only/);
@@ -2837,6 +2901,9 @@ test("root package exposes repeatable relay release audit gates", () => {
   assert.match(packageAuditScript, /npm_config_cache/);
   assert.match(packageAuditScript, /--pack-destination/);
   assert.match(packageAuditScript, /--global/);
+  assert.match(packageAuditScript, /pinned npx-compatible cold invocation/);
+  assert.match(packageAuditScript, /"exec"/);
+  assert.match(packageAuditScript, /"--package"/);
   assert.match(packageAuditScript, /self-hosted-relay/);
   assert.match(packageAuditScript, /fixture_uploaded/);
   assert.match(packageAuditScript, /--active/);
@@ -2922,6 +2989,179 @@ test("pairing client reports unreachable daemon and parses pair/start responses"
   assert.equal(session.expires_in_seconds, 600);
 });
 
+test("portable installer uses a user prefix and manages its PATH block idempotently", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-installer-"));
+  try {
+    const home = join(tempDir, "home");
+    const fakeBin = join(tempDir, "bin");
+    const prefix = join(home, ".healthlink", "npm-global");
+    const profile = join(home, ".profile");
+    const npmLog = join(tempDir, "npm.log");
+    const installScript = resolve(packageRoot, "..", "..", "install.sh");
+    const websiteInstallScript = resolve(packageRoot, "..", "..", "apps", "www", "public", "install.sh");
+    mkdirSync(fakeBin, { recursive: true });
+    mkdirSync(join(home, ".healthlink"), { recursive: true });
+    writeFileSync(join(home, ".healthlink", "preserve-me"), "local history", "utf8");
+    writeFileSync(join(fakeBin, "node"), "#!/bin/sh\nprintf '24\\n'\n", "utf8");
+    writeFileSync(join(fakeBin, "npm"), "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$TEST_NPM_LOG\"\n", "utf8");
+    writeFileSync(join(fakeBin, "uname"), "#!/bin/sh\nprintf 'Linux\\n'\n", "utf8");
+    chmodSync(join(fakeBin, "node"), 0o755);
+    chmodSync(join(fakeBin, "npm"), 0o755);
+    chmodSync(join(fakeBin, "uname"), 0o755);
+    const env = {
+      ...process.env,
+      HOME: home,
+      SHELL: "/bin/sh",
+      PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+      HEALTHLINK_PROFILE: profile,
+      HEALTHLINK_INSTALL_PREFIX: prefix,
+      WSL_DISTRO_NAME: "HealthLinkTestWSL",
+      TEST_NPM_LOG: npmLog
+    };
+
+    let lastStdout = "";
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const result = spawnSync("sh", [installScript, "--version", "0.3.0"], { env, encoding: "utf8" });
+      assert.equal(result.status, 0, result.stderr);
+      lastStdout = result.stdout;
+    }
+    assert.match(lastStdout, /Platform:\s+wsl/);
+    const installedProfile = readFileSync(profile, "utf8");
+    assert.equal((installedProfile.match(/# >>> healthlink-local >>>/g) ?? []).length, 1);
+    assert.match(installedProfile, new RegExp(escapeRegExp(`export PATH="${prefix}/bin:$PATH"`)));
+    assert.match(readFileSync(npmLog, "utf8"), /install --global --prefix .*healthlink-local@0\.3\.0/);
+    assert.equal(readFileSync(websiteInstallScript, "utf8"), readFileSync(installScript, "utf8"));
+
+    const uninstall = spawnSync("sh", [installScript, "--uninstall"], { env, encoding: "utf8" });
+    assert.equal(uninstall.status, 0, uninstall.stderr);
+    assert.doesNotMatch(readFileSync(profile, "utf8"), /healthlink-local/);
+    assert.equal(readFileSync(join(home, ".healthlink", "preserve-me"), "utf8"), "local history");
+    assert.match(readFileSync(npmLog, "utf8"), /uninstall --global --prefix .*healthlink-local/);
+
+    const malformedProfile = "user setting before\n# >>> healthlink-local >>>\nunrelated user setting after\n";
+    writeFileSync(profile, malformedProfile, "utf8");
+    const malformedUninstall = spawnSync("sh", [installScript, "--uninstall"], { env, encoding: "utf8" });
+    assert.equal(malformedUninstall.status, 0, malformedUninstall.stderr);
+    assert.equal(readFileSync(profile, "utf8"), malformedProfile);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("portable installer selects macOS, Linux, and WSL shell profiles without a system prefix", () => {
+  const rootTemp = mkdtempSync(join(tmpdir(), "healthlink-installer-platforms-"));
+  try {
+    const installScript = resolve(packageRoot, "..", "..", "install.sh");
+    const cases = [
+      { name: "macos-zsh", uname: "Darwin", shell: "/bin/zsh", wsl: undefined, profile: ".zshrc", platform: "macos" },
+      { name: "linux-bash", uname: "Linux", shell: "/bin/bash", wsl: undefined, profile: ".bashrc", platform: "linux" },
+      { name: "wsl-bash", uname: "Linux", shell: "/bin/bash", wsl: "Ubuntu", profile: ".bashrc", platform: "wsl" }
+    ];
+    for (const testCase of cases) {
+      const tempDir = join(rootTemp, testCase.name);
+      const home = join(tempDir, "home");
+      const fakeBin = join(tempDir, "bin");
+      const npmLog = join(tempDir, "npm.log");
+      mkdirSync(fakeBin, { recursive: true });
+      mkdirSync(home, { recursive: true });
+      writeFileSync(join(fakeBin, "node"), "#!/bin/sh\nprintf '24\\n'\n", "utf8");
+      writeFileSync(join(fakeBin, "npm"), "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$TEST_NPM_LOG\"\n", "utf8");
+      writeFileSync(join(fakeBin, "uname"), `#!/bin/sh\nprintf '${testCase.uname}\\n'\n`, "utf8");
+      for (const file of ["node", "npm", "uname"]) chmodSync(join(fakeBin, file), 0o755);
+      const env = {
+        ...process.env,
+        HOME: home,
+        SHELL: testCase.shell,
+        PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+        HEALTHLINK_PROFILE: undefined,
+        HEALTHLINK_INSTALL_PREFIX: undefined,
+        WSL_DISTRO_NAME: testCase.wsl,
+        npm_config_prefix: "/root/non-writable-system-prefix",
+        TEST_NPM_LOG: npmLog
+      };
+      const result = spawnSync("sh", [installScript], { env, encoding: "utf8" });
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(result.stdout, new RegExp(`Platform:\\s+${testCase.platform}`));
+      assert.equal(existsSync(join(home, testCase.profile)), true);
+      const expectedPrefix = join(home, ".healthlink", "npm-global");
+      assert.match(readFileSync(npmLog, "utf8"), new RegExp(escapeRegExp(`--prefix ${expectedPrefix}`)));
+      assert.doesNotMatch(readFileSync(npmLog, "utf8"), /non-writable-system-prefix/);
+    }
+  } finally {
+    rmSync(rootTemp, { recursive: true, force: true });
+  }
+});
+
+test("CLI setup emits one redacted JSON document for plan and resumable failure", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-cli-bootstrap-"));
+  try {
+    const cliPath = join(packageRoot, "src", "cli.ts");
+    const stateDir = join(tempDir, "state");
+    const databasePath = join(tempDir, "healthlink.sqlite");
+    const commonArgs = [
+      "--import", "tsx", cliPath,
+      "--state-dir", stateDir,
+      "--db", databasePath
+    ];
+    const env = { ...process.env, HOME: tempDir };
+    const emptyStateDir = join(tempDir, "empty-state");
+    const missingOnboarding = spawnSync(process.execPath, [
+      "--import", "tsx", cliPath,
+      "print-onboarding",
+      "--state-dir", emptyStateDir,
+      "--transport", "self-hosted-relay",
+      "--format", "qr",
+      "--output", "json"
+    ], { env, encoding: "utf8" });
+    assert.equal(missingOnboarding.status, 1);
+    const missingOutput = JSON.parse(missingOnboarding.stdout) as { status: string; error: { code: string } };
+    assert.equal(missingOutput.status, "failed");
+    assert.equal(typeof missingOutput.error.code, "string");
+    assert.equal(missingOnboarding.stderr, "");
+    assert.equal(existsSync(join(emptyStateDir, "config.json")), false);
+
+    const plan = spawnSync(process.execPath, [
+      ...commonArgs,
+      "setup",
+      "--agent", "generic",
+      "--transport", "self-hosted-relay",
+      "--relay-url", "http://127.0.0.1:8790",
+      "--manager", "manual",
+      "--output", "json"
+    ], { env, encoding: "utf8" });
+    assert.equal(plan.status, 0, plan.stderr);
+    const planOutput = JSON.parse(plan.stdout) as { status: string; schema_version: number; next_action: { type: string } };
+    assert.equal(planOutput.schema_version, 1);
+    assert.equal(planOutput.status, "awaiting_consent");
+    assert.equal(planOutput.next_action.type, "confirm");
+    assert.equal(existsSync(databasePath), false);
+    assert.equal(existsSync(join(stateDir, "config.json")), false);
+
+    const resume = spawnSync(process.execPath, [
+      ...commonArgs,
+      "setup", "--resume", "--yes", "--output", "json"
+    ], { env, encoding: "utf8" });
+    assert.equal(resume.status, 1);
+    const resumeOutput = JSON.parse(resume.stdout) as { status: string; error: { code: string; message: string } };
+    assert.equal(resumeOutput.status, "failed");
+    assert.equal(typeof resumeOutput.error.code, "string");
+    assert.doesNotMatch(resume.stdout, /relay_access_token|upload_auth_secret|BEGIN PRIVATE KEY|healthlink-e2ee-v1:/);
+    assert.equal(resume.stderr, "");
+
+    for (const commandArgs of [
+      ["status", "--output", "json"],
+      ["doctor", "--transport", "self-hosted-relay", "--manager", "manual", "--output", "json"],
+      ["print-onboarding", "--format", "qr", "--output", "json"]
+    ]) {
+      const result = spawnSync(process.execPath, [...commonArgs, ...commandArgs], { env, encoding: "utf8" });
+      assert.doesNotMatch(result.stdout, /relay_access_token|upload_auth_secret|relay_api_token|BEGIN PRIVATE KEY|healthlink-e2ee-v1:/);
+      assert.doesNotThrow(() => JSON.parse(result.stdout), `${commandArgs[0]} must emit one JSON document`);
+    }
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("service setup workflow installs agent, starts service, waits, pairs, then prints reload hint", async () => {
   const calls: string[] = [];
   await runServiceSetupWorkflow({
@@ -2988,6 +3228,210 @@ test("service ensure workflow installs missing service, starts it, waits, then p
     "wait-ready",
     "print-status"
   ]);
+});
+
+test("bootstrap plan and state are versioned, private, resumable, and idempotent", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-bootstrap-"));
+  try {
+    const config = {
+      agent_id: "openclaw" as const,
+      transport_id: "relay" as const,
+      service_manager: "manual" as const,
+      service_mode: "relay_pull" as const,
+      host: "0.0.0.0",
+      port: 8787,
+      pull_interval_seconds: 300,
+      install_skill: false,
+      state_dir: tempDir,
+      relay_url: "https://relay.example.com"
+    };
+    const plan = buildBootstrapPlan(config);
+    assert.equal(plan.length, 5);
+    assert.equal(plan.some((item) => item.id === "configure_agent" && item.persistent_change), true);
+
+    let state = createBootstrapState(config, new Date("2026-07-12T00:00:00.000Z"));
+    state = writeBootstrapState(state, { stateDir: tempDir });
+    assert.equal(readBootstrapState({ stateDir: tempDir })?.setup_id, state.setup_id);
+    const statePath = join(tempDir, "setup", "state-v1.json");
+    if (process.platform !== "win32") {
+      assert.equal(statSync(statePath).mode & 0o777, 0o600);
+      assert.equal(statSync(dirname(statePath)).mode & 0o777, 0o700);
+    }
+
+    state = markBootstrapStage(state, "consent_received", { status: "running", stateDir: tempDir });
+    state = markBootstrapStage(state, "consent_received", { status: "running", stateDir: tempDir });
+    assert.equal(state.completed_stages.filter((stage) => stage === "consent_received").length, 1);
+    assert.equal(bootstrapStageComplete(state, "consent_received"), true);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("bootstrap workflow resumes safely after every mutating stage", async () => {
+  const stages = ["runtime_initialized", "agent_configured", "service_installed", "service_started", "onboarding_created"] as const;
+  for (const failingStage of stages) {
+    const tempDir = mkdtempSync(join(tmpdir(), `healthlink-bootstrap-${failingStage}-`));
+    try {
+      const state = writeBootstrapState(createBootstrapState({
+        agent_id: "generic",
+        transport_id: "relay",
+        service_manager: "manual",
+        service_mode: "relay_pull",
+        host: "0.0.0.0",
+        port: 8787,
+        pull_interval_seconds: 300,
+        install_skill: false,
+        state_dir: tempDir,
+        relay_url: "https://relay.example.com"
+      }), { stateDir: tempDir });
+      const calls = new Map<string, number>();
+      let shouldFail = true;
+      const call = (stage: string) => {
+        calls.set(stage, (calls.get(stage) ?? 0) + 1);
+        if (stage === failingStage && shouldFail) {
+          shouldFail = false;
+          throw new Error(`fixture interruption at ${stage}`);
+        }
+      };
+      const actions = {
+        runtime_initialized: () => call("runtime_initialized"),
+        agent_configured: () => call("agent_configured"),
+        service_installed: () => call("service_installed"),
+        service_started: () => call("service_started"),
+        onboarding_created: () => {
+          call("onboarding_created");
+          return { onboarding_url: "file:///tmp/healthlink-onboarding-fixture.html" };
+        },
+        first_sync_observed: () => true
+      };
+
+      await assert.rejects(() => runBootstrapWorkflow(state, actions, { stateDir: tempDir }), /fixture interruption/);
+      const interrupted = readBootstrapState({ stateDir: tempDir });
+      assert.ok(interrupted);
+      assert.equal(interrupted.completed_stages.includes(failingStage), false);
+      const completed = await runBootstrapWorkflow(interrupted, actions, { stateDir: tempDir });
+      assert.equal(completed.status, "complete");
+      assert.equal(completed.completed_stages.includes("first_sync_observed"), true);
+
+      const failingIndex = stages.indexOf(failingStage);
+      for (let index = 0; index < failingIndex; index += 1) {
+        assert.equal(calls.get(stages[index] ?? ""), 1, `${stages[index]} should not repeat after resume`);
+      }
+      assert.equal(calls.get(failingStage), 2);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("bootstrap waits for first sync without repeating completed setup actions", async () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-bootstrap-first-sync-"));
+  try {
+    const state = writeBootstrapState(createBootstrapState({
+      agent_id: "generic",
+      transport_id: "lan",
+      service_manager: "manual",
+      service_mode: "receiver",
+      host: "0.0.0.0",
+      port: 8787,
+      pull_interval_seconds: 300,
+      install_skill: false,
+      state_dir: tempDir
+    }), { stateDir: tempDir });
+    const baselineState = writeBootstrapState({ ...state, initial_sync_count: 4 }, { stateDir: tempDir });
+    let mutations = 0;
+    let syncCount = 4;
+    const actions = {
+      runtime_initialized: () => { mutations += 1; },
+      agent_configured: () => { mutations += 1; },
+      service_installed: () => { mutations += 1; },
+      service_started: () => { mutations += 1; },
+      onboarding_created: () => {
+        mutations += 1;
+        return { onboarding_url: "http://127.0.0.1:8787/pair" };
+      },
+      first_sync_observed: () => syncCount > (baselineState.initial_sync_count ?? 0)
+    };
+    const waiting = await runBootstrapWorkflow(baselineState, actions, { stateDir: tempDir });
+    assert.equal(waiting.status, "awaiting_first_sync");
+    assert.equal(mutations, 5);
+    syncCount = 5;
+    const complete = await runBootstrapWorkflow(waiting, actions, { stateDir: tempDir });
+    assert.equal(complete.status, "complete");
+    assert.equal(mutations, 5);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("bootstrap lock rejects concurrent setup and recovers after release", async () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-bootstrap-lock-"));
+  try {
+    await withBootstrapLock({ stateDir: tempDir }, async () => {
+      await assert.rejects(
+        () => withBootstrapLock({ stateDir: tempDir }, async () => undefined),
+        /already running/
+      );
+    });
+    await withBootstrapLock({ stateDir: tempDir }, async () => undefined);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("Agent output redaction removes secret fields and credential-bearing onboarding values", () => {
+  const sanitized = sanitizeAgentOutput({
+    status: "failed",
+    relay_access_token: "fixture-secret-token-123456789",
+    nested: {
+      message: "healthlink://onboard?payload=fixture-sensitive-payload",
+      safe: "https://relay.example.com"
+    }
+  });
+  const serialized = JSON.stringify(sanitized);
+  assert.doesNotMatch(serialized, /fixture-secret-token/);
+  assert.doesNotMatch(serialized, /fixture-sensitive-payload/);
+  assert.match(serialized, /\[REDACTED\]/);
+  assert.match(serialized, /https:\/\/relay\.example\.com/);
+});
+
+test("relay onboarding artifact keeps credentials in a private local file", async () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-onboarding-artifact-"));
+  try {
+    const config = initializeRelayRuntime({
+      stateDir: tempDir,
+      relayUrl: "http://127.0.0.1:8790",
+      mode: "self_hosted_relay"
+    });
+    const artifact = await writeRelayOnboardingArtifact({ config, stateDir: tempDir });
+    assert.equal(artifact.local_url.startsWith("file://"), true);
+    assert.equal(artifact.contains_credentials, true);
+    const html = readFileSync(artifact.local_path, "utf8");
+    assert.match(html, /Connect HealthLink iOS/);
+    assert.match(html, /Do not share or upload/);
+    assert.match(html, /HealthLink onboarding QR code/);
+    assert.doesNotMatch(html, />Open HealthLink</);
+    assert.doesNotMatch(html, /<textarea/);
+    assert.doesNotMatch(JSON.stringify(artifact), new RegExp(escapeRegExp(config.relay_access_token)));
+    if (process.platform !== "win32") {
+      assert.equal(statSync(artifact.local_path).mode & 0o777, 0o600);
+    }
+
+    const deepLinkArtifact = await writeRelayOnboardingArtifact({ config, stateDir: tempDir, format: "deeplink" });
+    const deepLinkHtml = readFileSync(deepLinkArtifact.local_path, "utf8");
+    assert.match(deepLinkHtml, />Open HealthLink</);
+    assert.doesNotMatch(deepLinkHtml, /HealthLink onboarding QR code/);
+    assert.doesNotMatch(deepLinkHtml, /<textarea/);
+
+    const textArtifact = await writeRelayOnboardingArtifact({ config, stateDir: tempDir, format: "text" });
+    const textHtml = readFileSync(textArtifact.local_path, "utf8");
+    assert.match(textHtml, /<textarea/);
+    assert.match(textHtml, /healthlink-e2ee-v1:/);
+    assert.doesNotMatch(textHtml, />Open HealthLink</);
+    assert.doesNotMatch(textHtml, /HealthLink onboarding QR code/);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
 });
 
 test("Source platform capability metadata includes future app surfaces", () => {

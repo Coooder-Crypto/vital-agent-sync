@@ -31,6 +31,25 @@ For the published package, the intended user path is one command:
 npx -y healthlink-local setup
 ```
 
+For supported Agents, the preferred product experience is Skill-first. The Skill requests a versioned redacted plan and invokes the same resumable runtime bootstrap:
+
+```bash
+healthlink-local setup --agent openclaw --transport relay --relay-url https://relay.example.com --output json
+healthlink-local setup --resume --yes --output json
+healthlink-local status --output json
+```
+
+Without `--yes`, non-interactive setup stops at `awaiting_consent` and does not write Agent config or install/start services. Credential-bearing relay onboarding is written to a private local page; JSON returns only its local URL. Existing compatible `~/.healthlink` runtime state and history are reused across Skill upgrades.
+
+Portable installation without a writable system npm prefix:
+
+```bash
+curl -fsSL https://<healthlink-domain>/install.sh | sh
+healthlink-local setup
+```
+
+The installer writes to `~/.healthlink/npm-global`, manages one marked shell PATH block, never uses sudo, and preserves local HealthLink data on `install.sh --uninstall`.
+
 This auto-selects the current platform's service manager, auto-detects a supported Agent config when possible, installs the background receiver, starts it, and prints a 10-minute iPhone pairing QR. If Hermes is detected, it writes the Hermes MCP config and installs the HealthLink Hermes skill. After the first successful pair and sync, the terminal can close.
 
 For a global install:
