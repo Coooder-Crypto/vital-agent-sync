@@ -8,7 +8,7 @@ final class GatewaySettingsTests: XCTestCase {
     private var keychain: InMemoryKeychainStore!
 
     override func setUpWithError() throws {
-        suiteName = "app.healthlink.tests.\(UUID().uuidString)"
+        suiteName = "com.vitalmcp.tests.\(UUID().uuidString)"
         defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         defaults.removePersistentDomain(forName: suiteName)
         keychain = InMemoryKeychainStore()
@@ -18,6 +18,23 @@ final class GatewaySettingsTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
         defaults = nil
         keychain = nil
+    }
+
+    func testVitalMCPBundleMetadataAndCompatibilitySchemes() throws {
+        XCTAssertEqual(Bundle.main.bundleIdentifier, "com.vitalmcp.ios")
+        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String, "VitalMCP")
+        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String, "VitalMCP")
+
+        let permittedTasks = try XCTUnwrap(
+            Bundle.main.object(forInfoDictionaryKey: "BGTaskSchedulerPermittedIdentifiers") as? [String]
+        )
+        XCTAssertEqual(BackgroundSyncManager.appRefreshTaskIdentifier, "com.vitalmcp.ios.autosync")
+        XCTAssertTrue(permittedTasks.contains(BackgroundSyncManager.appRefreshTaskIdentifier))
+
+        let urlTypes = try XCTUnwrap(Bundle.main.object(forInfoDictionaryKey: "CFBundleURLTypes") as? [[String: Any]])
+        let schemes = Set(urlTypes.flatMap { $0["CFBundleURLSchemes"] as? [String] ?? [] })
+        XCTAssertTrue(schemes.contains(AppDeepLinkScheme.primary))
+        XCTAssertTrue(schemes.contains(AppDeepLinkScheme.legacy))
     }
 
     @MainActor

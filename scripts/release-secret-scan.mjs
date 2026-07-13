@@ -62,14 +62,14 @@ for (const relativePath of listReleaseFiles()) {
 }
 
 if (findings.length > 0) {
-  console.error(`HealthLink release secret scan failed with ${findings.length} finding(s).`);
+  console.error(`VitalMCP release secret scan failed with ${findings.length} finding(s).`);
   for (const finding of findings) {
     const location = finding.line === null ? finding.path : `${finding.path}:${finding.line}`;
     console.error(`${finding.rule}: ${location}`);
   }
   process.exitCode = 1;
 } else {
-  console.log("HealthLink release secret scan passed.");
+  console.log("VitalMCP release secret scan passed.");
   console.log(JSON.stringify({
     files_scanned: scannedFiles,
     skipped_binary_files: skippedBinaryFiles,
@@ -160,7 +160,7 @@ function runSelfTest() {
 
   const literal = ["relay_access_token=\"", "AbCdEfGhIjKlMnOpQrStUvWxYz_123456", "\""].join("");
   if (!containsLiteralHealthLinkSecret(literal)) {
-    throw new Error("Secret scan self-test failed for a HealthLink secret literal.");
+    throw new Error("Secret scan self-test failed for a VitalMCP secret literal.");
   }
   if (containsLiteralHealthLinkSecret("relay_access_token=\"replace-with-a-random-32-byte-value\"")) {
     throw new Error("Secret scan self-test incorrectly rejected a documented placeholder.");

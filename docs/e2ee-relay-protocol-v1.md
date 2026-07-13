@@ -1,12 +1,12 @@
 # HealthLink E2EE Relay Protocol v1
 
-This document is the implementation contract for `healthlink-e2ee-v1`. It covers the mobile source, relay mailbox, and `healthlink-local` runtime. Hosted and self-hosted relays use the same protocol.
+This document is the implementation contract for `healthlink-e2ee-v1`. It covers the mobile source, relay mailbox, and `vitalmcp` runtime. Hosted and self-hosted relays use the same protocol.
 
 ## Trust Boundary
 
 - The mobile source reads health data and encrypts it for one local runtime.
 - The relay authenticates transport requests and stores opaque envelopes. It does not receive the decryption private key or HMAC upload secret outside the end-to-end onboarding transfer.
-- `healthlink-local` owns the long-lived private key, verifies and decrypts envelopes, validates the plaintext schema, and writes SQLite.
+- `vitalmcp` owns the long-lived private key, verifies and decrypts envelopes, validates the plaintext schema, and writes SQLite.
 - Agents read health summaries through MCP. The relay API is not a health-query API.
 
 ## Encodings
@@ -45,7 +45,7 @@ Supported handoff forms:
 ```text
 raw JSON
 healthlink-e2ee-v1:<base64url(JSON)>
-healthlink://onboard?payload=healthlink-e2ee-v1:<base64url(JSON)>
+vitalmcp://onboard?payload=healthlink-e2ee-v1:<base64url(JSON)>
 ```
 
 The QR contains the deep link. HealthLink iOS accepts all three forms.

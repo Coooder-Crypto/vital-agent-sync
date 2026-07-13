@@ -13,19 +13,19 @@ const iosSdkPath = resolveIOSSDKPath();
 
 const checks = [
   {
-    label: "healthlink-local typecheck",
+    label: "vitalmcp typecheck",
     command: "npm",
-    args: ["run", "typecheck", "--workspace", "healthlink-local"]
+    args: ["run", "typecheck", "--workspace", "vitalmcp"]
   },
   {
-    label: "healthlink-local tests",
+    label: "vitalmcp tests",
     command: "npm",
-    args: ["test", "--workspace", "healthlink-local"]
+    args: ["test", "--workspace", "vitalmcp"]
   },
   {
-    label: "healthlink-local build",
+    label: "vitalmcp build",
     command: "npm",
-    args: ["run", "build", "--workspace", "healthlink-local"]
+    args: ["run", "build", "--workspace", "vitalmcp"]
   },
   {
     label: "compiled CLI version",
@@ -82,7 +82,7 @@ runHostedSetupFailClosedCheck();
 runCliArgumentValidationCheck();
 runSavedRelayModeCheck();
 await runCompiledRelayAudit();
-console.log("\nHealthLink E2EE relay local audit passed.");
+console.log("\nVitalMCP E2EE relay local audit passed.");
 
 function run(check) {
   console.log(`\n==> ${check.label}`);
@@ -144,7 +144,7 @@ function runHostedSetupFailClosedCheck() {
     }
     const output = result.stdout.trim() ? JSON.parse(result.stdout) : {};
     if (result.status === 0 || output.error?.code !== "relay_url_invalid" ||
-        !output.error?.message?.includes("Hosted HealthLink relay URL is not configured")) {
+        !output.error?.message?.includes("Hosted VitalMCP relay URL is not configured")) {
       process.stderr.write(result.stdout);
       process.stderr.write(result.stderr);
       throw new Error("Hosted relay setup did not fail with the expected missing-URL error.");

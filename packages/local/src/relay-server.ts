@@ -417,7 +417,7 @@ export async function startRelayServer(options: RelayServerOptions): Promise<voi
     host: options.host,
     port: options.port
   });
-  console.log("HealthLink relay running");
+  console.log("VitalMCP relay running");
   console.log(`Relay API: http://127.0.0.1:${options.port}`);
   console.log(`Database:  ${database.path}`);
   console.log(`Retention: ${resolveRelayLimits(options).retentionMs} ms`);
@@ -619,7 +619,7 @@ function renderRelayStatusPage(row: RelayStatusRow, limits: ReturnType<typeof re
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>HealthLink Relay Status</title>
+  <title>VitalMCP Relay Status</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 2rem; color: #151515; background: #fafafa; }
     main { max-width: 760px; }
@@ -632,7 +632,7 @@ function renderRelayStatusPage(row: RelayStatusRow, limits: ReturnType<typeof re
 </head>
 <body>
   <main>
-    <h1>HealthLink Relay Status</h1>
+    <h1>VitalMCP Relay Status</h1>
     <p>This page exposes aggregate relay health only. Private payload, authentication, and per-device materials are not shown.</p>
     <dl>
       <dt>Queued envelopes</dt><dd>${row.queuedCount}</dd>

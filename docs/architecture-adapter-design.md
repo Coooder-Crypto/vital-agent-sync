@@ -168,7 +168,7 @@ Health Connect ExerciseSessionRecord
 
 Android app responsibilities:
 
-- Pair with the same `healthlink://pair?...` payload.
+- Pair with the same `vitalmcp://pair?...` payload.
 - Store server URL, source-device ID, and token in Android secure storage.
 - Request Health Connect permissions once, with clear per-metric toggles when possible.
 - Sync the same `/health/sync` payload shape.
@@ -279,7 +279,7 @@ Recommended generic import path:
 1. User runs:
 
    ```bash
-   healthlink-local print-skill --format markdown
+   vitalmcp print-skill --format markdown
    ```
 
 2. User or adapter places the rendered Markdown into the agent's documented skill, rule, memory, or instruction location.
@@ -289,8 +289,8 @@ Recommended generic import path:
 Non-Hermes adapters should not install skill files until their rule format is verified. The fallback is always:
 
 ```bash
-healthlink-local print-agent-config --agent generic
-healthlink-local print-skill --format markdown
+vitalmcp print-agent-config --agent generic
+vitalmcp print-skill --format markdown
 ```
 
 ## Transport Provider Design
@@ -329,7 +329,7 @@ Future native provider:
 Until then, users can pass:
 
 ```bash
-healthlink-local init --transport cloudflare --server-url https://example.trycloudflare.com
+vitalmcp init --transport cloudflare --server-url https://example.trycloudflare.com
 ```
 
 ### ngrok
@@ -344,7 +344,7 @@ Future native provider:
 Until then, users can pass:
 
 ```bash
-healthlink-local init --transport ngrok --server-url https://example.ngrok-free.app
+vitalmcp init --transport ngrok --server-url https://example.ngrok-free.app
 ```
 
 ### Public HTTPS

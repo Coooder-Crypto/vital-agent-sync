@@ -15,7 +15,7 @@ npm run audit:dependencies
 npm run audit:secrets
 ```
 
-`audit:relay-local` covers TypeScript, Node tests, compiled fixture/CLI behavior, and iOS source/crypto interoperability. `audit:relay-container` requires a running Docker daemon and automates Compose validation, relay image build, runtime dependency/toolchain inspection, Caddy validation, hardened-container active audit, log scanning, SQLite cleanup checks, and teardown of uniquely named temporary resources. `audit:relay-package` packs `healthlink-local`, installs the tarball into an isolated temporary global prefix/cache, and uses only that installed CLI for encrypted fixture upload/pull/SQLite verification, active relay audit, and optional OpenClaw Skill export before removing all temporary state. Its cold dependency install prints a heartbeat every 15 seconds, bounds npm fetch retries, fails after five minutes, and cleans the child process plus temporary state on failure or interruption. `audit:agent-adapters` requires a locally installed Hermes CLI; it verifies the Agent-neutral CLI surface, a real generic MCP tool call, isolated Hermes config/skill installation, and a Hermes MCP handshake without changing the user's Hermes HOME.
+`audit:relay-local` covers TypeScript, Node tests, compiled fixture/CLI behavior, and iOS source/crypto interoperability. `audit:relay-container` requires a running Docker daemon and automates Compose validation, relay image build, runtime dependency/toolchain inspection, Caddy validation, hardened-container active audit, log scanning, SQLite cleanup checks, and teardown of uniquely named temporary resources. `audit:relay-package` packs `vitalmcp`, installs the tarball into an isolated temporary global prefix/cache, and uses only that installed CLI for encrypted fixture upload/pull/SQLite verification, active relay audit, and optional OpenClaw Skill export before removing all temporary state. Its cold dependency install prints a heartbeat every 15 seconds, bounds npm fetch retries, fails after five minutes, and cleans the child process plus temporary state on failure or interruption. `audit:agent-adapters` requires a locally installed Hermes CLI; it verifies the Agent-neutral CLI surface, a real generic MCP tool call, isolated Hermes config/skill installation, and a Hermes MCP handshake without changing the user's Hermes HOME.
 
 Latest repository evidence, 2026-07-11:
 
@@ -35,12 +35,19 @@ Latest repository evidence, 2026-07-11:
 - The hosted audit wrapper fails closed without `--yes`, rejects HTTP relay URLs, requires all three hosted environment values, keeps tokens out of child-process arguments, and is ready to run both audits once a real deployment exists.
 - `release:npm-preflight` passed from committed release source for publisher `coooder`, the 101-file `healthlink-local@0.2.0` artifact, a zero-finding secret scan, and the required version advance from registry `0.1.3`. `healthlink-local@0.2.0` was then published on 2026-07-11. The public registry reports `0.2.0` with an integrity hash, and an isolated `/tmp` install using a private npm cache/global prefix reports `healthlink-local 0.2.0` and successfully emits a `healthlink-e2ee-v1` encrypted fixture without private key material. No OpenClaw CLI is installed. A temporary ClawHub 0.23.0 `skill publish --dry-run --json` validation succeeded for `healthlink-personal-context@0.2.0` with exactly `SKILL.md` and `README.md`; the temporary CLI/cache was removed. ClawHub marketplace publication remains an explicit optional external action.
 
+VitalMCP direct-cutover evidence, 2026-07-12:
+
+- `vitalmcp@0.3.0` local tests pass 66/66, the full local relay audit passes, and the iOS simulator suite passes with Bundle ID `com.vitalmcp.ios`.
+- The final 107-file `vitalmcp-0.3.0.tgz` installs into an isolated global prefix and passes version, relay fixture/pull, active tenant audit, and OpenClaw Skill export checks using only the installed binary.
+- The authenticated release preflight identifies publisher `coooder`, reports `first_publish: true` for `vitalmcp`, and reports zero secret findings. The preflight does not publish.
+- The Web production build completes after switching the public install command and metadata to VitalMCP.
+
 That command runs the local evidence suite:
 
 ```bash
-npm run typecheck --workspace healthlink-local
-npm test --workspace healthlink-local
-npm run build --workspace healthlink-local
+npm run typecheck --workspace vitalmcp
+npm test --workspace vitalmcp
+npm run build --workspace vitalmcp
 node packages/local/dist/relay-fixture-flow.js
 swiftc -parse App/*.swift
 swiftc -target arm64-apple-ios17.0 -sdk <installed-iphoneos-sdk> -typecheck App/*.swift
@@ -57,7 +64,7 @@ Expected coverage:
 - Relay rejects malformed routing identifiers, non-integer sequences, invalid timestamps, and incorrectly encoded or sized X25519, nonce, tag, ciphertext, and signature fields before queueing; legacy HMAC and Ed25519 development envelopes remain covered as decrypt-only fixtures.
 - Relay storage accepts opaque envelopes, stores tenant access tokens only as hashes, enforces per-tenant list/ack/purge isolation, TTL cleanup, upload size/rate, bounded rate-limit state and list pages, and per-user queue limits.
 - Unlink, credential rotation, and identity reset/revoke purge superseded envelopes, block old identities, replace local keys, and require fresh iOS onboarding.
-- `healthlink-local pull` decrypts relay envelopes into the local SQLite database and leaves failed envelopes unacked.
+- `vitalmcp pull` decrypts relay envelopes into the local SQLite database and leaves failed envelopes unacked.
 - MCP health tools expose freshness metadata and can read fixture data after relay pull.
 - Generic MCP and Hermes expose the same 12-tool surface; Agent adapters only install config/skills and do not fork crypto, ingest, SQLite, or tool logic.
 - Portable skill output is Agent-parameterized. Optional OpenClaw export includes setup, onboarding credential handling, pull/Cron guidance, freshness, reporting, lifecycle confirmation, and privacy guardrails.
@@ -73,7 +80,7 @@ Expected coverage:
 Run a local relay and audit it:
 
 ```bash
-npm --workspace healthlink-local run dev -- relay serve \
+npm --workspace vitalmcp run dev -- relay serve \
   --host 127.0.0.1 \
   --port 8790 \
   --retention-days 30 \
@@ -88,9 +95,9 @@ npm --workspace healthlink-local run dev -- relay serve \
 In another terminal:
 
 ```bash
-npm --workspace healthlink-local run dev -- relay audit --relay-url http://127.0.0.1:8790 --metrics-token local-metrics-token
+npm --workspace vitalmcp run dev -- relay audit --relay-url http://127.0.0.1:8790 --metrics-token local-metrics-token
 
-npm --workspace healthlink-local run dev -- relay audit \
+npm --workspace vitalmcp run dev -- relay audit \
   --relay-url http://127.0.0.1:8790 \
   --metrics-token local-metrics-token \
   --relay-api-token local-relay-api-token \
@@ -133,8 +140,8 @@ The production preflight parses the final Compose JSON without starting services
 - Edge rate limits are configured outside the Node process.
 - `HEALTHLINK_RELAY_API_TOKEN` is set unless the hosting layer provides equivalent upload/list/ack/purge access control.
 - `/v1/status` reports `tenantProtected: true`; two disposable identities prove one tenant cannot list, ack, purge, unlink, rotate, or revoke the other.
-- Passive `healthlink-local relay audit --relay-url <hosted-url> --metrics-token <operator-token>` returns `ok: true`.
-- Active `healthlink-local relay audit --relay-url <hosted-url> --metrics-token <operator-token> --relay-api-token <deployment-token> --active --yes` returns `ok: true` and leaves no disposable test envelopes queued or acknowledged.
+- Passive `vitalmcp relay audit --relay-url <hosted-url> --metrics-token <operator-token>` returns `ok: true`.
+- Active `vitalmcp relay audit --relay-url <hosted-url> --metrics-token <operator-token> --relay-api-token <deployment-token> --active --yes` returns `ok: true` and leaves no disposable test envelopes queued or acknowledged.
 - Logs exclude request bodies and do not contain envelope JSON, ciphertext fields, upload secrets, or health plaintext.
 - `/v1/metrics` is internal or access-controlled; hosted deployments should set `HEALTHLINK_RELAY_METRICS_TOKEN` unless infrastructure already restricts access.
 - Relay SQLite backups are encrypted or disabled and do not retain rows longer than the retention policy.
@@ -147,44 +154,44 @@ The production preflight parses the final Compose JSON without starting services
 These checks require a machine with the matching iOS SDK/runtime and a test device or simulator setup:
 
 - Xcode build succeeds for the app target.
-- Direct pairing still works through `healthlink://pair?...`.
-- Relay onboarding works through QR/text code and `healthlink://onboard?payload=...`.
+- Direct pairing works through `vitalmcp://pair?...`; the legacy `healthlink://` scheme remains covered by compatibility tests.
+- Relay onboarding works through QR/text code and `vitalmcp://onboard?payload=...`.
 - Relay upload sends encrypted envelopes to a local or hosted relay.
-- `healthlink://sync?source=<agent>&request_id=...` triggers sync for any Agent. An adapter may include an explicitly allowlisted callback scheme; callbacks return only status metadata.
+- `vitalmcp://sync?source=<agent>&request_id=...` triggers sync for any Agent. An adapter may include an explicitly allowlisted callback scheme; callbacks return only status metadata.
 - Callback URLs never contain health data, tokens, envelope bodies, upload secrets, or detailed error payloads.
 - Callback output contains only a validated `request_id`, fixed status, and `source=healthlink`; original callback query items and fragments are discarded.
 
 ## Optional OpenClaw Publishing Gate
 
-The generated skill requires the relay-capable `healthlink-local@0.2.0` runtime. The npm runtime publication gate completed with:
+The generated Skill requires the relay-capable `vitalmcp@0.3.0` runtime. Before publishing it, run:
 
 ```bash
-npm run pack:check --workspace healthlink-local
+npm run pack:check --workspace vitalmcp
 npm run release:npm-preflight
-npm publish --workspace healthlink-local
-npm view healthlink-local version
+npm publish --workspace vitalmcp
+npm view vitalmcp version
 ```
 
-`release:npm-preflight` requires a clean non-website worktree, validates the public package manifest and dry-run artifact, checks `npm whoami`, and requires the local version to be newer than the registry version. It never executes `npm publish`. Set `HEALTHLINK_NPM_RELEASE_ALLOW_DIRTY=1` only when testing the preflight script itself; do not use that override for a real release. For `0.2.0`, the normal preflight passed before publication, npm now serves `0.2.0`, and a clean isolated global install plus version/E2EE fixture smoke test passed. After publication, the same-version preflight is expected to fail closed until the package version is bumped for the next release.
+`release:npm-preflight` requires a clean non-website worktree, validates the public package manifest and dry-run artifact, checks `npm whoami`, and allows the first `vitalmcp` publication only when the registry returns a verified package-not-found response. After publication, it requires the local version to be newer than the registry version. It never executes `npm publish`. Set `VITALMCP_NPM_RELEASE_ALLOW_DIRTY=1` only when testing the preflight script itself; do not use that override for a real release.
 
 Before each registry publication, run `npm run audit:relay-package`. It proves the exact local tarball installs into an isolated global prefix and that its installed binary completes relay and Skill workflows without importing workspace code. Registry metadata and a fresh install must still be checked independently after publication.
 
 Local skill generation and ClawHub dry-run validation are implemented, but account publication and listing installation are separate:
 
 ```bash
-npm --workspace healthlink-local run dev -- export-skill --agent openclaw --output-dir /tmp/healthlink-openclaw-skill
+npm --workspace vitalmcp run dev -- export-skill --agent openclaw --output-dir /tmp/vitalmcp-openclaw-skill
 ```
 
 Before publishing:
 
 - Review generated `SKILL.md` and `README.md`; ClawHub reads publication and runtime metadata from `SKILL.md` frontmatter.
-- Confirm `metadata.openclaw.requires.bins` and the Node install specification both identify `healthlink-local`.
+- Confirm `metadata.openclaw.requires.bins` and the Node install specification both identify `vitalmcp`.
 - Confirm install instructions use the intended package source and hosted relay URL.
-- Confirm `healthlink-local --version` reports `0.2.0` after installation from npm.
+- Confirm `vitalmcp --version` reports `0.3.0` after installation from npm.
 - Confirm the skill tells the agent to use MCP tools for health claims.
 - Confirm the skill does not ask the user to paste `~/.healthlink/secrets` or raw SQLite contents.
 - Confirm the skill never transcribes onboarding QR/deep-link/text credentials into Agent messages, logs, memory, or tool arguments.
-- Re-run `clawhub skill publish /tmp/healthlink-openclaw-skill --slug healthlink-personal-context --name "HealthLink Personal Context" --version 0.2.0 --changelog "Initial E2EE relay release" --dry-run` with the release toolchain.
+- Re-run `clawhub skill publish /tmp/vitalmcp-openclaw-skill --slug vitalmcp-personal-context --name "VitalMCP Personal Context" --version 0.3.0 --changelog "VitalMCP E2EE relay release" --dry-run` with the release toolchain.
 - Publish to ClawHub, then smoke test `openclaw skills install <owner-or-final-slug>` from the published listing.
 
 ## Release Decision

@@ -90,21 +90,21 @@ enum SyncFailureCategory: String, Codable {
     var recoveryHint: String {
         switch self {
         case .receiverUnreachable:
-            return "Make sure the Agent receiver is running and this iPhone can reach the saved server URL."
+            return String(localized: "Make sure the Agent receiver is running and this iPhone can reach the saved server URL.")
         case .tokenRevoked:
-            return "Pair this iPhone with the Agent again to receive a fresh device token."
+            return String(localized: "Pair this iPhone with the Agent again to receive a fresh device token.")
         case .healthPermissionMissing:
-            return "Open iOS Settings and allow HealthLink to read the selected Health data."
+            return String(localized: "Open iOS Settings and allow VitalMCP to read the selected Health data.")
         case .networkUnavailable:
-            return "Check Wi-Fi or cellular connectivity, then retry sync."
+            return String(localized: "Check Wi-Fi or cellular connectivity, then retry sync.")
         case .requestTimedOut:
-            return "Keep the Agent receiver online and retry when the network is stable."
+            return String(localized: "Keep the Agent receiver online and retry when the network is stable.")
         case .serverError:
-            return "Check the Agent receiver logs, then retry sync."
+            return String(localized: "Check the Agent receiver logs, then retry sync.")
         case .configuration:
-            return "Scan a pairing QR or complete the saved server and token settings."
+            return String(localized: "Scan a pairing QR or complete the saved server and token settings.")
         case .unknown:
-            return "Retry sync. If it keeps failing, check the Agent receiver status."
+            return String(localized: "Retry sync. If it keeps failing, check the Agent receiver status.")
         }
     }
 }
@@ -127,7 +127,7 @@ enum SyncDeliveryState: String, Codable {
         case .receiverAccepted:
             return String(localized: "The paired receiver stored this sync for Agent tools.")
         case .relayQueued:
-            return String(localized: "The relay accepted the encrypted envelope. Your Agent can read it after HealthLink Local pulls it.")
+            return String(localized: "The relay accepted the encrypted envelope. Your Agent can read it after the local runtime pulls it.")
         }
     }
 }
@@ -156,6 +156,18 @@ struct LastSyncDetail: Codable, Identifiable {
     }
 }
 
+enum AppDeepLinkScheme {
+    static let primary = "vitalmcp"
+    static let legacy = "healthlink"
+
+    static func isSupported(_ scheme: String?) -> Bool {
+        guard let scheme = scheme?.lowercased() else {
+            return false
+        }
+        return scheme == primary || scheme == legacy
+    }
+}
+
 struct PairingLink {
     let serverURL: URL
     let pairingCode: String
@@ -163,8 +175,8 @@ struct PairingLink {
     init(rawValue: String) throws {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let components = URLComponents(string: trimmed),
-              components.scheme == "healthlink",
-              components.host == "pair" else {
+              AppDeepLinkScheme.isSupported(components.scheme),
+              components.host?.lowercased() == "pair" else {
             throw GatewayError.invalidPairingURL
         }
 
@@ -295,7 +307,7 @@ struct RelayOnboardingPayload: Codable, Identifiable {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         let encodedValue: String
         if let components = URLComponents(string: trimmed),
-           components.scheme?.lowercased() == "healthlink",
+           AppDeepLinkScheme.isSupported(components.scheme),
            components.host?.lowercased() == "onboard",
            let payload = components.queryItems?.first(where: { $0.name == "payload" })?.value {
             encodedValue = payload
@@ -581,7 +593,7 @@ enum GatewayError: LocalizedError {
         case .healthKitUnavailable:
             return "HealthKit is not available on this device."
         case .healthPermissionRequired:
-            return "Health permission is missing or denied. Open iOS Settings and allow HealthLink to read selected Health data."
+            return "Health permission is missing or denied. Open iOS Settings and allow VitalMCP to read selected Health data."
         case .missingServerURL:
             return "Server URL is not configured."
         case .missingAPIToken:
@@ -599,7 +611,7 @@ enum GatewayError: LocalizedError {
             }
             return "Server returned HTTP \(statusCode)."
         case .receiverUnreachable:
-            return "Receiver is not reachable. Make sure HealthLink Local is running and this iPhone can reach the server URL."
+            return "Receiver is not reachable. Make sure vitalmcp is running and this iPhone can reach the server URL."
         case .networkUnavailable:
             return "Network is unavailable. Check Wi-Fi or cellular connectivity."
         case .requestTimedOut:

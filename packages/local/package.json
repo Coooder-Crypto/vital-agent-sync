@@ -1,7 +1,7 @@
 {
-  "name": "healthlink-local",
+  "name": "vitalmcp",
   "version": "0.3.0",
-  "description": "Local HealthLink Agent server for pairing, ingest, storage, and MCP tools.",
+  "description": "Local VitalMCP Agent server for pairing, ingest, storage, and MCP tools.",
   "license": "MIT",
   "type": "module",
   "homepage": "https://github.com/Coooder-Crypto/health-link#readme",
@@ -14,7 +14,7 @@
     "url": "https://github.com/Coooder-Crypto/health-link/issues"
   },
   "keywords": [
-    "healthlink",
+    "vitalmcp",
     "mcp",
     "agent",
     "apple-health",
@@ -22,7 +22,7 @@
     "openclaw"
   ],
   "bin": {
-    "healthlink-local": "./dist/cli.js"
+    "vitalmcp": "./dist/cli.js"
   },
   "files": [
     "dist",

@@ -28,15 +28,15 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
   const database = openHealthLinkDatabase({ path: options.databasePath });
   const agentClient = ensureDefaultMcpAgentClient(database);
   const server = new McpServer({
-    name: "healthlink-local",
+    name: "vitalmcp",
     version: "0.1.0"
   });
 
   server.registerTool(
     "healthlink_status",
     {
-      title: "HealthLink Status",
-      description: "Check whether HealthLink is connected and fresh. Use when the user asks if HealthLink is working, whether iPhone data has synced, how many devices are paired, or when the last sync happened."
+      title: "VitalMCP Status",
+      description: "Check whether VitalMCP is connected and fresh. Use when the user asks if VitalMCP is working, whether iPhone data has synced, how many devices are paired, or when the last sync happened."
     },
     async () => auditedJsonResult(database, agentClient.id, "healthlink_status", getAgentHealthStatus(database))
   );
@@ -105,7 +105,7 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
   server.registerTool(
     "get_weekly_summary",
     {
-      title: "Get Weekly HealthLink Summary",
+      title: "Get Weekly VitalMCP Summary",
       description: "Get a compact 7-day provider-neutral summary with freshness, source coverage, sleep, activity, workout, and recovery signals.",
       inputSchema: z.object({
         days: z.number().int().min(1).max(14).optional().describe("Number of latest synced days to summarize. Defaults to 7, max 14.")
@@ -117,8 +117,8 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
   server.registerTool(
     "list_source_devices",
     {
-      title: "List HealthLink Source Devices",
-      description: "List paired HealthLink source devices, platform, accepted scopes, revocation state, sync count, and latest sync time."
+      title: "List VitalMCP Source Devices",
+      description: "List paired VitalMCP source devices, platform, accepted scopes, revocation state, sync count, and latest sync time."
     },
     async () => auditedJsonResult(database, agentClient.id, "list_source_devices", {
       source_devices: listSourceDevices(database)
@@ -128,8 +128,8 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
   server.registerTool(
     "revoke_source_device",
     {
-      title: "Revoke HealthLink Source Device",
-      description: "Revoke a paired HealthLink source device so its token can no longer sync.",
+      title: "Revoke VitalMCP Source Device",
+      description: "Revoke a paired VitalMCP source device so its token can no longer sync.",
       inputSchema: z.object({
         source_device_id: z.string().min(1).describe("Source device ID to revoke.")
       })
@@ -146,8 +146,8 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
   server.registerTool(
     "list_devices",
     {
-      title: "List HealthLink Devices",
-      description: "Legacy alias for listing paired HealthLink source devices. Prefer list_source_devices in new integrations."
+      title: "List VitalMCP Devices",
+      description: "Legacy alias for listing paired VitalMCP source devices. Prefer list_source_devices in new integrations."
     },
     async () => auditedJsonResult(database, agentClient.id, "list_devices", {
       devices: listDevices(database)
@@ -157,8 +157,8 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
   server.registerTool(
     "revoke_device",
     {
-      title: "Revoke HealthLink Device",
-      description: "Legacy alias for revoking a paired HealthLink source device. Prefer revoke_source_device in new integrations.",
+      title: "Revoke VitalMCP Device",
+      description: "Legacy alias for revoking a paired VitalMCP source device. Prefer revoke_source_device in new integrations.",
       inputSchema: z.object({
         device_id: z.string().min(1).describe("Device ID to revoke.")
       })
@@ -175,8 +175,8 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
   server.registerTool(
     "record_feedback",
     {
-      title: "Record HealthLink Feedback",
-      description: "Record user feedback about a HealthLink analysis, recommendation, sync issue, missing metric, or correction. Use after the user explicitly gives feedback such as 'that was wrong', 'remember this was helpful', or 'next time account for my sleep debt'.",
+      title: "Record VitalMCP Feedback",
+      description: "Record user feedback about a VitalMCP analysis, recommendation, sync issue, missing metric, or correction. Use after the user explicitly gives feedback such as 'that was wrong', 'remember this was helpful', or 'next time account for my sleep debt'.",
       inputSchema: z.object({
         category: z.string().min(1).max(80).describe("Short feedback category, such as analysis_quality, missing_data, preference, or correction."),
         rating: z.number().int().min(1).max(5).optional().describe("Optional 1-5 usefulness or satisfaction rating."),
@@ -210,7 +210,7 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error(`HealthLink MCP running with database ${database.path}`);
+  console.error(`VitalMCP MCP running with database ${database.path}`);
 }
 
 function jsonResult(value: unknown) {

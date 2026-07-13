@@ -1,4 +1,4 @@
-"CFBundleDisplayName" = "HealthLink";
-"NSHealthShareUsageDescription" = "HealthLink reads selected Apple Health data to sync daily summaries to your authorized agent server.";
-"NSCameraUsageDescription" = "HealthLink scans pairing QR codes shown by your local Agent server.";
-"NSLocalNetworkUsageDescription" = "HealthLink connects to your local Agent server on your network after you approve pairing.";
+"CFBundleDisplayName" = "VitalMCP";
+"NSHealthShareUsageDescription" = "VitalMCP reads selected Apple Health data to sync daily summaries to your authorized agent server.";
+"NSCameraUsageDescription" = "VitalMCP scans pairing QR codes shown by your local Agent server.";
+"NSLocalNetworkUsageDescription" = "VitalMCP connects to your local Agent server on your network after you approve pairing.";

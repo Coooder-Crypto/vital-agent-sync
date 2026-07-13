@@ -134,7 +134,7 @@ struct HomeView: View {
                     .padding(.bottom, 28)
                 }
             }
-            .navigationTitle("HealthLink")
+            .navigationTitle("VitalMCP")
             .navigationBarTitleDisplayMode(.inline)
         }
     }
@@ -347,7 +347,7 @@ struct SettingsView: View {
                 }
 
                 Section("About") {
-                    LabeledContent("App", value: "HealthLink")
+                    LabeledContent("App", value: "VitalMCP")
                     LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "-")
                 }
             }
@@ -434,7 +434,7 @@ struct ConnectionView: View {
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("HealthLink will remove this pairing from the iPhone. If the receiver is reachable, it will also revoke the device token on the agent side.")
+                Text("VitalMCP will remove this pairing from the iPhone. If the receiver is reachable, it will also revoke the device token on the agent side.")
             }
             .onAppear {
                 scheduleDeferredReceiverCheck()
@@ -582,7 +582,7 @@ struct HomeHeroPanel: View {
 
     private var subtitle: LocalizedStringKey {
         if !isPaired {
-            return "Pair HealthLink with your local Agent receiver."
+            return "Pair VitalMCP with your local Agent receiver."
         }
         if isSyncing {
             return "Uploading your latest daily summaries."
@@ -652,7 +652,7 @@ struct PairingCommandPanel: View {
                     .font(.headline)
                     .foregroundStyle(GatewayStyle.text)
 
-                Text("npx -y healthlink-local setup --agent hermes --service")
+                Text("npx -y vitalmcp setup --agent hermes --service")
                     .font(.footnote.monospaced())
                     .foregroundStyle(GatewayStyle.text)
                     .padding(12)
@@ -691,7 +691,7 @@ struct FirstSyncGuidePanel: View {
                 FirstSyncStepRow(
                     index: 1,
                     title: "Grant Health access",
-                    detail: "Approve the Health categories HealthLink can summarize.",
+                    detail: "Approve the Health categories VitalMCP can summarize.",
                     systemImage: "heart.text.square"
                 )
 
@@ -705,7 +705,7 @@ struct FirstSyncGuidePanel: View {
                 FirstSyncStepRow(
                     index: 3,
                     title: "Ask your Agent",
-                    detail: "The Agent reads from its local HealthLink store after sync completes.",
+                    detail: "The Agent reads from its local VitalMCP context after sync completes.",
                     systemImage: "sparkles"
                 )
 
@@ -949,7 +949,7 @@ struct ConnectionStatusPanel: View {
             }
             return settings.serverURLText.isEmpty ? "Connected" : settings.serverURLText
         }
-        return "Scan a HealthLink pairing or relay onboarding QR to connect this iPhone."
+        return String(localized: "Scan a VitalMCP pairing or relay onboarding QR to connect this iPhone.")
     }
 
     private var badgeTitle: LocalizedStringKey {
@@ -1166,8 +1166,8 @@ struct RelayOnboardingConfirmationView: View {
 
                 Section("Privacy Boundary") {
                     Label("Health summaries are encrypted before they are sent to the relay.", systemImage: "lock")
-                    Label("The relay stores encrypted envelopes. Your local runtime decrypts them after healthlink-local pull.", systemImage: "tray.and.arrow.down")
-                    Label("This onboarding code contains access credentials. HealthLink stores them in Keychain.", systemImage: "key")
+                    Label("The relay stores encrypted envelopes. Your local runtime decrypts them after vitalmcp pull.", systemImage: "tray.and.arrow.down")
+                    Label("This onboarding code contains access credentials. VitalMCP stores them in Keychain.", systemImage: "key")
                     Label("Do not share your local ~/.healthlink/secrets folder.", systemImage: "exclamationmark.shield")
                 }
                 .font(.footnote)

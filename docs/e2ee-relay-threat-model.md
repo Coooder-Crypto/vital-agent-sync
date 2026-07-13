@@ -7,7 +7,7 @@ This document defines the security boundary for the HealthLink relay route. It c
 In scope:
 
 - HealthLink iOS or compatible mobile source app.
-- `healthlink-local` runtime, local SQLite database, MCP server, and private key storage.
+- `vitalmcp` runtime, local SQLite database, MCP server, and private key storage.
 - Hosted or self-hosted relay API that stores encrypted envelopes.
 - OpenClaw, Hermes, and generic MCP agents that read through MCP.
 
@@ -43,7 +43,7 @@ HealthKit
   -> iOS source app
   -> encrypted envelope
   -> hosted/self-hosted relay
-  -> healthlink-local private key boundary
+  -> vitalmcp private key boundary
   -> SQLite
   -> MCP
   -> Agent
@@ -57,7 +57,7 @@ The local runtime is trusted with private keys and decrypted health summaries. A
 
 - Relay operators cannot decrypt health payloads.
 - Relay storage contains opaque encrypted envelopes and minimal hashed tenant/revocation metadata, not health plaintext or local private keys.
-- Local private keys never leave `healthlink-local`.
+- Local private keys never leave `vitalmcp`.
 - Decryption happens only on the local runtime machine.
 - Decrypted payloads are schema-validated before SQLite ingestion.
 - Failed envelopes are not acknowledged.
@@ -121,7 +121,7 @@ Not yet implemented:
 - [x] Relay implementation has no code path that imports local private keys.
 - [x] Bad signatures, tampered ciphertext, stale timestamps, duplicate IDs, wrong devices, and non-increasing sequences fail tests.
 - [x] Malformed identifiers, fractional sequences, timestamps, key material, nonce, tag, ciphertext, and signatures are rejected before relay queue insertion.
-- [x] `healthlink-local print-onboarding` does not print private keys.
+- [x] `vitalmcp print-onboarding` does not print private keys.
 - [x] Skill instructions forbid printing or copying `~/.healthlink/secrets`.
 - [x] Skill instructions classify the complete onboarding value as credentials and require confirmation for lifecycle commands.
 - [x] Cross-tenant list, ack, and purge attempts fail without modifying another tenant's queue in tests.

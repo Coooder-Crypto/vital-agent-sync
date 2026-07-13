@@ -1,15 +1,15 @@
 #!/bin/sh
 set -eu
 
-PACKAGE_NAME="healthlink-local"
+PACKAGE_NAME="vitalmcp"
 DEFAULT_VERSION="0.3.0"
-VERSION="${HEALTHLINK_VERSION:-$DEFAULT_VERSION}"
-PREFIX="${HEALTHLINK_INSTALL_PREFIX:-$HOME/.healthlink/npm-global}"
+VERSION="${VITALMCP_VERSION:-$DEFAULT_VERSION}"
+PREFIX="${VITALMCP_INSTALL_PREFIX:-$HOME/.vitalmcp/npm-global}"
 BIN_DIR="$PREFIX/bin"
 ACTION="install"
 MANAGE_PROFILE=1
-BEGIN_MARKER="# >>> healthlink-local >>>"
-END_MARKER="# <<< healthlink-local <<<"
+BEGIN_MARKER="# >>> vitalmcp >>>"
+END_MARKER="# <<< vitalmcp <<<"
 
 usage() {
   printf '%s\n' "Usage: install.sh [--version <semver>] [--uninstall] [--no-profile]"
@@ -44,7 +44,7 @@ done
 
 case "$VERSION" in
   ''|*[!0-9A-Za-z.+-]*)
-    printf 'Invalid healthlink-local version: %s\n' "$VERSION" >&2
+    printf 'Invalid vitalmcp version: %s\n' "$VERSION" >&2
     exit 2
     ;;
 esac
@@ -65,8 +65,8 @@ detect_platform() {
 }
 
 select_profile() {
-  if [ -n "${HEALTHLINK_PROFILE:-}" ]; then
-    printf '%s\n' "$HEALTHLINK_PROFILE"
+  if [ -n "${VITALMCP_PROFILE:-}" ]; then
+    printf '%s\n' "$VITALMCP_PROFILE"
     return
   fi
   shell_name="${SHELL##*/}"
@@ -86,7 +86,7 @@ select_profile() {
 remove_profile_block() {
   profile="$1"
   [ -f "$profile" ] || return 0
-  temporary="$profile.healthlink-tmp-$$"
+  temporary="$profile.vitalmcp-tmp-$$"
   awk -v begin="$BEGIN_MARKER" -v end="$END_MARKER" '
     $0 == begin && !skipping { skipping = 1; buffered = $0 ORS; next }
     skipping {
@@ -107,7 +107,7 @@ install_profile_block() {
   [ -f "$profile" ] || : > "$profile"
   remove_profile_block "$profile"
   if grep -Fqx "$BEGIN_MARKER" "$profile" || grep -Fqx "$END_MARKER" "$profile"; then
-    printf 'Incomplete HealthLink PATH block in %s; repair the marked lines and rerun.\n' "$profile" >&2
+    printf 'Incomplete VitalMCP PATH block in %s; repair the marked lines and rerun.\n' "$profile" >&2
     return 1
   fi
   {
@@ -122,7 +122,7 @@ install_profile_block() {
 
 platform="$(detect_platform)"
 if [ "$platform" = "unsupported" ]; then
-  printf '%s\n' "HealthLink installer currently supports macOS, Linux, and WSL." >&2
+  printf '%s\n' "VitalMCP installer currently supports macOS, Linux, and WSL." >&2
   exit 1
 fi
 
@@ -135,7 +135,7 @@ if [ "$ACTION" = "uninstall" ]; then
   if [ "$MANAGE_PROFILE" -eq 1 ]; then
     remove_profile_block "$profile"
   fi
-  printf '%s\n' "Removed the HealthLink CLI and installer-owned PATH entry."
+  printf '%s\n' "Removed the VitalMCP CLI and installer-owned PATH entry."
   printf '%s\n' "Local data under $HOME/.healthlink was preserved."
   exit 0
 fi
@@ -165,11 +165,11 @@ if [ "$MANAGE_PROFILE" -eq 1 ]; then
   install_profile_block "$profile"
 fi
 
-printf '\n%s\n' "HealthLink CLI installed."
+printf '\n%s\n' "VitalMCP CLI installed."
 printf 'Platform: %s\n' "$platform"
 printf 'Version:  %s\n' "$VERSION"
-printf 'Binary:   %s/healthlink-local\n' "$BIN_DIR"
+printf 'Binary:   %s/vitalmcp\n' "$BIN_DIR"
 if [ "$MANAGE_PROFILE" -eq 1 ]; then
   printf 'Profile:  %s\n' "$profile"
 fi
-printf '\nRun next:\n  %s/healthlink-local setup\n' "$BIN_DIR"
+printf '\nRun next:\n  %s/vitalmcp setup\n' "$BIN_DIR"

@@ -14,7 +14,7 @@ const hermesSkillPath = join(
   hermesHome,
   "skills",
   "health",
-  "healthlink-personal-context",
+  "vitalmcp-personal-context",
   "SKILL.md"
 );
 const databasePath = join(tempDir, "healthlink.sqlite");
@@ -38,11 +38,11 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 }
 
 try {
-  run("healthlink-local build", "npm", [
+  run("vitalmcp build", "npm", [
     "run",
     "build",
     "--workspace",
-    "healthlink-local"
+    "vitalmcp"
   ]);
   if (process.platform !== "win32") {
     chmodSync(cliPath, 0o755);
@@ -51,7 +51,7 @@ try {
   installIsolatedHermesAdapter();
   await verifyGenericMcpClient();
   verifyHermesCli();
-  console.log("\nHealthLink generic MCP and Hermes adapter audit passed.");
+  console.log("\nVitalMCP generic MCP and Hermes adapter audit passed.");
 } finally {
   await cleanup();
 }
@@ -79,20 +79,20 @@ function installIsolatedHermesAdapter() {
     "--db",
     databasePath
   ], { env: isolatedEnv });
-  assert(installOutput.includes("HealthLink MCP installed for Hermes"), "Hermes MCP install did not complete.");
+  assert(installOutput.includes("VitalMCP MCP installed for Hermes"), "Hermes MCP install did not complete.");
 
   const config = readFileSync(hermesConfigPath, "utf8");
   assert(config.includes("mcp_servers:"), "Hermes config does not contain mcp_servers.");
   assert(config.includes("healthlink:"), "Hermes config does not contain the healthlink server.");
-  assert(config.includes(cliPath), "Hermes config does not point at the compiled HealthLink CLI.");
-  assert(config.includes(databasePath), "Hermes config does not point at the isolated HealthLink database.");
+  assert(config.includes(cliPath), "Hermes config does not point at the compiled VitalMCP CLI.");
+  assert(config.includes(databasePath), "Hermes config does not point at the isolated VitalMCP database.");
 
   const skillOutput = capture(cliPath, [
     "install-hermes-skill",
     "--hermes-skill-path",
     hermesSkillPath
   ], { env: isolatedEnv });
-  assert(skillOutput.includes("HealthLink skill installed for Hermes"), "Hermes skill install did not complete.");
+  assert(skillOutput.includes("VitalMCP skill installed for Hermes"), "Hermes skill install did not complete.");
 
   const skill = readFileSync(hermesSkillPath, "utf8");
   assert(skill.includes("Target agent: Hermes."), "Installed Hermes skill is not targeted at Hermes.");
@@ -146,7 +146,7 @@ async function verifyGenericMcpClient() {
     assert(typeof text === "string", "healthlink_status did not return text content.");
     const status = JSON.parse(text);
     assert(status.ok === true, "healthlink_status did not report ok=true.");
-    assert(status.service === "healthlink-local", "healthlink_status reported the wrong service.");
+    assert(status.service === "vitalmcp", "healthlink_status reported the wrong service.");
     assert(status.status === "running", "healthlink_status did not report a running MCP data layer.");
     console.log(`Generic MCP discovered ${toolNames.length} tools and called healthlink_status.`);
   } catch (error) {
@@ -174,8 +174,8 @@ function verifyHermesCli() {
     timeout: 30_000
   });
   assert(test.includes("Connected"), "Hermes did not connect to the healthlink MCP server.");
-  assert(test.includes("Tools discovered: 12"), "Hermes did not discover all 12 HealthLink tools.");
-  assert(!test.includes("Connection failed"), "Hermes reported a failed HealthLink MCP connection.");
+  assert(test.includes("Tools discovered: 12"), "Hermes did not discover all 12 VitalMCP tools.");
+  assert(!test.includes("Connection failed"), "Hermes reported a failed VitalMCP MCP connection.");
   for (const required of ["healthlink_status", "get_personal_context", "get_weekly_summary"]) {
     assert(test.includes(required), `Hermes MCP discovery output is missing ${required}.`);
   }

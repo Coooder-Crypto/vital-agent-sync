@@ -10,16 +10,16 @@ For adapter implementation guidance, see [architecture-adapter-design.md](archit
 
 ```text
 1. User asks an Agent to install HealthLink, or uses the portable CLI fallback.
-2. The Agent shows a redacted setup plan and invokes the shared healthlink-local bootstrap.
+2. The Agent shows a redacted setup plan and invokes the shared vitalmcp bootstrap.
 3. HealthLink initializes local state, MCP, and the selected transport.
 4. The user receives one QR/deep-link action and opens it with the iOS app.
 5. The user selects which data types to expose and authorizes Apple Health once.
-6. The iOS app sends compact summaries directly or as encrypted relay envelopes.
-7. healthlink-local ingests the summaries into the same local SQLite model.
+6. The iOS app sends compact summaries directly over LAN by default, or over the user's authorized tailnet when Tailscale is selected.
+7. vitalmcp ingests the summaries into the same local SQLite model.
 8. The Agent verifies freshness and reads data only through MCP tools.
 ```
 
-The user should not manually copy tokens, edit SQLite, or understand HealthKit. The only required setup steps should be "approve install", "open onboarding", "approve scopes", and "grant Apple permissions". Manual sync remains available, but the product expectation is pair once, authorize once, then keep the local Agent context fresh automatically when iOS allows it.
+The user should not manually copy tokens, edit SQLite, or understand HealthKit. The only required setup steps should be "approve install", "open onboarding", "approve scopes", and "grant Apple permissions". The v0.1 promise is manual sync plus catch-up while the app is active or returns to the foreground. Background opportunities are best-effort, not a scheduled delivery guarantee.
 
 ## Product Boundary
 
@@ -32,9 +32,9 @@ HealthLink iOS
   scope selection
   manual and automatic sync
 
-healthlink-local
+vitalmcp
   Agent-first bootstrap and onboarding artifact
-  direct receiver and encrypted Relay pull
+  LAN/Tailscale receiver and experimental encrypted Relay pull
   SQLite/Postgres storage
   MCP tools
 
@@ -44,7 +44,7 @@ Agent runtime
   may load optional HealthLink skills
 ```
 
-The agent never talks to HealthKit directly. Skills and Agent adapters do not become alternate data stores. The Hosted Relay handles opaque encrypted envelopes and must not become a health data warehouse.
+The agent never talks to HealthKit directly. Skills and Agent adapters do not become alternate data stores. Experimental Hosted Relay code handles opaque encrypted envelopes and must not become a health data warehouse.
 
 ## Persistent Link Model
 
@@ -56,13 +56,13 @@ iOS app
   source_device_id
   device token in Keychain
 
-healthlink-local
+vitalmcp
   paired source devices
   scoped token hashes
   ~/.healthlink/healthlink.sqlite
 
 Hermes or another agent
-  MCP config pointing to healthlink-local mcp
+  MCP config pointing to vitalmcp mcp
   optional HealthLink skill instructions
 ```
 
@@ -87,7 +87,7 @@ Reconnect or re-pair only when:
 Product language:
 
 ```text
-Pair once. HealthLink keeps your local Agent updated automatically. Ask your Agent anytime.
+Pair once. Sync manually anytime; VitalMCP also catches up when the app is active. Ask your Agent after a fresh sync.
 ```
 
 ## Sync Lifecycle
@@ -98,10 +98,10 @@ Current MVP:
 - sync writes compact summaries to `/health/sync`
 - MCP tools read the latest rows at query time
 
-Expected near-term iOS behavior:
+Current v0.1 behavior:
 
-- auto sync immediately after successful pairing and permission grant
-- auto sync when the app launches or returns to foreground
+- sync immediately after successful pairing and permission grant when the app is active
+- catch up when the app launches or returns to foreground
 - throttle auto sync by a minimum interval, such as 30 minutes
 - skip auto sync when not paired, already syncing, missing permissions, or recently attempted
 - keep a manual Sync button for explicit refresh
@@ -112,22 +112,22 @@ Background sync should be best-effort, not a strict schedule:
 - use HealthKit observer queries and background delivery where possible
 - never promise exact intervals like "every 30 minutes"
 
-Recommended UX copy:
+Required UX copy:
 
 ```text
-HealthLink syncs automatically after authorization and when iOS allows background refresh. You can also sync manually anytime.
+Use Sync Now anytime. VitalMCP also catches up while the app is active or returns to the foreground. Background refresh is best-effort and has no guaranteed schedule.
 ```
 
 ## Connection Modes
 
-HealthLink should expose one product flow with multiple transport modes underneath.
+VitalMCP exposes one product flow with LAN first, Tailscale as the optional private remote path, and advanced/experimental transports outside the Local Preview happy path.
 
 ### Mode A: LAN
 
-Available for local agents and development.
+This is the Local Preview default for new users.
 
 ```text
-iPhone -> http://192.168.x.x:8787 -> healthlink-local -> SQLite -> MCP -> Agent
+iPhone -> http://192.168.x.x:8787 -> vitalmcp -> SQLite -> MCP -> Agent
 ```
 
 Pros:
@@ -139,9 +139,28 @@ Pros:
 Limits:
 
 - iPhone and Agent receiver must be on the same reachable network.
-- The iPhone cannot use `127.0.0.1`; QR must use LAN, Tailscale, or public address.
+- The iPhone cannot use `127.0.0.1`; the QR must use the receiver's reachable LAN address.
+- The network should be trusted; public Wi-Fi with client isolation may block the connection.
 
-### Mode B: Public HTTPS
+LAN setup needs no relay URL, VPS, domain, VitalMCP account, payment method, or Agent marketplace listing.
+
+### Mode B: Tailscale
+
+Use Tailscale when the user needs private remote access outside the receiver's LAN. It is optional and user-managed.
+
+Prerequisites:
+
+- install and sign in to Tailscale on the iPhone and receiver machine
+- use a Tailscale account with both devices authorized on the same tailnet
+- keep the receiver online and reachable through its MagicDNS name or Tailscale address
+
+```bash
+vitalmcp setup --transport tailscale --tailscale-name my-mac.tailnet.ts.net
+```
+
+VitalMCP can also try to read Tailscale MagicDNS from `tailscale status --json`, or fall back to the local 100.64.0.0/10 address when available. It does not install Tailscale, create an account, or authorize devices.
+
+### Mode C: Public HTTPS
 
 For agents deployed on a VPS or a user-controlled server.
 
@@ -156,32 +175,34 @@ Requirements:
 - Firewall allows receiver port.
 - QR uses the public URL.
 
-### Mode C: Tunnel / Relay
+This is an advanced user-operated path, not the Local Preview default.
 
-The E2EE Hosted Relay is the target product default for users who should not expose a local machine or configure public HTTPS.
+### Mode D: Relay (Future / Experimental)
+
+Hosted Relay is not available, recommended, or required in Local Preview. Keep it out of the normal onboarding flow. The implementation remains for explicit experiments and future hosted work.
 
 ```text
-iPhone -> encrypted Relay -> healthlink-local pull/decrypt -> SQLite -> MCP -> Agent
+iPhone -> encrypted Relay -> vitalmcp pull/decrypt -> SQLite -> MCP -> Agent
 ```
 
-The relay is a transport layer, not a data platform. It stores opaque, bounded, expiring envelopes; decryption, validation, normalized storage, and MCP access stay in healthlink-local.
+The relay is a transport layer, not a data platform. It stores opaque, bounded, expiring envelopes; decryption, validation, normalized storage, and MCP access stay in vitalmcp. This technical boundary does not make the relay a current product recommendation.
 
-### Mode D: Tailscale
+### LAN / Tailscale Troubleshooting And Reset
 
-For users who already run a tailnet:
+- Run `vitalmcp service status`, `vitalmcp logs`, and `vitalmcp doctor --transport lan`.
+- Confirm the QR uses an address the iPhone can reach, not `127.0.0.1` or `localhost`.
+- For Tailscale, confirm both devices are online in the same authorized tailnet, then run `vitalmcp doctor --transport tailscale --tailscale-name <host.tailnet.ts.net>`.
+- If the QR expires, run `vitalmcp pair`.
+- To revoke/reset a source connection, call MCP `revoke_source_device`, remove the saved connection in the iOS app, and pair again. This preserves local SQLite history.
 
-```bash
-healthlink-local init --transport tailscale --tailscale-name my-mac.tailnet.ts.net
-```
-
-HealthLink can also try to read Tailscale MagicDNS from `tailscale status --json`, or fall back to the local 100.64.0.0/10 address when available.
+Generic MCP clients remain supported through the printed MCP configuration; no OpenClaw or other marketplace listing is required.
 
 ## CLI Shape
 
 The current portable fallback is:
 
 ```bash
-npx -y healthlink-local setup
+npx -y vitalmcp setup
 ```
 
 `setup` should:
@@ -205,14 +226,14 @@ Agent-facing output may include setup stage, detected adapter, service status, a
 Advanced users can still force an adapter or manager:
 
 ```bash
-npx -y healthlink-local setup --agent hermes
-npx -y healthlink-local setup --agent openclaw --manager systemd
+npx -y vitalmcp setup --agent hermes
+npx -y vitalmcp setup --agent openclaw --manager systemd
 ```
 
 The foreground compatibility receiver remains:
 
 ```bash
-npx -y healthlink-local init
+npx -y vitalmcp init
 ```
 
 It starts the same receiver without writing a Hermes config and remains attached to the terminal.
@@ -220,20 +241,20 @@ It starts the same receiver without writing a Hermes config and remains attached
 The background service commands are:
 
 ```bash
-npx -y healthlink-local daemon
-npx -y healthlink-local ensure
-npx -y healthlink-local pair
-npx -y healthlink-local service install
-npx -y healthlink-local service start
-npx -y healthlink-local service status
-npx -y healthlink-local logs
-npx -y healthlink-local service stop
-npx -y healthlink-local service uninstall
+npx -y vitalmcp daemon
+npx -y vitalmcp ensure
+npx -y vitalmcp pair
+npx -y vitalmcp service install
+npx -y vitalmcp service start
+npx -y vitalmcp service status
+npx -y vitalmcp logs
+npx -y vitalmcp service stop
+npx -y vitalmcp service uninstall
 ```
 
-Agents that provide lifecycle hooks should call `healthlink-local ensure` during startup. This command is an idempotent receiver check: it installs the supported platform service if missing, starts it if stopped, waits for the local receiver to answer `/health/status`, and prints service status. It intentionally does not create a pairing QR, rewrite Agent config, or reinstall skills.
+Agents that provide lifecycle hooks should call `vitalmcp ensure` during startup. This command is an idempotent receiver check: it installs the supported platform service if missing, starts it if stopped, waits for the local receiver to answer `/health/status`, and prints service status. It intentionally does not create a pairing QR, rewrite Agent config, or reinstall skills.
 
-First-time user onboarding should still use `setup`, because setup writes the Agent MCP config and creates the initial pairing QR. Long-running non-service deployments, such as Docker, PM2, Task Scheduler, or custom cloud process managers, should run `healthlink-local daemon` under their own supervisor instead of relying on `ensure`.
+First-time user onboarding should still use `setup`, because setup writes the Agent MCP config and creates the initial pairing QR. Long-running non-service deployments, such as Docker, PM2, Task Scheduler, or custom cloud process managers, should run `vitalmcp daemon` under their own supervisor instead of relying on `ensure`.
 
 Expected output:
 
@@ -250,7 +271,7 @@ Database:
   ~/.healthlink/healthlink.sqlite
 
 MCP:
-  npx -y healthlink-local mcp
+  npx -y vitalmcp mcp
 ```
 
 Current development command:
@@ -271,7 +292,7 @@ node packages/local/dist/cli.js setup
 The QR should carry a pairing URL or equivalent JSON payload:
 
 ```text
-healthlink://pair?server=http%3A%2F%2F192.168.31.230%3A8787&code=8K2F-J91Q
+vitalmcp://pair?server=http%3A%2F%2F192.168.31.230%3A8787&code=8K2F-J91Q
 ```
 
 Future payload fields:
@@ -319,7 +340,7 @@ Published package config:
   "mcpServers": {
     "healthlink": {
       "command": "npx",
-      "args": ["-y", "healthlink-local", "mcp"]
+      "args": ["-y", "vitalmcp", "mcp"]
     }
   }
 }
@@ -328,15 +349,15 @@ Published package config:
 Implemented helpers:
 
 ```bash
-npx -y healthlink-local print-mcp-config
-npx -y healthlink-local install-hermes
-npx -y healthlink-local init --hermes
-npx -y healthlink-local setup
-npx -y healthlink-local service status
-npx -y healthlink-local logs
-npx -y healthlink-local pair
-npx -y healthlink-local status
-npx -y healthlink-local doctor
+npx -y vitalmcp print-mcp-config
+npx -y vitalmcp install-hermes
+npx -y vitalmcp init --hermes
+npx -y vitalmcp setup
+npx -y vitalmcp service status
+npx -y vitalmcp logs
+npx -y vitalmcp pair
+npx -y vitalmcp status
+npx -y vitalmcp doctor
 ```
 
 The helpers should not invent new protocols. They should write or print the same MCP command with the correct database path. `setup` uses the same install logic as the selected Agent adapter, installs the HealthLink Hermes skill by default when Hermes is selected, installs/starts the receiver service, and folds pairing into one Agent-driven flow. `init --hermes` remains the foreground compatibility path.
@@ -371,9 +392,9 @@ Skill non-responsibilities:
 Potential helper commands:
 
 ```bash
-npx -y healthlink-local print-skill --format markdown
-npx -y healthlink-local install-hermes-skill
-npx -y healthlink-local init --hermes --install-skill
+npx -y vitalmcp print-skill --format markdown
+npx -y vitalmcp install-hermes-skill
+npx -y vitalmcp init --hermes --install-skill
 ```
 
 These should remain additive. Non-Hermes agents should still work through generic MCP config alone.

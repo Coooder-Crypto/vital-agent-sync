@@ -23,7 +23,7 @@ Relay mode:
 iOS
   -> encrypt HealthSyncPayload into HealthLinkEncryptedEnvelope
   -> POST /v1/envelopes to relay
-  -> healthlink-local pull
+  -> vitalmcp pull
   -> decrypt envelope locally
   -> parse HealthSyncPayload
   -> ingestValidatedHealthSync
@@ -155,4 +155,4 @@ Common direct-sync errors:
 | 403 | `missing_scope` | The device token lacks a required write scope. |
 | 400 | `invalid_payload` | The request body does not match `HealthSyncPayload`. |
 
-Relay pull surfaces equivalent validation failures through `healthlink-local pull` and records failed envelope metadata in relay cursor state without acking the envelope.
+Relay pull surfaces equivalent validation failures through `vitalmcp pull` and records failed envelope metadata in relay cursor state without acking the envelope.

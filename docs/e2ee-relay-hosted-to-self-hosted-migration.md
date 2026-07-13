@@ -7,7 +7,7 @@ This guide moves a HealthLink relay setup from the hosted relay to a user-owned 
 Changes:
 
 - iOS uploads encrypted envelopes to the self-hosted relay URL.
-- `healthlink-local` pulls from the self-hosted relay URL.
+- `vitalmcp` pulls from the self-hosted relay URL.
 - Relay operator responsibility moves to the user.
 
 Does not change:
@@ -26,8 +26,8 @@ Keep the current hosted setup working until the self-hosted relay is verified.
 Record the current local runtime status:
 
 ```bash
-healthlink-local status
-healthlink-local relay status
+vitalmcp status
+vitalmcp relay status
 ```
 
 Back up local state before changing transport settings:
@@ -43,11 +43,11 @@ The backup contains sensitive local data and secrets. Store it privately.
 Generate the relay-only Compose file:
 
 ```bash
-healthlink-local print-relay-docker-compose > docker-compose.relay.yml
+vitalmcp print-relay-docker-compose > docker-compose.relay.yml
 docker compose -f docker-compose.relay.yml up -d
 ```
 
-Verify the relay is reachable from the machine running `healthlink-local`:
+Verify the relay is reachable from the machine running `vitalmcp`:
 
 ```bash
 curl http://127.0.0.1:8790/v1/status
@@ -65,7 +65,7 @@ https://healthlink-relay.example.com
 After the target relay is reachable, run the explicit migration command:
 
 ```bash
-healthlink-local relay migrate --yes \
+vitalmcp relay migrate --yes \
   --transport self-hosted-relay \
   --relay-url http://192.168.31.53:8790
 ```
@@ -74,7 +74,7 @@ If the target relay uses a deployment API key, provide it through the environmen
 
 ```bash
 export HEALTHLINK_RELAY_API_TOKEN=<target-deployment-key>
-healthlink-local relay migrate --yes \
+vitalmcp relay migrate --yes \
   --transport self-hosted-relay \
   --relay-url https://healthlink-relay.example.com
 ```
@@ -83,7 +83,7 @@ The command authenticates to the old relay using the current config, revokes and
 
 ## Pair iOS Again
 
-Scan the new onboarding QR or open the generated `healthlink://onboard?...` deep link in HealthLink iOS.
+Scan the new onboarding QR or open the generated `vitalmcp://onboard?...` deep link in VitalMCP iOS.
 
 Confirm in iOS:
 
@@ -94,8 +94,8 @@ Confirm in iOS:
 After iOS uploads a sync, pull locally:
 
 ```bash
-healthlink-local pull --once
-healthlink-local status
+vitalmcp pull --once
+vitalmcp status
 ```
 
 The expected pull result is:
@@ -112,7 +112,7 @@ Latest sequence: greater than 0
 Ask the agent for `healthlink_status` or run:
 
 ```bash
-healthlink-local doctor --agent openclaw
+vitalmcp doctor --agent openclaw
 ```
 
 Expected relay metadata:
@@ -136,7 +136,7 @@ If self-hosted relay fails:
 
 1. Restart the relay container and check `/v1/status`.
 2. Confirm iOS can reach the relay URL.
-3. Run `healthlink-local relay status`.
+3. Run `vitalmcp relay status`.
 4. If needed, restore the previous local state backup:
 
 ```bash

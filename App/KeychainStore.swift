@@ -8,7 +8,7 @@ protocol KeychainStoring {
 }
 
 final class KeychainStore: KeychainStoring {
-    static let shared = KeychainStore(service: "app.healthlink.ios")
+    static let shared = KeychainStore(service: "com.vitalmcp.ios")
 
     private let service: String
 
