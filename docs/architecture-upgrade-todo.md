@@ -214,9 +214,9 @@ type AgentAdapter = {
 Tasks:
 
 - [x] Move Hermes config writing behind `AgentAdapter`.
-- [x] Add `healthlink-local init --agent hermes` as an alias for `--hermes`.
-- [x] Keep `healthlink-local init --hermes` for compatibility.
-- [x] Add `healthlink-local print-agent-config --agent generic`.
+- [x] Add `vitalmcp init --agent hermes` as an alias for `--hermes`.
+- [x] Keep `vitalmcp init --hermes` for compatibility.
+- [x] Add `vitalmcp print-agent-config --agent generic`.
 - [x] Add OpenClaw adapter research:
   - config location
   - MCP format
@@ -226,7 +226,7 @@ Tasks:
   - config location
   - tool integration format
   - prompt/rule package format
-- [x] Add `healthlink-local doctor --agent <id>`.
+- [x] Add `vitalmcp doctor --agent <id>`.
 - [x] Add tests using temporary agent homes/config files.
 
 ## Skill Layer TODO
@@ -236,9 +236,9 @@ MCP is the product protocol. Skills are optional instructions that improve natur
 Tasks:
 
 - [x] Add a bundled HealthLink skill Markdown template.
-- [x] Add `healthlink-local print-skill --format markdown`.
-- [x] Add `healthlink-local install-hermes-skill`.
-- [x] Add `healthlink-local init --hermes --install-skill`.
+- [x] Add `vitalmcp print-skill --format markdown`.
+- [x] Add `vitalmcp install-hermes-skill`.
+- [x] Add `vitalmcp init --hermes --install-skill`.
 - [x] Define a generic skill contract:
   - when to call `get_personal_context`
   - how to use lower-level tools
@@ -278,7 +278,7 @@ Tasks:
   - user-provided tunnel URL
 - [x] Add public HTTPS mode docs.
 - [x] Add pairing status payload field `transport`.
-- [x] Add `healthlink-local doctor --transport <id>`.
+- [x] Add `vitalmcp doctor --transport <id>`.
 
 ## iOS Auto Sync TODO
 

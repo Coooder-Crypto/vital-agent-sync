@@ -1,6 +1,8 @@
-# HealthLink iOS
+# VitalMCP iOS
 
-HealthLink is a private iOS data gateway for agent systems. The MVP reads user-authorized Apple Health summaries, uploads compact daily context to the user's Agent-side receiver, stores it locally, and exposes it to agents through MCP tools.
+VitalMCP is a private iOS data gateway for agent systems. The MVP reads user-authorized Apple Health summaries, uploads compact daily context to the user's Agent-side receiver, stores it locally, and exposes it to agents through MCP tools.
+
+The pre-release product is branded VitalMCP, including the `vitalmcp` npm package and CLI. Protocol and persisted identifiers such as `healthlink-e2ee-v1`, `healthlink://`, `~/.healthlink`, and the internal Xcode target/module remain unchanged during the migration. See [docs/brand-identity.md](docs/brand-identity.md).
 
 It is intentionally not an agent. It is a user-controlled data connector.
 
@@ -27,11 +29,12 @@ For the broader product plan covering local daemon, MCP, pairing, scopes, and pa
   - device token in Keychain
 - Sync lifecycle:
   - current MVP supports manual user-triggered sync
-  - target UX is pair once, authorize once, then auto-sync when the app is active or iOS grants background time
+  - v0.1 promises manual sync plus catch-up when the app is active or returns to the foreground
+  - iOS background opportunities are best-effort; no exact daily, weekly, or interval schedule is promised
 - Upload endpoint:
   - encrypted direct `POST /v1/direct` envelope (the receiver decrypts locally)
 - Agent access:
-  - MCP stdio tools from `healthlink-local`
+  - MCP stdio tools from `vitalmcp`
 
 ## Generate The Xcode Project
 
@@ -51,9 +54,17 @@ npm install
 npm run dev:local
 ```
 
-The local package lives in `packages/local` and is named `healthlink-local`. The package is prepared for public npm publishing and exposes the `healthlink-local` CLI.
+The local package lives in `packages/local` and is named `vitalmcp`. The package is prepared for public npm publishing and exposes the `vitalmcp` CLI.
 
-The target product entry is Agent-first: the user asks an existing Agent to install HealthLink, the Agent adapter invokes the shared `healthlink-local` bootstrap, and the user receives one QR/deep-link action for the iOS app. The Skill is an orchestration layer only; MCP remains the data contract. See [Agent-First Onboarding And Runtime Bootstrap](docs/agent-first-onboarding.md).
+The target product entry is Agent-first: the user asks an existing Agent to install VitalMCP, the Agent adapter invokes the shared `vitalmcp` bootstrap, and the user receives one QR/deep-link action for the iOS app. The Skill is an orchestration layer only; MCP remains the data contract. See [Agent-First Onboarding And Runtime Bootstrap](docs/agent-first-onboarding.md).
+
+## Local Preview Network Path
+
+LAN is the default onboarding path. `vitalmcp setup` starts a receiver on the user's machine and creates a QR for an iPhone on the same reachable trusted network. This path needs no relay URL, VPS, domain, VitalMCP account, or payment method.
+
+Tailscale is the optional private remote path. It requires the user to install and sign in to Tailscale on both the iPhone and receiver machine, and to authorize both devices on the same tailnet. VitalMCP uses the user-managed tailnet; it does not create an account or approve devices.
+
+Hosted Relay remains future/experimental during Local Preview. Its implementation and protocol documentation remain in the repository, but it is not the default, recommended, or required onboarding route.
 
 The current local development loop is:
 
@@ -61,7 +72,7 @@ The current local development loop is:
 iPhone app
   -> HealthKit summaries
   -> POST /health/sync on manual or automatic sync
-  -> healthlink-local
+  -> vitalmcp
   -> SQLite
   -> MCP tools
   -> Hermes or another agent
@@ -77,24 +88,25 @@ node packages/local/dist/cli.js mcp --db ~/.healthlink/healthlink.sqlite
 Current portable CLI fallback:
 
 ```bash
-npx -y healthlink-local setup
+npx -y vitalmcp setup
 ```
 
-Supported Agents can use the Skill-first flow instead: the generated HealthLink Skill requests a redacted setup plan, asks for consent, resumes the shared `healthlink-local` bootstrap, presents one private local onboarding page, and verifies the first sync through MCP. The Skill never owns keys, relay crypto, SQLite, or a separate health query path. See [docs/agent-first-onboarding.md](docs/agent-first-onboarding.md).
+Supported Agents can use the Skill-first flow instead: the generated VitalMCP Skill requests a redacted setup plan, asks for consent, resumes the shared `vitalmcp` bootstrap, presents one private local onboarding page, and verifies the first sync through MCP. The Skill never owns keys, relay crypto, SQLite, or a separate health query path. See [docs/agent-first-onboarding.md](docs/agent-first-onboarding.md).
 
 Portable no-sudo installer fallback:
 
 ```bash
 curl -fsSL https://<healthlink-domain>/install.sh | sh
-healthlink-local setup
+vitalmcp setup
 ```
 
 Agent-safe setup commands:
 
 ```bash
-healthlink-local setup --agent auto --transport relay --output json
-healthlink-local setup --resume --yes --output json
-healthlink-local status --output json
+vitalmcp setup --agent auto --transport lan --output json
+vitalmcp setup --resume --yes --output json
+vitalmcp setup --agent auto --transport tailscale --tailscale-name <host.tailnet.ts.net> --output json
+vitalmcp status --output json
 ```
 
 Development pairing loop:
@@ -104,16 +116,19 @@ npm run build:local
 node packages/local/dist/cli.js setup
 ```
 
-`setup` installs and starts the background receiver through the current platform's service manager, prints the iPhone pairing QR, and auto-detects Hermes/OpenClaw when their config exists. If Hermes is detected, it backs up and writes `~/.hermes/config.yaml`, installs the HealthLink Hermes skill, and points Hermes at the same HealthLink database. macOS uses `launchd`; Linux servers use a user-level `systemd` service. Pass `--agent hermes`, `--agent openclaw`, or `--agent generic` to force an adapter. After pairing and syncing, restart Hermes or run `/reload-mcp` when an Agent config was changed. If the QR expires, run `healthlink-local pair` or `npx -y healthlink-local pair`.
+`setup` installs and starts the background receiver through the current platform's service manager, prints the iPhone pairing QR, and auto-detects Hermes/OpenClaw when their config exists. If Hermes is detected, it backs up and writes `~/.hermes/config.yaml`, installs the VitalMCP Hermes Skill, and points Hermes at the same VitalMCP database. macOS uses `launchd`; Linux servers use a user-level `systemd` service. Pass `--agent hermes`, `--agent openclaw`, or `--agent generic` to force an adapter. After pairing and syncing, restart Hermes or run `/reload-mcp` when an Agent config was changed. If the QR expires, run `vitalmcp pair` or `npx -y vitalmcp pair`.
 
-The planned one-command installer only bootstraps this package into a user-writable prefix. It must not create a second setup implementation. Agent-first, website, and manual CLI entry points all converge on `healthlink-local setup`, the same local state, and the same MCP tools.
+The planned one-command installer only bootstraps this package into a user-writable prefix. It must not create a second setup implementation. Agent-first, website, and manual CLI entry points all converge on `vitalmcp setup`, the same local state, and the same MCP tools.
 
 Common deployment choices are documented separately:
 
-- Mac local mode: receiver, SQLite, and MCP run on the user's Mac.
-- Home server / NAS / N100 mode: receiver and SQLite run on an always-on home machine, usually via `systemd`.
+- Mac local LAN mode (default): receiver, SQLite, and MCP run on the user's Mac.
+- Tailscale (optional): the same receiver stays private on the user's authorized tailnet for remote sync.
+- Home server / NAS / N100 mode: receiver and SQLite run on an always-on home machine over LAN or Tailscale, usually via `systemd`.
 - Docker Compose mode: receiver runs in a container and SQLite lives in a mounted host volume.
-- User-owned VPS / public HTTPS mode: receiver and SQLite run on the user's server with user-managed HTTPS.
+- User-owned VPS / public HTTPS mode: advanced path with user-managed DNS, TLS, and infrastructure.
+
+For connection problems, run `vitalmcp service status`, `vitalmcp logs`, and `vitalmcp doctor --transport lan`. For Tailscale, first confirm both devices are signed in to the same authorized tailnet, then run `vitalmcp doctor --transport tailscale --tailscale-name <host.tailnet.ts.net>`. If a QR expires, run `vitalmcp pair`. To disconnect a phone, revoke it with the MCP `revoke_source_device` tool, remove the saved connection in the iOS app, and pair again; local SQLite history is preserved.
 
 Foreground compatibility/debug command:
 
@@ -128,7 +143,7 @@ After that first setup, Hermes does not need to reconnect for every sync. iOS wr
 If an Agent supports a startup hook, it can run this idempotent command before loading MCP tools:
 
 ```bash
-npx -y healthlink-local ensure
+npx -y vitalmcp ensure
 ```
 
 `ensure` makes sure the background receiver service exists and is running. It is intentionally separate from `setup`: it does not print a QR, rewrite Agent config, or install skills, so it is safe to call repeatedly when an Agent starts.
@@ -145,41 +160,41 @@ node packages/local/dist/cli.js doctor
 Published package shape:
 
 ```bash
-npx -y healthlink-local init
-npx -y healthlink-local init --hermes
-npx -y healthlink-local setup
-npx -y healthlink-local setup --agent hermes
-npx -y healthlink-local setup --agent openclaw
-npx -y healthlink-local ensure
-npx -y healthlink-local service status
-npx -y healthlink-local logs
-npx -y healthlink-local pair
-npx -y healthlink-local mcp
-npx -y healthlink-local print-mcp-config
-npx -y healthlink-local install-hermes
-npx -y healthlink-local status
-npx -y healthlink-local doctor
+npx -y vitalmcp init
+npx -y vitalmcp init --hermes
+npx -y vitalmcp setup
+npx -y vitalmcp setup --agent hermes
+npx -y vitalmcp setup --agent openclaw
+npx -y vitalmcp ensure
+npx -y vitalmcp service status
+npx -y vitalmcp logs
+npx -y vitalmcp pair
+npx -y vitalmcp mcp
+npx -y vitalmcp print-mcp-config
+npx -y vitalmcp install-hermes
+npx -y vitalmcp status
+npx -y vitalmcp doctor
 ```
 
 Release check for the local package:
 
 ```bash
-npm run typecheck --workspace healthlink-local
-npm run test --workspace healthlink-local
+npm run typecheck --workspace vitalmcp
+npm run test --workspace vitalmcp
 npm run audit:relay-local
 npm run audit:agent-adapters
 npm run audit:dependencies
 npm run audit:secrets
 npm run release:npm-preflight -- --local
-npm run pack:check --workspace healthlink-local
+npm run pack:check --workspace vitalmcp
 ```
 
 Useful background-service diagnostics:
 
 ```bash
-npx -y healthlink-local service status
-npx -y healthlink-local logs
-npx -y healthlink-local logs --lines 200
+npx -y vitalmcp service status
+npx -y vitalmcp logs
+npx -y vitalmcp logs --lines 200
 lsof -nP -iTCP:8787 -sTCP:LISTEN
 ```
 
@@ -201,16 +216,16 @@ Normal use after setup:
 
 ```text
 iOS syncs latest summaries -> ~/.healthlink/healthlink.sqlite
-Hermes calls HealthLink MCP -> reads the latest summaries
+Hermes calls VitalMCP MCP -> reads the latest summaries
 ```
 
 No repeated QR scan, `install-hermes`, or `/reload-mcp` is needed unless the pairing, database path, MCP configuration, or skill files change.
 
 ## Agent Skills
 
-MCP is the stable integration contract. Skills are optional agent-side usage guidance that help an AI decide when to call HealthLink and how to format analysis.
+MCP is the stable integration contract. Skills are optional agent-side usage guidance that help an AI decide when to call VitalMCP and how to format analysis.
 
-Skills may also guide installation, onboarding, first-sync verification, and Agent-native scheduling by invoking `healthlink-local`. They must not implement relay cryptography, store a separate copy of health data, expose onboarding credentials, or bypass MCP. OpenClaw marketplace publication is optional; Hermes and generic MCP remain supported without it.
+Skills may also guide installation, onboarding, and first-sync verification by invoking `vitalmcp`. They must not promise scheduled iOS delivery, implement relay cryptography, store a separate copy of health data, expose onboarding credentials, or bypass MCP. OpenClaw marketplace publication is optional; Hermes and generic MCP remain supported without any marketplace listing.
 
 For Hermes, the preferred skill behavior is:
 
@@ -219,7 +234,7 @@ For Hermes, the preferred skill behavior is:
 - mention data freshness before analysis
 - avoid medical diagnosis or prescriptions
 
-Product installs should keep the generic MCP path available for non-Hermes agents, while Hermes-first setup can install or update a HealthLink skill as an experience enhancement.
+Product installs should keep the generic MCP path available for non-Hermes agents, while Hermes-first setup can install or update a VitalMCP Skill as an experience enhancement.
 
 ## Sync Contract
 
@@ -272,7 +287,7 @@ Canonical plaintext payload after local receiver decryption:
 - Add foreground auto sync after pairing, app launch, and app foregrounding with throttling.
 - Add `HKAnchoredObjectQuery` for incremental sample sync.
 - Add `HKObserverQuery`, `BGAppRefreshTask`, and background delivery as best-effort triggers.
-- Add an optional bundled HealthLink skill installer for Hermes.
+- Add an optional bundled VitalMCP Skill installer for Hermes.
 - Add automated iOS UI coverage after real-device workflow stabilizes.
 - Add tunnel and public HTTPS transports.
 - Add Reminders summaries.

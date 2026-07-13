@@ -172,7 +172,7 @@ export function ingestHealthSync(
 
 export function getHealthStatus(database: HealthLinkDatabase): {
   ok: true;
-  service: "healthlink-local";
+  service: "vitalmcp";
   status: "running";
   device_count: number;
   sync_count: number;
@@ -187,7 +187,7 @@ export function getHealthStatus(database: HealthLinkDatabase): {
 
   return {
     ok: true,
-    service: "healthlink-local",
+    service: "vitalmcp",
     status: "running",
     device_count: row.deviceCount,
     sync_count: row.syncCount,

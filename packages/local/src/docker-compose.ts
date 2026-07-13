@@ -33,7 +33,7 @@ export function buildDockerComposeYaml(options: DockerComposeOptions): string {
       - sh
       - -c
       - >
-        npx -y healthlink-local daemon
+        npx -y vitalmcp daemon
         --host "$$HEALTHLINK_HOST"
         --port "$$HEALTHLINK_PORT"
         --db "$$HEALTHLINK_DB"
@@ -69,7 +69,7 @@ export function buildRelayDockerComposeYaml(options: RelayDockerComposeOptions =
       - sh
       - -c
       - >
-        npx -y healthlink-local relay serve
+        npx -y vitalmcp relay serve
         --host "$$HEALTHLINK_RELAY_HOST"
         --port "$$HEALTHLINK_RELAY_PORT"
         --db "$$HEALTHLINK_RELAY_DB"

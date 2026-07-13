@@ -4,7 +4,7 @@ This document is user-facing language for the relay route. It should guide produ
 
 ## Short Version
 
-HealthLink relay mode is designed so the relay forwards encrypted envelopes. The relay should not be able to read Apple Health summaries. Your local `healthlink-local` runtime owns the private keys, decrypts data, stores it in your SQLite database, and exposes it to your chosen Agent through MCP.
+HealthLink relay mode is designed so the relay forwards encrypted envelopes. The relay should not be able to read Apple Health summaries. Your local `vitalmcp` runtime owns the private keys, decrypts data, stores it in your SQLite database, and exposes it to your chosen Agent through MCP.
 
 ## What Each Mode Means
 
@@ -15,7 +15,7 @@ Use this when you want the easiest setup and do not want to expose a local port.
 Data path:
 
 ```text
-iPhone -> HealthLink hosted relay -> healthlink-local pull -> SQLite -> MCP -> Agent
+iPhone -> HealthLink hosted relay -> vitalmcp pull -> SQLite -> MCP -> Agent
 ```
 
 The hosted relay can see:
@@ -42,7 +42,7 @@ Use this when you want the relay under your own infrastructure but still want th
 Data path:
 
 ```text
-iPhone -> your relay -> healthlink-local pull -> SQLite -> MCP -> Agent
+iPhone -> your relay -> vitalmcp pull -> SQLite -> MCP -> Agent
 ```
 
 Your relay stores the same encrypted envelope format as the hosted relay. Anyone operating the relay can see metadata and ciphertext, but not health plaintext unless they also have your local private keys.
@@ -54,7 +54,7 @@ Use this when your iPhone can reach your local receiver through LAN, Tailscale, 
 Data path:
 
 ```text
-iPhone -> healthlink-local receiver -> SQLite -> MCP -> Agent
+iPhone -> vitalmcp receiver -> SQLite -> MCP -> Agent
 ```
 
 There is no relay queue. The receiver sees plaintext because it is the trusted local runtime that stores data.
@@ -78,7 +78,7 @@ Agents should read HealthLink data through MCP tools, not by opening SQLite dire
 
 Agents should mention freshness when answering health-context questions. If data is stale, the expected next step is:
 
-- relay mode: run `healthlink-local pull`, then ask the user to sync from iOS if no new envelopes are available.
+- relay mode: run `vitalmcp pull`, then ask the user to sync from iOS if no new envelopes are available.
 - direct mode: ask the user to sync from iOS or check the local receiver.
 
 ## What Not To Promise

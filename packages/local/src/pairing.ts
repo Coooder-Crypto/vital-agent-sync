@@ -64,7 +64,7 @@ export class PairingStore {
 
     const expiresInSeconds = input.expiresInSeconds ?? 600;
     const code = createPairingCode();
-    const pairingUrl = new URL("healthlink://pair");
+    const pairingUrl = new URL("vitalmcp://pair");
     pairingUrl.searchParams.set("server", input.serverUrl);
     pairingUrl.searchParams.set("code", code);
     pairingUrl.searchParams.set("transport", input.transport ?? "lan");

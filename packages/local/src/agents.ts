@@ -128,7 +128,7 @@ const genericAgentAdapter: AgentAdapter = {
       id: "generic",
       available: true,
       installed: true,
-      detail: "Generic agents use the printed mcpServers JSON; HealthLink does not write agent-specific config."
+      detail: "Generic agents use the printed mcpServers JSON; VitalMCP does not write agent-specific config."
     };
   },
   installMcp(config) {
@@ -171,7 +171,7 @@ const hermesAgentAdapter: AgentAdapter = {
       configPath: result.configPath,
       backupPath: result.backupPath,
       server: result.server,
-      message: `HealthLink MCP installed for Hermes in ${result.configPath}`
+      message: `VitalMCP MCP installed for Hermes in ${result.configPath}`
     };
   },
   installSkill(options) {
@@ -224,7 +224,7 @@ const openClawAgentAdapter: AgentAdapter = {
       configPath: result.configPath,
       backupPath: result.backupPath,
       server: result.server,
-      message: `HealthLink MCP installed for OpenClaw in ${result.configPath}`
+      message: `VitalMCP MCP installed for OpenClaw in ${result.configPath}`
     };
   },
   formatMcpConfig(config) {

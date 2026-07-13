@@ -4,12 +4,12 @@
 <dict>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>app.healthlink.ios.autosync</string>
+		<string>com.vitalmcp.ios.autosync</string>
 	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>HealthLink</string>
+	<string>VitalMCP</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -17,7 +17,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>$(PRODUCT_NAME)</string>
+	<string>VitalMCP</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -26,9 +26,10 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>app.healthlink.ios</string>
+			<string>com.vitalmcp.ios</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
+				<string>vitalmcp</string>
 				<string>healthlink</string>
 			</array>
 		</dict>
@@ -43,11 +44,11 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>HealthLink scans pairing QR codes shown by your local Agent server.</string>
+	<string>VitalMCP scans pairing QR codes shown by your local Agent server.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>HealthLink reads selected Apple Health data to sync daily summaries to your authorized agent server.</string>
+	<string>VitalMCP reads selected Apple Health data to sync daily summaries to your authorized agent server.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>HealthLink connects to your local Agent server on your network after you approve pairing.</string>
+	<string>VitalMCP connects to your local Agent server on your network after you approve pairing.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>

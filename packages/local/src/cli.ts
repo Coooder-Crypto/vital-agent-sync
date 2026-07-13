@@ -470,7 +470,7 @@ async function main(): Promise<void> {
   }
 
   if (options.command === "version") {
-    console.log("healthlink-local 0.3.0");
+    console.log("vitalmcp 0.3.0");
     return;
   }
 
@@ -524,9 +524,9 @@ async function main(): Promise<void> {
   if (options.command === "export-skill") {
     const result = exportHealthLinkSkillPackage({
       agent: options.agentId,
-      outputDir: options.outputDir ?? "healthlink-openclaw-skill"
+      outputDir: options.outputDir ?? "vitalmcp-openclaw-skill"
     });
-    console.log("HealthLink skill package exported");
+    console.log("VitalMCP skill package exported");
     console.log(`Package:  ${result.packageDir}`);
     console.log(`Skill:    ${result.skillPath}`);
     console.log(`README:   ${result.readmePath}`);
@@ -574,13 +574,13 @@ async function main(): Promise<void> {
     if (!result) {
       throw new Error("Hermes adapter does not support skill installation.");
     }
-    console.log("HealthLink skill installed for Hermes");
+    console.log("VitalMCP skill installed for Hermes");
     console.log(`Skill: ${result.skillPath}`);
     if (result.backupPath) {
       console.log(`Backup: ${result.backupPath}`);
     }
     console.log("");
-    console.log("Restart Hermes or reload skills to make the HealthLink skill visible.");
+    console.log("Restart Hermes or reload skills to make the VitalMCP skill visible.");
     return;
   }
 
@@ -665,28 +665,29 @@ async function main(): Promise<void> {
       }
       console.log(`  ${agent.reloadHint()}`);
       if (skillInstall) {
-        console.log(`  installed HealthLink skill in ${skillInstall.skillPath}`);
+        console.log(`  installed VitalMCP skill in ${skillInstall.skillPath}`);
       }
     } else {
-      console.log("  healthlink-local init --agent hermes");
-      console.log("  healthlink-local init --hermes");
-      console.log("  healthlink-local install-hermes");
-      console.log("  healthlink-local install-hermes-skill");
+      console.log("  vitalmcp init --agent hermes");
+      console.log("  vitalmcp init --hermes");
+      console.log("  vitalmcp install-hermes");
+      console.log("  vitalmcp install-hermes-skill");
     }
     console.log("");
   }
 }
 
 function buildCliHelp(): string {
-  return `HealthLink Local 0.3.0
+  return `VitalMCP Local 0.3.0
 
 Usage:
-  healthlink-local <command> [options]
+  vitalmcp <command> [options]
 
 Core setup:
-  setup --transport lan --agent <generic|hermes|openclaw|workbuddy> [--output json]
-  setup --transport relay --relay-url https://HOSTED-RELAY --agent <agent> [--output json]
+  setup --transport lan --agent <generic|hermes|openclaw|workbuddy> [--output json]  # Local Preview default
+  setup --transport tailscale --tailscale-name <host.tailnet.ts.net> --agent <agent> # optional private remote
   setup --transport self-hosted-relay --relay-url http://HOST:8790 --agent <agent>
+  setup --transport relay --relay-url https://HOSTED-RELAY --agent <agent> [--output json] # future/experimental
   setup --resume --yes [--output json]
   pair
   status
@@ -719,7 +720,7 @@ Service:
   logs [--mode receiver|relay-pull] [--lines N]
 
 Global:
-  --db <path>        HealthLink SQLite path
+  --db <path>        VitalMCP SQLite path
   --state-dir <path> Relay runtime state directory
   --output text|json Versioned Agent-safe command output
   --yes              Apply a reviewed setup plan
@@ -733,25 +734,25 @@ async function runServiceCommand(options: CliOptions): Promise<void> {
   const serviceOptions = toServiceOptions(options);
   if (action === "install") {
     const status = installHealthLinkService(serviceOptions);
-    console.log("HealthLink service installed");
+    console.log("VitalMCP service installed");
     await printServiceStatusDetails(status, options);
     return;
   }
   if (action === "start") {
     const status = startHealthLinkService(serviceOptions);
-    console.log("HealthLink service start requested");
+    console.log("VitalMCP service start requested");
     await printServiceStatusDetails(status, options);
     return;
   }
   if (action === "stop") {
     const status = stopHealthLinkService(serviceOptions);
-    console.log("HealthLink service stop requested");
+    console.log("VitalMCP service stop requested");
     await printServiceStatusDetails(status, options);
     return;
   }
   if (action === "uninstall") {
     const status = uninstallHealthLinkService(serviceOptions);
-    console.log("HealthLink service uninstalled");
+    console.log("VitalMCP service uninstalled");
     await printServiceStatusDetails(status, options);
     return;
   }
@@ -806,7 +807,7 @@ async function runSetup(options: CliOptions): Promise<void> {
       completed_stages: state.completed_stages,
       next_action: {
         type: "retry",
-        command: "healthlink-local setup --resume --yes --output json"
+        command: "vitalmcp setup --resume --yes --output json"
       },
       error: {
         code: classifyBootstrapError(error),
@@ -844,7 +845,7 @@ function createAndPersistBootstrapState(options: CliOptions): BootstrapState {
     return existing;
   }
   if (existing && existing.status !== "complete") {
-    throw new Error("An unfinished HealthLink setup already exists with different options. Resume it with setup --resume, or finish it before starting a different setup plan.");
+    throw new Error("An unfinished VitalMCP setup already exists with different options. Resume it with setup --resume, or finish it before starting a different setup plan.");
   }
   const state = createBootstrapState(config);
   return writeBootstrapState(state, { stateDir: options.stateDir });
@@ -883,7 +884,7 @@ function restoreBootstrapOptions(options: CliOptions): CliOptions {
 function requireBootstrapState(options: Pick<CliOptions, "stateDir">): BootstrapState {
   const state = readBootstrapState({ stateDir: options.stateDir });
   if (!state) {
-    throw new Error("No resumable HealthLink setup was found. Run healthlink-local setup with the desired Agent and transport first.");
+    throw new Error("No resumable VitalMCP setup was found. Run vitalmcp setup with the desired Agent and transport first.");
   }
   return state;
 }
@@ -925,7 +926,7 @@ function printBootstrapPlan(state: BootstrapState, options: CliOptions): void {
     printJson(buildBootstrapOutput(state, options));
     return;
   }
-  console.log(`HealthLink setup plan for ${getAgentAdapter(state.config.agent_id).displayName}`);
+  console.log(`VitalMCP setup plan for ${getAgentAdapter(state.config.agent_id).displayName}`);
   for (const [index, item] of state.plan.entries()) {
     console.log(`${index + 1}. ${item.description}${item.persistent_change ? " (persistent change)" : ""}`);
   }
@@ -1032,7 +1033,7 @@ function buildBootstrapOutput(state: BootstrapState, options: CliOptions): Boots
       plan: state.plan,
       next_action: {
         type: "confirm",
-        command: "healthlink-local setup --resume --yes --output json"
+        command: "vitalmcp setup --resume --yes --output json"
       }
     });
   }
@@ -1041,11 +1042,11 @@ function buildBootstrapOutput(state: BootstrapState, options: CliOptions): Boots
     const health = getHealthStatus(database);
     const relay = getRelayLocalStatus({ stateDir: options.stateDir });
     const nextAction = state.status === "awaiting_first_sync"
-        ? { type: "sync_ios" as const, url: state.onboarding_url, command: "healthlink-local setup --resume --yes --output json" }
+        ? { type: "sync_ios" as const, url: state.onboarding_url, command: "vitalmcp setup --resume --yes --output json" }
         : state.status === "complete"
           ? { type: "ask_agent" as const, suggested_prompt: "How am I doing today?" }
           : state.status === "failed"
-            ? { type: "retry" as const, command: "healthlink-local setup --resume --yes --output json" }
+            ? { type: "retry" as const, command: "vitalmcp setup --resume --yes --output json" }
             : undefined;
     return sanitizeAgentOutput({
       schema_version: BOOTSTRAP_SCHEMA_VERSION,
@@ -1063,7 +1064,7 @@ function buildBootstrapOutput(state: BootstrapState, options: CliOptions): Boots
       },
       error: state.last_error_code ? {
         code: state.last_error_code,
-        message: state.last_error_message ?? "HealthLink setup failed."
+        message: state.last_error_message ?? "VitalMCP setup failed."
       } : undefined
     });
   } finally {
@@ -1077,13 +1078,13 @@ function printBootstrapResult(state: BootstrapState, options: CliOptions): void 
     return;
   }
   const agent = getAgentAdapter(state.config.agent_id);
-  console.log(`HealthLink setup status: ${state.status}`);
+  console.log(`VitalMCP setup status: ${state.status}`);
   if (state.onboarding_url && state.status !== "complete") {
     console.log(`Open this local onboarding page: ${state.onboarding_url}`);
     console.log("This page contains credentials. Do not upload or paste it into an Agent chat.");
   }
   if (state.status === "awaiting_first_sync") {
-    console.log("Next: connect HealthLink iOS, run the first sync, then run healthlink-local setup --resume --yes.");
+    console.log("Next: connect VitalMCP iOS, run the first sync, then run vitalmcp setup --resume --yes.");
   } else if (state.status === "complete") {
     console.log("First sync observed. Verify freshness with healthlink_status, then ask: How am I doing today?");
     console.log(agent.reloadHint());
@@ -1098,7 +1099,7 @@ async function runEnsure(options: CliOptions): Promise<void> {
   const ensureOptions = await resolveAutoServicePort(options);
   const serviceOptions = toServiceOptions(ensureOptions);
   let lastStatus: HealthLinkServiceStatus | undefined;
-  console.log("Ensuring HealthLink receiver service");
+  console.log("Ensuring VitalMCP receiver service");
   await runServiceEnsureWorkflow({
     getStatus: () => {
       lastStatus = getHealthLinkServiceStatus(serviceOptions);
@@ -1106,14 +1107,14 @@ async function runEnsure(options: CliOptions): Promise<void> {
     },
     installService: () => {
       if (lastStatus?.manager === "manual") {
-        throw new Error(`${lastStatus.detail ?? "This platform does not have a supported service manager."} Run healthlink-local daemon under Docker, PM2, Task Scheduler, or another process manager.`);
+        throw new Error(`${lastStatus.detail ?? "This platform does not have a supported service manager."} Run vitalmcp daemon under Docker, PM2, Task Scheduler, or another process manager.`);
       }
       console.log(`Service not installed for ${lastStatus?.manager ?? resolveServiceManagerIdForCli(options)}; installing...`);
       lastStatus = installHealthLinkService(serviceOptions);
     },
     startService: () => {
       if (lastStatus?.manager === "manual") {
-        throw new Error(`${lastStatus.detail ?? "This platform does not have a supported service manager."} Run healthlink-local daemon under Docker, PM2, Task Scheduler, or another process manager.`);
+        throw new Error(`${lastStatus.detail ?? "This platform does not have a supported service manager."} Run vitalmcp daemon under Docker, PM2, Task Scheduler, or another process manager.`);
       }
       console.log("Service not running; starting...");
       lastStatus = startHealthLinkService(serviceOptions);
@@ -1121,7 +1122,7 @@ async function runEnsure(options: CliOptions): Promise<void> {
     waitForReady: () => waitForLocalReceiver(ensureOptions),
     printStatus: async () => {
       const status = getHealthLinkServiceStatus(serviceOptions);
-      console.log("HealthLink receiver is ready.");
+      console.log("VitalMCP receiver is ready.");
       await printServiceStatusDetails(status, ensureOptions);
     }
   });
@@ -1148,7 +1149,7 @@ async function resolveAutoServicePort(options: CliOptions): Promise<CliOptions> 
 
   const listener = describePortListeners(options.port);
   if (options.outputFormat === "text") {
-    console.log(`Port ${options.port} is already in use; using ${selected.port} for HealthLink.`);
+    console.log(`Port ${options.port} is already in use; using ${selected.port} for VitalMCP.`);
     if (listener) {
       console.log(`Current listener: ${listener}`);
     }
@@ -1203,9 +1204,9 @@ async function printPairingSession(options: CliOptions): Promise<void> {
   }
   console.log("");
   console.log("Next:");
-  console.log("  1. Scan with HealthLink iOS Settings -> Pairing -> Scan QR.");
+  console.log("  1. Scan with VitalMCP iOS Settings -> Pairing -> Scan QR.");
   console.log("  2. Confirm pairing in the app, grant Health access, then Sync.");
-  console.log("  3. If this code expires, run healthlink-local pair to print a fresh QR.");
+  console.log("  3. If this code expires, run vitalmcp pair to print a fresh QR.");
   console.log("");
 }
 
@@ -1233,7 +1234,7 @@ async function waitForLocalReceiver(options: CliOptions): Promise<void> {
     lastError = probe.detail;
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error(`HealthLink service did not become ready at ${localReceiverStatusEndpoint(options)} within 5 seconds. ${lastError}`);
+  throw new Error(`VitalMCP service did not become ready at ${localReceiverStatusEndpoint(options)} within 5 seconds. ${lastError}`);
 }
 
 function toServiceOptions(options: CliOptions): LaunchdServiceOptions {
@@ -1257,7 +1258,7 @@ async function printServiceStatusDetails(status: HealthLinkServiceStatus, option
   try {
     const health = getHealthStatus(database);
     const receiver = await probeLocalReceiver(options);
-    console.log("HealthLink service");
+    console.log("VitalMCP service");
     console.log(`Manager:   ${status.manager}`);
     console.log(`Label:     ${status.label}`);
     console.log(`Installed: ${status.installed ? "yes" : "no"}`);
@@ -1271,13 +1272,13 @@ async function printServiceStatusDetails(status: HealthLinkServiceStatus, option
     console.log(`Last sync: ${health.last_sync_at ?? "never"}`);
     console.log("");
     if (!status.installed) {
-      console.log("Next: run healthlink-local setup to install and start the receiver.");
+      console.log("Next: run vitalmcp setup to install and start the receiver.");
     } else if (!status.running) {
-      console.log("Next: run healthlink-local service start, then healthlink-local pair.");
+      console.log("Next: run vitalmcp service start, then vitalmcp pair.");
     } else if (!receiver.reachable) {
-      console.log(`Next: check healthlink-local logs and confirm port ${options.port} is not occupied by another process.`);
+      console.log(`Next: check vitalmcp logs and confirm port ${options.port} is not occupied by another process.`);
     } else {
-      console.log("Next: run healthlink-local pair to print a new QR, or scan the browser QR at the Local API /pair page.");
+      console.log("Next: run vitalmcp pair to print a new QR, or scan the browser QR at the Local API /pair page.");
     }
   } finally {
     database.close();
@@ -1298,7 +1299,7 @@ function printServiceLogs(options: CliOptions): void {
     lines: options.logLines
   });
 
-  console.log(`HealthLink service logs (${options.logLines} lines)`);
+  console.log(`VitalMCP service logs (${options.logLines} lines)`);
   printLogSection("stdout", stdout);
   printLogSection("stderr", stderr);
 }
@@ -1318,17 +1319,17 @@ function printSetupNextSteps(agent: ReturnType<typeof getAgentAdapter>, manager:
   console.log("Setup complete");
   console.log("");
   console.log("Next:");
-  console.log("  1. Scan the QR with HealthLink iOS.");
+  console.log("  1. Scan the QR with VitalMCP iOS.");
   console.log("  2. Confirm pairing, grant Health access, then run Sync in the app.");
   console.log(`  3. ${agent.reloadHint()}`);
   console.log("");
   console.log(`After the first sync, this terminal can close. The ${manager} background receiver keeps accepting iOS syncs.`);
   console.log("Useful commands:");
-  console.log("  healthlink-local service status");
-  console.log(`  healthlink-local doctor --agent ${agent.id}`);
-  console.log("  healthlink-local logs");
-  console.log("  healthlink-local pair");
-  console.log("  healthlink-local service stop");
+  console.log("  vitalmcp service status");
+  console.log(`  vitalmcp doctor --agent ${agent.id}`);
+  console.log("  vitalmcp logs");
+  console.log("  vitalmcp pair");
+  console.log("  vitalmcp service stop");
 }
 
 function runRelaySetup(options: CliOptions): void {
@@ -1348,7 +1349,7 @@ function runRelaySetup(options: CliOptions): void {
   });
   const onboarding = formatRelayOnboarding(config, { mode });
 
-  console.log(`Setting up HealthLink relay for ${agent.displayName}`);
+  console.log(`Setting up VitalMCP relay for ${agent.displayName}`);
   printAgentAutoDetectSummary(options, agentId);
   if (agentId === "generic") {
     console.log("Agent config: generic MCP config will be printed on request.");
@@ -1383,25 +1384,25 @@ function runRelaySetup(options: CliOptions): void {
   process.stdout.write(onboarding);
   console.log("Next:");
   if (mode === "self_hosted_relay") {
-    console.log("  1. Run healthlink-local relay serve to start the self-hosted relay.");
-    console.log("  2. Scan the onboarding QR from HealthLink iOS or a compatible agent/mobile app.");
+    console.log("  1. Run vitalmcp relay serve to start the self-hosted relay.");
+    console.log("  2. Scan the onboarding QR from VitalMCP iOS or a compatible agent/mobile app.");
     console.log("  3. The background relay-pull service will decrypt synced envelopes into the local MCP database.");
   } else {
-    console.log("  1. Scan the onboarding QR from HealthLink iOS or a compatible agent/mobile app.");
+    console.log("  1. Scan the onboarding QR from VitalMCP iOS or a compatible agent/mobile app.");
     console.log("  2. The background relay-pull service will decrypt hosted relay envelopes into the local MCP database.");
   }
   console.log(`  4. ${agent.reloadHint()}`);
-  console.log("  5. Use healthlink-local status and healthlink-local logs --mode relay-pull to inspect freshness.");
+  console.log("  5. Use vitalmcp status and vitalmcp logs --mode relay-pull to inspect freshness.");
 }
 
 async function printRelayOnboarding(options: CliOptions): Promise<void> {
   const requestedMode = options.transportId === "relay" ? "hosted_relay" : "self_hosted_relay";
   const config = readRelayRuntimeConfig({ stateDir: options.stateDir });
   if (options.transportProvided && config.relay_mode !== requestedMode) {
-    throw new Error(`Existing runtime uses ${config.relay_mode}; run healthlink-local setup to review and approve a transport change.`);
+    throw new Error(`Existing runtime uses ${config.relay_mode}; run vitalmcp setup to review and approve a transport change.`);
   }
   if (options.relayUrl && normalizeRelayUrlForMode(options.relayUrl, config.relay_mode) !== config.relay_url) {
-    throw new Error("Existing runtime uses a different relay URL; run healthlink-local setup to review and approve the change.");
+    throw new Error("Existing runtime uses a different relay URL; run vitalmcp setup to review and approve the change.");
   }
   const mode = config.relay_mode;
   const artifact = await writeRelayOnboardingArtifact({
@@ -1427,7 +1428,7 @@ async function printRelayOnboarding(options: CliOptions): Promise<void> {
     } satisfies BootstrapOutput);
     return;
   }
-  console.log("HealthLink relay onboarding is ready.");
+  console.log("VitalMCP relay onboarding is ready.");
   console.log(`Open this local credential-bearing page: ${artifact.local_url}`);
   console.log("Do not upload, paste, or attach this page in an Agent chat.");
 }
@@ -1440,7 +1441,7 @@ async function runRelayPull(options: CliOptions): Promise<void> {
       relayUrl: options.relayUrl,
       relayApiToken: options.relayApiToken
     });
-    console.log("HealthLink relay pull complete");
+    console.log("VitalMCP relay pull complete");
     console.log(`Fetched:         ${result.fetched}`);
     console.log(`Ingested:        ${result.ingested}`);
     console.log(`Acked:           ${result.acked}`);
@@ -1481,16 +1482,16 @@ async function runRelayCommand(options: CliOptions): Promise<void> {
               targetRelayApiToken: options.relayApiToken ?? process.env.HEALTHLINK_RELAY_API_TOKEN,
               targetMode: options.transportId === "self_hosted_relay" ? "self_hosted_relay" : "hosted_relay"
             });
-    console.log(`HealthLink relay ${result.action} complete`);
+    console.log(`VitalMCP relay ${result.action} complete`);
     console.log(`Relay:      ${result.relay_url}`);
     console.log(`User:       ${result.user_id}`);
     console.log(`Device:     ${result.source_device_id}`);
     console.log(`Purged:     ${result.purged}`);
-    console.log("Onboarding: required on HealthLink iOS");
+    console.log("Onboarding: required on VitalMCP iOS");
     if (action !== "unlink") {
-      console.log("Next: run healthlink-local print-onboarding and reconnect the iOS app.");
+      console.log("Next: run vitalmcp print-onboarding and reconnect the iOS app.");
     } else {
-      console.log("Next: run healthlink-local relay rotate --yes before reconnecting this device.");
+      console.log("Next: run vitalmcp relay rotate --yes before reconnecting this device.");
     }
     return;
   }
@@ -1634,7 +1635,7 @@ function printStatus(options: CliOptions): void {
       } satisfies BootstrapOutput);
       return;
     }
-    console.log("HealthLink Local status");
+    console.log("VitalMCP Local status");
     console.log(`Database:   ${database.path}`);
     console.log(`Sources:    ${status.device_count}`);
     console.log(`Syncs:      ${status.sync_count}`);
@@ -1808,11 +1809,11 @@ async function printDoctor(options: CliOptions): Promise<void> {
       },
       error: hasFailure ? {
         code: "doctor_failed",
-        message: "One or more HealthLink diagnostic checks failed."
+        message: "One or more VitalMCP diagnostic checks failed."
       } : undefined
     } satisfies BootstrapOutput);
   } else {
-    console.log("HealthLink doctor");
+    console.log("VitalMCP doctor");
     for (const result of results) {
       console.log(`[${result.status}] ${result.label}: ${result.detail}`);
     }
@@ -1857,7 +1858,7 @@ async function probeLocalReceiver(options: CliOptions): Promise<ReceiverProbeRes
     if (!isReceiverHealthStatus(body)) {
       return {
         reachable: false,
-        detail: `${endpoint} responded, but it does not look like a HealthLink receiver`
+        detail: `${endpoint} responded, but it does not look like a VitalMCP receiver`
       };
     }
     return {
@@ -1869,7 +1870,7 @@ async function probeLocalReceiver(options: CliOptions): Promise<ReceiverProbeRes
     const listenerDetail = listener ? ` Listener on port ${options.port}: ${listener}.` : "";
     return {
       reachable: false,
-      detail: `${endpoint} is not reachable. Run healthlink-local service start or healthlink-local setup.${listenerDetail} ${error instanceof Error ? error.message : String(error)}`
+      detail: `${endpoint} is not reachable. Run vitalmcp service start or vitalmcp setup.${listenerDetail} ${error instanceof Error ? error.message : String(error)}`
     };
   }
 }
@@ -1918,23 +1919,23 @@ function formatCliError(error: unknown): string {
     const portNumber = Number(port);
     const listener = describePortListeners(Number.isInteger(portNumber) ? portNumber : 8787);
     return [
-      `HealthLink Local failed: ${message}`,
+      `VitalMCP Local failed: ${message}`,
       "",
       `Port ${port} is already in use.`,
       listener ? `Current listener: ${listener}` : "Current listener: could not be identified automatically.",
       `Check the process with: lsof -nP -iTCP:${port} -sTCP:LISTEN`,
       "If it is an old foreground receiver, stop it with Ctrl-C and retry.",
-      "If the background service is already running, use: healthlink-local pair"
+      "If the background service is already running, use: vitalmcp pair"
     ].join("\n");
   }
   if (message.includes("did not become ready")) {
     return [
-      `HealthLink Local failed: ${message}`,
+      `VitalMCP Local failed: ${message}`,
       "",
-      "Check service status with: healthlink-local service status",
-      "Check daemon logs with: healthlink-local logs",
+      "Check service status with: vitalmcp service status",
+      "Check daemon logs with: vitalmcp logs",
       "If port 8787 is occupied, stop the old receiver or rerun with --port <free-port>."
     ].join("\n");
   }
-  return `HealthLink Local failed: ${message}`;
+  return `VitalMCP Local failed: ${message}`;
 }

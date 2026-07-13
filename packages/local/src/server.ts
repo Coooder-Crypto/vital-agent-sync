@@ -306,7 +306,7 @@ function printStartupInfo(
 ): void {
   const loopback = `http://127.0.0.1:${options.port}`;
   console.log("");
-  console.log("HealthLink Local running");
+  console.log("VitalMCP running");
   console.log("");
   console.log(`Pairing page: ${loopback}/pair`);
   console.log(`${transportLabel} address:  ${advertisedUrl}`);
@@ -348,7 +348,7 @@ function renderPairingPage(input: {
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Pair HealthLink</title>
+    <title>Pair VitalMCP</title>
     <style>
       :root {
         color-scheme: light dark;
@@ -438,10 +438,10 @@ function renderPairingPage(input: {
   </head>
   <body>
     <main>
-      <h1>Pair HealthLink</h1>
-      <p>Scan this QR code with HealthLink iOS to connect this local Agent server.</p>
+      <h1>Pair VitalMCP</h1>
+      <p>Scan this QR code with VitalMCP iOS to connect this local Agent server.</p>
       <div class="qr">
-        <img src="${input.qrDataUrl}" alt="HealthLink pairing QR code">
+        <img src="${input.qrDataUrl}" alt="VitalMCP pairing QR code">
       </div>
       <div class="code">${escapeHtml(input.pairingCode)}</div>
       <dl>

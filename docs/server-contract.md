@@ -23,7 +23,7 @@ Relay mode:
 iOS
   -> encrypt HealthSyncPayload into HealthLinkEncryptedEnvelope
   -> POST /v1/envelopes to relay
-  -> healthlink-local pull
+  -> vitalmcp pull
   -> decrypt envelope locally
   -> parse HealthSyncPayload
   -> ingestValidatedHealthSync
@@ -158,4 +158,4 @@ Common direct-sync errors:
 | 409 | `replayed_envelope` | The direct request ID was already processed. |
 | 426 | `encrypted_direct_transport_required` | A removed plaintext direct route was used. |
 
-Relay pull surfaces equivalent validation failures through `healthlink-local pull` and records failed envelope metadata in relay cursor state without acking the envelope.
+Relay pull surfaces equivalent validation failures through `vitalmcp pull` and records failed envelope metadata in relay cursor state without acking the envelope.

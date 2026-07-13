@@ -45,7 +45,7 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 }
 
 try {
-  const tarballPath = packHealthLinkLocal();
+  const tarballPath = packVitalMCP();
   verifyPinnedNpxFallback(tarballPath);
   await installTarball(tarballPath);
   const binaryPath = resolveInstalledBinary();
@@ -53,7 +53,7 @@ try {
   await verifyInstalledRelayFlow(binaryPath);
   verifyInstalledSkillExport(binaryPath);
   verifyRelayLogs();
-  console.log("\nHealthLink relay package audit passed.");
+  console.log("\nVitalMCP relay package audit passed.");
 } finally {
   await cleanup();
 }
@@ -66,10 +66,10 @@ function verifyPinnedNpxFallback(tarballPath) {
     "--package",
     tarballPath,
     "--",
-    "healthlink-local",
+    "vitalmcp",
     "--version"
   ], { cwd: tempDir, env: npmEnv, timeoutMs: 5 * 60_000 }).trim();
-  assert(version === "healthlink-local 0.3.0", "Pinned npm exec fallback reports the wrong version.");
+  assert(version === "vitalmcp 0.3.0", "Pinned npm exec fallback reports the wrong version.");
   console.log(version);
   const status = JSON.parse(capture("npm", [
     "exec",
@@ -77,7 +77,7 @@ function verifyPinnedNpxFallback(tarballPath) {
     "--package",
     tarballPath,
     "--",
-    "healthlink-local",
+    "vitalmcp",
     "status",
     "--state-dir",
     join(tempDir, "npx-state"),
@@ -90,19 +90,19 @@ function verifyPinnedNpxFallback(tarballPath) {
   assert(status.command === "status", "Pinned npm exec fallback ran the wrong command.");
 }
 
-function packHealthLinkLocal() {
-  console.log("\n==> pack healthlink-local tarball");
+function packVitalMCP() {
+  console.log("\n==> pack vitalmcp tarball");
   const output = capture("npm", [
     "pack",
     "--workspace",
-    "healthlink-local",
+    "vitalmcp",
     "--pack-destination",
     packDir,
     "--json"
   ], { cwd: root, env: npmEnv });
   const packed = JSON.parse(output);
   const artifact = packed[0];
-  assert(artifact?.name === "healthlink-local", "npm pack returned the wrong package name.");
+  assert(artifact?.name === "vitalmcp", "npm pack returned the wrong package name.");
   assert(artifact.version === "0.3.0", "npm pack returned the wrong package version.");
   assert(Array.isArray(artifact.files), "npm pack did not report package files.");
   const packagePaths = artifact.files.map((entry) => entry.path);
@@ -115,11 +115,11 @@ function packHealthLinkLocal() {
     "dist/relay-pull.js",
     "dist/relay-server.js"
   ]) {
-    assert(packagePaths.includes(required), `Packed healthlink-local is missing ${required}.`);
+    assert(packagePaths.includes(required), `Packed vitalmcp is missing ${required}.`);
   }
   assert(
     packagePaths.every((path) => !path.startsWith("src/") && !path.startsWith("tests/")),
-    "Packed healthlink-local contains source or test files."
+    "Packed vitalmcp contains source or test files."
   );
   const tarballPath = join(packDir, artifact.filename);
   assert(existsSync(tarballPath), "npm pack did not create the reported tarball.");
@@ -150,16 +150,16 @@ async function installTarball(tarballPath) {
 
 function resolveInstalledBinary() {
   const path = process.platform === "win32"
-    ? join(installPrefix, "healthlink-local.cmd")
-    : join(installPrefix, "bin", "healthlink-local");
-  assert(existsSync(path), "Isolated global install did not create healthlink-local.");
+    ? join(installPrefix, "vitalmcp.cmd")
+    : join(installPrefix, "bin", "vitalmcp");
+  assert(existsSync(path), "Isolated global install did not create vitalmcp.");
   return path;
 }
 
 function verifyInstalledCli(binaryPath) {
   console.log("\n==> isolated installed CLI");
   const version = capture(binaryPath, ["--version"], { cwd: tempDir, env: npmEnv }).trim();
-  assert(version === "healthlink-local 0.3.0", "Installed CLI reports the wrong version.");
+  assert(version === "vitalmcp 0.3.0", "Installed CLI reports the wrong version.");
   const help = capture(binaryPath, ["--help"], { cwd: tempDir, env: npmEnv });
   for (const expected of [
     "setup --transport relay",
@@ -300,10 +300,10 @@ function verifyInstalledSkillExport(binaryPath) {
   const skill = readFileSync(join(skillDir, "SKILL.md"), "utf8");
   const readme = readFileSync(join(skillDir, "README.md"), "utf8");
   for (const expected of [
-    "name: healthlink-personal-context",
+    "name: vitalmcp-personal-context",
     "version: 0.3.0",
-    "healthlink-local@0.3.0",
-    "healthlink-local pull"
+    "vitalmcp@0.3.0",
+    "vitalmcp pull"
   ]) {
     assert(skill.includes(expected), `Installed CLI skill export is missing: ${expected}.`);
   }

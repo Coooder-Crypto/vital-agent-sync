@@ -27,17 +27,17 @@ const auditEnv = {
   HEALTHLINK_RELAY_METRICS_TOKEN: metricsToken
 };
 
-run("healthlink-local build", "npm", [
+run("vitalmcp build", "npm", [
   "run",
   "build",
   "--workspace",
-  "healthlink-local"
+  "vitalmcp"
 ]);
 
 const passive = runAudit("passive", []);
 const active = runAudit("active", ["--active", "--yes"]);
 
-console.log("\nHealthLink hosted relay audit passed.");
+console.log("\nVitalMCP hosted relay audit passed.");
 console.log(JSON.stringify({
   relay_url: relayUrl,
   passive: passive.ok,

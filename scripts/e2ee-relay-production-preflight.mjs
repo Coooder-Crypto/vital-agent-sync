@@ -36,7 +36,7 @@ verifyRelayService(relay);
 verifyCaddyService(caddy);
 verifyCaddyfile();
 
-console.log("HealthLink production relay preflight passed.");
+console.log("VitalMCP production relay preflight passed.");
 console.log(JSON.stringify({
   domain,
   relay_url: `https://${domain}`,

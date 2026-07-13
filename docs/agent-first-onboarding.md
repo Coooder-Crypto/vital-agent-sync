@@ -16,7 +16,7 @@ HealthLink is not an OpenClaw-only skill and it is not a shell installer with an
 ```text
 HealthLink iOS source
   -> encrypted transport
-  -> healthlink-local context runtime
+  -> vitalmcp context runtime
   -> Agent-neutral MCP
   -> Agent adapters and optional skills
 ```
@@ -37,14 +37,14 @@ The Agent can guide this flow, but it must not become the data plane. Removing a
 
 ## Reference Product Alignment
 
-The current [Apple Health Sync skill on ClawHub](https://clawhub.ai/lukasosterheider/skills/apple-health-sync) and [Health Sync product walkthrough](https://gethealthsync.app/) provide a useful interaction benchmark:
+The current [Apple Health Sync skill on ClawHub](https://clawhub.ai/lukasosterheider/skills/apple-health-sync) and [Health Sync product walkthrough](https://gethealthsync.app/) provide a useful interaction benchmark, but VitalMCP Local Preview does not depend on any marketplace listing:
 
 1. The user starts inside an Agent conversation.
 2. The Agent installs a Skill and initializes a local runtime.
 3. The Agent offers one onboarding format, with QR preferred and a text form as fallback.
 4. The user connects an iOS app and completes a first sync.
 5. The local runtime fetches, decrypts, validates, and persists snapshots.
-6. The Agent can generate summaries and schedule recurring work.
+6. The Agent can generate summaries from the latest available sync.
 
 HealthLink should align with that low-friction sequence, but not copy an Agent-specific runtime or duplicate the query layer in Skill scripts. HealthLink already has a reusable TypeScript runtime, E2EE relay protocol, SQLite ingest path, lifecycle controls, and 12 Agent-neutral MCP tools.
 
@@ -55,7 +55,7 @@ HealthLink should align with that low-friction sequence, but not copy an Agent-s
 The user gives a supported Agent a HealthLink install URL or marketplace package. The adapter:
 
 - explains the filesystem, service, network, and Agent-config changes before applying them
-- invokes the shared `healthlink-local` bootstrap
+- invokes the shared `vitalmcp` bootstrap
 - presents one onboarding action at a time
 - verifies the first sync through MCP
 - returns Agent-specific reload and scheduling guidance
@@ -67,17 +67,17 @@ OpenClaw and Hermes may provide first-class Skill packages. Other runtimes can i
 Users without a supported Agent installer use:
 
 ```bash
-npx -y healthlink-local setup
+npx -y vitalmcp setup
 ```
 
 The planned website bootstrap command may install the package into a user-writable prefix when Node/npm or global npm permissions are unsuitable:
 
 ```bash
 curl -fsSL https://<healthlink-domain>/install.sh | sh
-healthlink-local setup
+vitalmcp setup
 ```
 
-The shell script is a distribution helper, not a second setup implementation. It must delegate product initialization to `healthlink-local setup`.
+The shell script is a distribution helper, not a second setup implementation. It must delegate product initialization to `vitalmcp setup`.
 
 ### 3. Mobile Agent Trigger
 
@@ -85,10 +85,10 @@ A mobile Agent may open a HealthLink universal/deep link after an Agent-side run
 
 ```text
 Agent mobile app
-  -> healthlink://onboard?... or an HTTPS universal link
+  -> vitalmcp://onboard?... or an HTTPS universal link
   -> HealthLink iOS confirms the target and requested scopes
   -> HealthLink uploads ciphertext
-  -> healthlink-local pulls, decrypts, and exposes MCP
+  -> vitalmcp pulls, decrypts, and exposes MCP
 ```
 
 Mobile Agent callbacks carry request ID and coarse status only. They never carry health payloads, private keys, bearer tokens, envelope bodies, or detailed errors.
@@ -99,17 +99,19 @@ Mobile Agent callbacks carry request ID and coarse status only. They never carry
 flowchart LR
   user["User"] --> chat["Agent conversation"]
   chat --> adapter["Agent adapter or Skill"]
-  website["Website or CLI fallback"] --> bootstrap["healthlink-local bootstrap"]
+  website["Website or CLI fallback"] --> bootstrap["vitalmcp bootstrap"]
   adapter --> bootstrap
   bootstrap --> runtime["Local runtime, keys, SQLite, MCP"]
   bootstrap --> handoff["One onboarding action"]
-  handoff --> ios["HealthLink iOS"]
-  ios -->|"opaque encrypted envelope"| relay["Hosted or self-hosted Relay"]
-  relay -->|"pull ciphertext"| runtime
+  handoff --> ios["VitalMCP iOS"]
+  ios -->|"default: trusted LAN"| runtime
+  ios -->|"optional: authorized tailnet"| runtime
+  ios -.->|"future/experimental encrypted envelope"| relay["Hosted or self-hosted Relay"]
+  relay -.->|"pull ciphertext"| runtime
   runtime -->|"Agent-neutral MCP"| chat
 ```
 
-Direct LAN remains available for local-first and development use, but Hosted Relay is the target default because it avoids inbound ports, LAN reachability, public DNS, reverse proxies, and Tailscale on the Agent machine.
+LAN is the Local Preview default and requires only a reachable trusted network between the iPhone and receiver. Tailscale is the optional private remote path for users who install its apps, sign in to an account, and authorize both devices on the same tailnet. Neither path asks for a relay URL, VPS, domain, VitalMCP account, or payment method. Hosted Relay remains future/experimental and is not recommended or required in Local Preview.
 
 ## Bootstrap Ownership
 
@@ -119,8 +121,8 @@ The POSIX installer owns only package availability:
 
 - detect macOS, Linux, and WSL
 - verify a supported Node.js/npm environment, or explain the missing prerequisite
-- install `healthlink-local` into a user-writable prefix without `sudo`
-- use `~/.healthlink/npm-global` by default and support a pinned package version
+- install `vitalmcp` into a user-writable prefix without `sudo`
+- use `~/.vitalmcp/npm-global` by default and support a pinned package version
 - update a supported shell profile idempotently, without replacing unrelated content
 - support a pinned package version
 - print the exact next command
@@ -128,12 +130,13 @@ The POSIX installer owns only package availability:
 
 It must not generate relay keys, write Agent configuration, start services, or create onboarding credentials itself.
 
-### `healthlink-local setup`
+### `vitalmcp setup`
 
 The shared runtime owns product initialization:
 
 - detect the Agent adapter and service manager
-- select Hosted Relay, self-hosted Relay, or direct transport
+- select LAN by default, or Tailscale after the user confirms its prerequisites
+- keep Hosted Relay and self-hosted Relay behind an explicit future/experimental choice
 - create and harden local state
 - initialize or migrate keys and configuration
 - install/start the local pull or receiver service
@@ -151,7 +154,7 @@ The Agent layer owns conversation orchestration only:
 - request explicit confirmation before persistent changes
 - choose one onboarding presentation
 - explain freshness and the next action
-- suggest Agent-native schedules when appropriate
+- explain freshness without promising an iOS delivery schedule
 - call MCP tools for all health-data reads
 
 It must not implement cryptography, parse HealthKit payloads, maintain a separate health database, or bypass MCP.
@@ -198,17 +201,16 @@ Setup records the database sync count after consent and only marks `first_sync_o
 The existing interactive command remains the human fallback:
 
 ```bash
-healthlink-local setup
+vitalmcp setup
 ```
 
 The target Agent-facing contract should add stable non-interactive and machine-readable behavior, for example:
 
 ```bash
-healthlink-local setup --agent auto --transport relay --output json
-healthlink-local setup --resume --yes --output json
-healthlink-local print-onboarding --format qr --output json
-healthlink-local pull --once
-healthlink-local status --output json
+vitalmcp setup --agent auto --transport lan --output json
+vitalmcp setup --resume --yes --output json
+vitalmcp setup --agent auto --transport tailscale --tailscale-name <host.tailnet.ts.net> --output json
+vitalmcp status --output json
 ```
 
 Exact flags may follow existing CLI conventions, but the JSON schema must be versioned. Safe output includes:
@@ -259,12 +261,15 @@ The bootstrap chooses transport independently from the Agent adapter:
 
 | Transport | Product role | Local inbound port | User infrastructure |
 | --- | --- | --- | --- |
-| Hosted Relay | Recommended default after production launch | No | None |
-| Self-hosted Relay | Privacy/control option | No on Agent machine | Relay host |
-| Direct LAN/Tailscale | Local/developer option | Yes | Reachable Agent host |
+| Direct LAN | Local Preview default | Yes | Reachable trusted network |
+| Tailscale | Optional private remote path | Yes | User-installed apps, account, and authorized tailnet |
 | Public direct HTTPS | Advanced existing deployment | Yes | DNS, TLS, firewall |
+| Hosted Relay | Future/experimental; not a Local Preview recommendation | No | Future hosted service |
+| Self-hosted Relay | Experimental operator path | No on Agent machine | User-operated relay host |
 
 The Agent must not silently switch transport modes. Migration preserves local history and requires new iOS onboarding when credentials or routing change.
+
+The v0.1 sync promise is user-triggered Sync Now plus catch-up when the iOS app is active or returns to the foreground. Background opportunities are best-effort. Product and Agent copy must not promise scheduled daily/weekly delivery, an exact interval, or a guaranteed background time.
 
 ## Failure And Recovery UX
 
@@ -285,10 +290,13 @@ Required recovery paths:
 - invalid Agent config
 - service manager unavailable
 - local port unavailable in direct mode
-- Relay unreachable
+- Tailscale app, sign-in, authorization, or reachability failure
+- experimental Relay unreachable
 - stale or mismatched onboarding credentials
 - first sync not completed
 - MCP installed but Agent reload required
+- expired LAN/Tailscale pairing QR: run `vitalmcp pair`
+- source reset: call MCP `revoke_source_device`, remove the saved iOS connection, and pair again without deleting local SQLite history
 
 Unknown Agents fall back to standard MCP JSON and never block setup.
 
@@ -301,11 +309,14 @@ The Agent-first onboarding milestone is complete when:
 - macOS and Linux installation succeeds without `sudo npm install -g`
 - install and setup are idempotent and recover from interruption
 - persistent changes require a visible plan and user consent
-- Hosted Relay setup requires no inbound port on the Agent machine
+- LAN setup succeeds without a relay URL, VPS, domain, account, or payment method
+- Tailscale setup states its app, account, and authorized-tailnet prerequisites before making changes
 - the user sees one QR/deep-link/text action, not a dump of credential fields
 - secrets and health plaintext are absent from Agent messages, JSON, logs, and support output
 - first iOS sync is pulled and visible through `healthlink_status` plus the standard MCP tools
 - removing an optional Skill does not remove local data or break MCP
+- generic MCP remains usable without an Agent marketplace listing
+- product copy promises manual sync plus foreground catch-up, with background delivery best-effort and unscheduled
 - automated tests cover installer EACCES fallback, shell-profile idempotency, Agent detection, setup resume, output redaction, and unknown-Agent fallback
 
 ## Non-Goals

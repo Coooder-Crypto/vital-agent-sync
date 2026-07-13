@@ -5,14 +5,16 @@ import CryptoKit
 final class PairingAndPayloadTests: XCTestCase {
     private let directPublicKey = Data(repeating: 7, count: 32).base64URLEncodedString()
 
-    func testPairingLinkParsesPinnedDirectTransportKey() throws {
-        let link = try PairingLink(
-            rawValue: "healthlink://pair?server=http://192.168.1.25:8787&code=ab12-cd34&key=\(directPublicKey)"
-        )
+    func testPairingLinkAcceptsVitalMCPAndLegacySchemesWithPinnedTransportKey() throws {
+        for scheme in [AppDeepLinkScheme.primary, AppDeepLinkScheme.legacy] {
+            let link = try PairingLink(
+                rawValue: "\(scheme)://pair?server=http://192.168.1.25:8787&code=ab12-cd34&key=\(directPublicKey)"
+            )
 
-        XCTAssertEqual(link.serverURL.absoluteString, "http://192.168.1.25:8787")
-        XCTAssertEqual(link.pairingCode, "AB12-CD34")
-        XCTAssertEqual(link.directTransportPublicKey, directPublicKey)
+            XCTAssertEqual(link.serverURL.absoluteString, "http://192.168.1.25:8787")
+            XCTAssertEqual(link.pairingCode, "AB12-CD34")
+            XCTAssertEqual(link.directTransportPublicKey, directPublicKey)
+        }
     }
 
     func testPairingLinkRejectsInvalidSchemeAndMissingCode() {
@@ -88,12 +90,14 @@ final class PairingAndPayloadTests: XCTestCase {
         XCTAssertEqual(textDecoded.source_device_id, payload.source_device_id)
         XCTAssertEqual(textDecoded.relay_url, payload.relay_url)
 
-        var components = URLComponents()
-        components.scheme = "healthlink"
-        components.host = "onboard"
-        components.queryItems = [URLQueryItem(name: "payload", value: encoded)]
-        let deepLinkDecoded = try RelayOnboardingPayload(rawValue: try XCTUnwrap(components.url).absoluteString)
-        XCTAssertEqual(deepLinkDecoded.user_id, payload.user_id)
+        for scheme in [AppDeepLinkScheme.primary, AppDeepLinkScheme.legacy] {
+            var components = URLComponents()
+            components.scheme = scheme
+            components.host = "onboard"
+            components.queryItems = [URLQueryItem(name: "payload", value: encoded)]
+            let deepLinkDecoded = try RelayOnboardingPayload(rawValue: try XCTUnwrap(components.url).absoluteString)
+            XCTAssertEqual(deepLinkDecoded.user_id, payload.user_id)
+        }
     }
 
     func testRelayOnboardingRejectsHostedHTTPURL() throws {
@@ -118,6 +122,24 @@ final class PairingAndPayloadTests: XCTestCase {
         let encoded = try JSONEncoder().encode(invalid).base64URLEncodedString()
 
         XCTAssertThrowsError(try RelayOnboardingPayload(rawValue: "healthlink-e2ee-v1:\(encoded)"))
+    }
+
+    func testCallbackKeepsLegacySourceAndDropsUntrustedMetadata() throws {
+        let callback = try XCTUnwrap(HealthLinkCallbackPolicy.safeCallbackURL(
+            rawCallbackURL: "openclaw://healthlink-result?secret=drop-me#drop-me-too",
+            requestID: "issue55-001",
+            status: "ok"
+        ))
+        let components = try XCTUnwrap(URLComponents(url: callback, resolvingAgainstBaseURL: false))
+        let query = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value ?? "") })
+
+        XCTAssertEqual(components.scheme, "openclaw")
+        XCTAssertNil(components.fragment)
+        XCTAssertEqual(query.count, 3)
+        XCTAssertEqual(query["request_id"], "issue55-001")
+        XCTAssertEqual(query["status"], "ok")
+        XCTAssertEqual(query["source"], "healthlink")
+        XCTAssertNil(query["secret"])
     }
 
     func testHealthSyncPayloadEncodesExpectedContract() throws {

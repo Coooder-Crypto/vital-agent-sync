@@ -432,8 +432,8 @@ function transportLabel(id: TransportProviderId): string {
   case "public_https":
     return "public HTTPS";
   case "relay":
-    return "HealthLink Relay";
+    return "VitalMCP Relay";
   case "self_hosted_relay":
-    return "self-hosted HealthLink Relay";
+    return "self-hosted VitalMCP Relay";
   }
 }

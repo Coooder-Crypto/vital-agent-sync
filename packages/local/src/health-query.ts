@@ -67,7 +67,7 @@ export function getPersonalContext(database: HealthLinkDatabase, options: QueryO
   const days = clampDays(options.days);
 
   return {
-    purpose: "Use this HealthLink context to answer personal status, energy, recovery, workout readiness, sleep, activity, and day-planning questions. Do not invent health facts that are not present here.",
+    purpose: "Use this VitalMCP context to answer personal status, energy, recovery, workout readiness, sleep, activity, and day-planning questions. Do not invent health facts that are not present here.",
     metadata: buildQueryMetadata(database),
     status: getAgentHealthStatus(database),
     focus_date: options.date ?? "latest_synced_date",
