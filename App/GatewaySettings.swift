@@ -45,6 +45,7 @@ final class GatewaySettings: ObservableObject {
     @Published var pairingURLText: String = ""
     @Published private(set) var pairedDeviceID: String?
     @Published private(set) var pairedAgentName: String?
+    @Published private(set) var directTransportPublicKey: String?
     @Published private(set) var acceptedScopes: [String]
     @Published private(set) var isPairing = false
     @Published var pendingPairing: PairingPreview?
@@ -73,6 +74,7 @@ final class GatewaySettings: ObservableObject {
         static let apiToken = "gateway.apiToken"
         static let pairedDeviceID = "gateway.pairedDeviceID"
         static let pairedAgentName = "gateway.pairedAgentName"
+        static let directTransportPublicKey = "gateway.directTransportPublicKey"
         static let acceptedScopes = "gateway.acceptedScopes"
         static let autoSyncEnabled = "gateway.autoSyncEnabled"
         static let autoSyncMinimumIntervalMinutes = "gateway.autoSyncMinimumIntervalMinutes"
@@ -104,6 +106,7 @@ final class GatewaySettings: ObservableObject {
         self.apiTokenText = (try? keychain.get(account: Keys.apiToken)) ?? ""
         self.pairedDeviceID = defaults.string(forKey: Keys.pairedDeviceID)
         self.pairedAgentName = defaults.string(forKey: Keys.pairedAgentName)
+        self.directTransportPublicKey = defaults.string(forKey: Keys.directTransportPublicKey)
         self.acceptedScopes = defaults.stringArray(forKey: Keys.acceptedScopes) ?? Self.defaultAcceptedScopes
         self.uploadHealthEnabled = defaults.object(forKey: Keys.uploadHealthEnabled) as? Bool ?? true
         self.autoSyncEnabled = defaults.object(forKey: Keys.autoSyncEnabled) as? Bool ?? true
@@ -132,7 +135,9 @@ final class GatewaySettings: ObservableObject {
         if relayOnboarding != nil {
             return true
         }
-        return pairedDeviceID != nil && !apiTokenText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return pairedDeviceID != nil &&
+            directTransportPublicKey != nil &&
+            !apiTokenText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var usesRelayTransport: Bool {
@@ -214,6 +219,7 @@ final class GatewaySettings: ObservableObject {
                 agentName: preview.status.agent_name,
                 deviceID: response.device_id,
                 deviceToken: response.device_token,
+                directTransportPublicKey: preview.link.directTransportPublicKey,
                 acceptedScopes: preview.status.requested_scopes
             )
             pairingURLText = ""
@@ -259,14 +265,20 @@ final class GatewaySettings: ObservableObject {
         let deviceID = pairedDeviceID
         let serverURL = self.serverURL
         let token = apiTokenText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let directTransportPublicKey = self.directTransportPublicKey
 
         var revokeError: Error?
         if revokeRemote,
            let deviceID,
            let serverURL,
+           let directTransportPublicKey,
            !token.isEmpty {
             do {
-                let client = GatewayAPIClient(serverURL: serverURL, apiToken: token)
+                let client = GatewayAPIClient(
+                    serverURL: serverURL,
+                    apiToken: token,
+                    directTransportPublicKey: directTransportPublicKey
+                )
                 _ = try await client.revokeDevice(deviceID: deviceID)
             } catch {
                 revokeError = error
@@ -385,17 +397,26 @@ final class GatewaySettings: ObservableObject {
         defaults.removeObject(forKey: Keys.syncHistory)
     }
 
-    private func savePairing(serverURL: URL, agentName: String, deviceID: String, deviceToken: String, acceptedScopes: [String]) {
+    private func savePairing(
+        serverURL: URL,
+        agentName: String,
+        deviceID: String,
+        deviceToken: String,
+        directTransportPublicKey: String,
+        acceptedScopes: [String]
+    ) {
         clearRelayOnboarding()
         serverURLText = serverURL.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         apiTokenText = deviceToken
         pairedDeviceID = deviceID
         pairedAgentName = agentName
+        self.directTransportPublicKey = directTransportPublicKey
         self.acceptedScopes = acceptedScopes
 
         defaults.set(serverURLText, forKey: Keys.serverURL)
         defaults.set(deviceID, forKey: Keys.pairedDeviceID)
         defaults.set(agentName, forKey: Keys.pairedAgentName)
+        defaults.set(directTransportPublicKey, forKey: Keys.directTransportPublicKey)
         defaults.set(acceptedScopes, forKey: Keys.acceptedScopes)
 
         do {
@@ -453,11 +474,13 @@ final class GatewaySettings: ObservableObject {
         apiTokenText = ""
         pairedDeviceID = payload.source_device_id
         pairedAgentName = payload.agent_name
+        directTransportPublicKey = nil
         acceptedScopes = payload.requested_scopes
         defaults.set(serverURLText, forKey: Keys.serverURL)
         defaults.set(payload.source_device_id, forKey: Keys.pairedDeviceID)
         defaults.set(payload.agent_name, forKey: Keys.pairedAgentName)
         defaults.set(payload.requested_scopes, forKey: Keys.acceptedScopes)
+        defaults.removeObject(forKey: Keys.directTransportPublicKey)
         try keychain.delete(account: Keys.apiToken)
     }
 
@@ -511,11 +534,13 @@ final class GatewaySettings: ObservableObject {
         apiTokenText = ""
         pairedDeviceID = nil
         pairedAgentName = nil
+        directTransportPublicKey = nil
         acceptedScopes = Self.defaultAcceptedScopes
         clearRelayOnboarding()
         resetSyncTracking()
         defaults.removeObject(forKey: Keys.pairedDeviceID)
         defaults.removeObject(forKey: Keys.pairedAgentName)
+        defaults.removeObject(forKey: Keys.directTransportPublicKey)
         defaults.removeObject(forKey: Keys.acceptedScopes)
         try keychain.delete(account: Keys.apiToken)
     }

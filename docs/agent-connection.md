@@ -127,8 +127,10 @@ HealthLink should expose one product flow with multiple transport modes undernea
 Available for local agents and development.
 
 ```text
-iPhone -> http://192.168.x.x:8787 -> healthlink-local -> SQLite -> MCP -> Agent
+iPhone -> encrypted direct envelope over LAN -> vitalmcp decrypts -> SQLite -> MCP -> Agent
 ```
+
+LAN uses receiver-pinned application-layer encryption for pairing credentials, device tokens, and Health summaries. It is not network-layer E2EE: the user-owned local VitalMCP receiver is the trusted decrypting endpoint. See [direct-lan-security.md](direct-lan-security.md).
 
 Pros:
 
@@ -175,6 +177,8 @@ healthlink-local init --transport tailscale --tailscale-name my-mac.tailnet.ts.n
 ```
 
 HealthLink can also try to read Tailscale MagicDNS from `tailscale status --json`, or fall back to the local 100.64.0.0/10 address when available.
+
+The direct protocol is unchanged inside Tailscale: the WireGuard tunnel adds network protection, while the same receiver-pinned application envelope prevents direct credentials and Health summaries from appearing as HTTP plaintext.
 
 ## CLI Shape
 

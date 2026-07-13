@@ -1109,6 +1109,14 @@ struct PairingConfirmationView: View {
                     }
                     LabeledContent("Code", value: preview.status.pairing_code)
                     LabeledContent("Expires", value: preview.status.expires_at)
+                    Label(
+                        "Pairing credentials and Health summaries use receiver-pinned application-layer encryption on trusted LAN or Tailscale connections.",
+                        systemImage: "lock.shield"
+                    )
+                    Label(
+                        "LAN mode is not network-layer E2EE; the local VitalMCP receiver is the trusted decrypting endpoint.",
+                        systemImage: "network"
+                    )
                 }
 
                 Section("Data Access") {

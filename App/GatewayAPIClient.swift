@@ -3,21 +3,19 @@ import Foundation
 final class GatewayAPIClient {
     private let serverURL: URL
     private let apiToken: String
-    private let encoder: JSONEncoder
+    private let directTransportPublicKey: String
 
-    init(serverURL: URL, apiToken: String) {
+    init(serverURL: URL, apiToken: String, directTransportPublicKey: String) {
         self.serverURL = serverURL
         self.apiToken = apiToken
-        self.encoder = JSONEncoder()
-        self.encoder.outputFormatting = [.sortedKeys]
-    }
-
-    func uploadHealthSummary(_ summary: DailyHealthSummary) async throws {
-        try await post(summary, path: "/api/health/daily-summary")
+        self.directTransportPublicKey = directTransportPublicKey
     }
 
     func uploadHealthSync(_ payload: HealthSyncPayload) async throws -> HealthSyncResponse {
-        try await post(payload, path: "/health/sync")
+        try await postDirect(
+            DirectHealthSyncRequest(device_token: apiToken, payload: payload),
+            purpose: .healthSync
+        )
     }
 
     static func uploadRelayEnvelope(
@@ -56,8 +54,10 @@ final class GatewayAPIClient {
     }
 
     func revokeDevice(deviceID: String) async throws -> DeviceRevokeResponse {
-        struct EmptyPayload: Encodable {}
-        return try await post(EmptyPayload(), path: "/devices/\(deviceID)/revoke")
+        try await postDirect(
+            DirectDeviceRevokeRequest(device_token: apiToken, device_id: deviceID),
+            purpose: .deviceRevoke
+        )
     }
 
     static func confirmPairing(link: PairingLink, deviceName: String, acceptedScopes: [String]) async throws -> PairConfirmResponse {
@@ -67,53 +67,21 @@ final class GatewayAPIClient {
             device_platform: "ios",
             accepted_scopes: acceptedScopes
         )
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-
-        var request = URLRequest(url: endpoint(baseURL: link.serverURL, path: "/pair/confirm"))
-        request.httpMethod = "POST"
-        request.httpBody = try encoder.encode(payload)
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await URLSession.shared.data(for: request)
-        } catch let error as URLError {
-            throw GatewayError.fromURL(error)
-        }
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw GatewayError.invalidServerResponse(-1)
-        }
-        guard 200..<300 ~= httpResponse.statusCode else {
-            throw GatewayError.invalidServerResponse(httpResponse.statusCode)
-        }
-
-        return try JSONDecoder().decode(PairConfirmResponse.self, from: data)
+        return try await postDirect(
+            payload,
+            purpose: .pairingConfirm,
+            serverURL: link.serverURL,
+            directTransportPublicKey: link.directTransportPublicKey
+        )
     }
 
     static func getPairingStatus(link: PairingLink) async throws -> PairingStatusResponse {
-        var components = URLComponents(url: endpoint(baseURL: link.serverURL, path: "/pair/status/\(link.pairingCode)"), resolvingAgainstBaseURL: false)
-        components?.percentEncodedQuery = nil
-        guard let url = components?.url else {
-            throw GatewayError.invalidPairingURL
-        }
-
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await URLSession.shared.data(from: url)
-        } catch let error as URLError {
-            throw GatewayError.fromURL(error)
-        }
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw GatewayError.invalidServerResponse(-1)
-        }
-        guard 200..<300 ~= httpResponse.statusCode else {
-            throw GatewayError.invalidServerResponse(httpResponse.statusCode)
-        }
-
-        return try JSONDecoder().decode(PairingStatusResponse.self, from: data)
+        try await postDirect(
+            DirectPairingStatusRequest(pairing_code: link.pairingCode),
+            purpose: .pairingStatus,
+            serverURL: link.serverURL,
+            directTransportPublicKey: link.directTransportPublicKey
+        )
     }
 
     static func checkReceiver(serverURL: URL) async throws -> ReceiverHealthStatus {
@@ -137,17 +105,33 @@ final class GatewayAPIClient {
         return try JSONDecoder().decode(ReceiverHealthStatus.self, from: data)
     }
 
-    private func post<T: Encodable>(_ payload: T, path: String) async throws {
-        let _: EmptyResponse = try await post(payload, path: path)
+    private func postDirect<T: Encodable, R: Decodable>(
+        _ payload: T,
+        purpose: DirectTransportPurpose
+    ) async throws -> R {
+        try await Self.postDirect(
+            payload,
+            purpose: purpose,
+            serverURL: serverURL,
+            directTransportPublicKey: directTransportPublicKey
+        )
     }
 
-    private func post<T: Encodable, R: Decodable>(_ payload: T, path: String) async throws -> R {
-        let body = try encoder.encode(payload)
-        var request = URLRequest(url: endpoint(path))
+    private static func postDirect<T: Encodable, R: Decodable>(
+        _ payload: T,
+        purpose: DirectTransportPurpose,
+        serverURL: URL,
+        directTransportPublicKey: String
+    ) async throws -> R {
+        let exchange = try DirectTransportCrypto.makeRequest(
+            purpose: purpose,
+            payload: payload,
+            receiverPublicKey: directTransportPublicKey
+        )
+        var request = URLRequest(url: endpoint(baseURL: serverURL, path: "/v1/direct"))
         request.httpMethod = "POST"
-        request.httpBody = body
+        request.httpBody = try canonicalJSONData(exchange.envelope)
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(apiToken)", forHTTPHeaderField: "Authorization")
 
         let data: Data
         let response: URLResponse
@@ -162,15 +146,8 @@ final class GatewayAPIClient {
         guard 200..<300 ~= httpResponse.statusCode else {
             throw GatewayError.invalidServerResponse(httpResponse.statusCode)
         }
-
-        if R.self == EmptyResponse.self {
-            return EmptyResponse() as! R
-        }
-        return try JSONDecoder().decode(R.self, from: data)
-    }
-
-    private func endpoint(_ path: String) -> URL {
-        Self.endpoint(baseURL: serverURL, path: path)
+        let responseEnvelope = try JSONDecoder().decode(DirectEncryptedEnvelope.self, from: data)
+        return try DirectTransportCrypto.decryptResponse(responseEnvelope, exchange: exchange, as: R.self)
     }
 
     private static func endpoint(baseURL: URL, path: String) -> URL {
@@ -179,4 +156,16 @@ final class GatewayAPIClient {
     }
 }
 
-private struct EmptyResponse: Decodable {}
+private struct DirectPairingStatusRequest: Encodable {
+    let pairing_code: String
+}
+
+private struct DirectHealthSyncRequest: Encodable {
+    let device_token: String
+    let payload: HealthSyncPayload
+}
+
+private struct DirectDeviceRevokeRequest: Encodable {
+    let device_token: String
+    let device_id: String
+}

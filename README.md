@@ -29,7 +29,7 @@ For the broader product plan covering local daemon, MCP, pairing, scopes, and pa
   - current MVP supports manual user-triggered sync
   - target UX is pair once, authorize once, then auto-sync when the app is active or iOS grants background time
 - Upload endpoint:
-  - `POST /health/sync`
+  - encrypted direct `POST /v1/direct` envelope (the receiver decrypts locally)
 - Agent access:
   - MCP stdio tools from `healthlink-local`
 
@@ -223,14 +223,9 @@ Product installs should keep the generic MCP path available for non-Hermes agent
 
 ## Sync Contract
 
-All requests use:
+Direct LAN and Tailscale pairing/sync use the receiver-pinned `vitalmcp-direct-v1` application envelope. The device token and canonical payload below are ciphertext inside `POST /v1/direct`; they are not an HTTP bearer header or plaintext JSON body. Hosted/self-hosted relay requests continue using their relay authorization and E2EE envelope. See [docs/direct-lan-security.md](docs/direct-lan-security.md) and [docs/server-contract.md](docs/server-contract.md).
 
-```http
-Authorization: Bearer <token>
-Content-Type: application/json
-```
-
-Unified payload:
+Canonical plaintext payload after local receiver decryption:
 
 ```json
 {

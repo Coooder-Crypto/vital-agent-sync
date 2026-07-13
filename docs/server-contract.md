@@ -4,15 +4,15 @@ This document describes the canonical HealthLink sync contract used by both dire
 
 ## Shared Data Model
 
-`HealthSyncPayload` is the canonical plaintext object. It is validated by `packages/local/src/schemas.ts` and ingested through `ingestValidatedHealthSync`, whether it arrives through direct HTTP or after local relay decryption.
+`HealthSyncPayload` is the canonical plaintext object inside the trusted iPhone and local receiver. It is validated by `packages/local/src/schemas.ts` and ingested through `ingestValidatedHealthSync`, whether it arrives after direct-envelope decryption or local relay decryption.
 
 Direct mode:
 
 ```text
 iOS
-  -> POST /health/sync
-  -> bearer auth
-  -> parse HealthSyncPayload
+  -> encrypt device token + HealthSyncPayload into vitalmcp-direct-v1
+  -> POST /v1/direct
+  -> decrypt and authenticate at the local receiver
   -> ingestValidatedHealthSync
   -> SQLite
 ```
@@ -32,15 +32,16 @@ iOS
 
 The relay never receives plaintext `HealthSyncPayload`; it stores encrypted envelopes plus minimal hashed tenant/revocation metadata.
 
-## Direct Sync Endpoint
+## Direct Encrypted Endpoint
 
 ```http
-POST /health/sync
-Authorization: Bearer <device_token>
+POST /v1/direct
 Content-Type: application/json
 ```
 
-The bearer token authenticates a paired source device and provides write scopes. A payload with daily summaries requires `health.daily_summary.write`.
+The outer body is a `vitalmcp-direct-v1` X25519/HKDF/ChaCha20-Poly1305 envelope. Its authenticated purpose is one of `pair.status`, `pair.confirm`, `health.sync`, or `device.revoke`. For `health.sync`, the decrypted object contains `{ "device_token": "...", "payload": HealthSyncPayload }`. The token authenticates the paired source device and provides write scopes, but it is never an HTTP authorization header or plaintext body field. A payload with daily summaries requires `health.daily_summary.write`.
+
+The old plaintext `/pair/status/:pairing_code`, `/pair/confirm`, `/health/sync`, and device-revoke routes return HTTP 426. See [direct-lan-security.md](direct-lan-security.md) for the protocol and LAN/Tailscale/relay trust boundaries.
 
 ## HealthSyncPayload
 
@@ -101,9 +102,9 @@ Validation rules:
 - Optional metrics can be omitted or set to `null`.
 - `workouts` defaults to an empty array per daily summary.
 
-## Canonical JSON For Relay Encryption
+## Canonical JSON For Transport Encryption
 
-Relay encryption uses the same `HealthSyncPayload` object after schema-compatible construction on iOS. For signing and encryption tests, object keys are serialized in deterministic sorted-key order before encryption/HMAC. Consumers must not rely on raw JSON string order after decryption; they must parse and validate the object.
+Direct and relay encryption use the same `HealthSyncPayload` object after schema-compatible construction on iOS. Object keys are serialized in deterministic sorted-key order before encryption or HMAC. Consumers must not rely on raw JSON string order after decryption; they must parse and validate the object.
 
 Envelope metadata, signatures, freshness, device matching, and replay checks are defined in the E2EE relay documents:
 
@@ -148,11 +149,13 @@ Common direct-sync errors:
 
 | HTTP | Code | Meaning |
 | --- | --- | --- |
-| 401 | `missing_authorization` | No bearer token was supplied. |
-| 401 | `invalid_authorization` | The authorization header is not a bearer token. |
 | 401 | `invalid_token` | The token does not match an active paired source device. |
 | 403 | `device_mismatch` | Payload `device_id` does not match the authenticated source device. |
 | 403 | `missing_scope` | The device token lacks a required write scope. |
 | 400 | `invalid_payload` | The request body does not match `HealthSyncPayload`. |
+| 400 | `invalid_envelope` / `decrypt_failed` | The direct envelope is malformed, unpinned, or fails authentication. |
+| 400 | `stale_envelope` | The request is outside the direct freshness window. |
+| 409 | `replayed_envelope` | The direct request ID was already processed. |
+| 426 | `encrypted_direct_transport_required` | A removed plaintext direct route was used. |
 
 Relay pull surfaces equivalent validation failures through `healthlink-local pull` and records failed envelope metadata in relay cursor state without acking the envelope.

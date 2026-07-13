@@ -217,10 +217,18 @@ final class SyncCoordinator: ObservableObject {
             )
         }
         guard let serverURL = context.serverURL,
-              let apiToken = context.apiToken else {
+              let apiToken = context.apiToken,
+              let directTransportPublicKey = context.directTransportPublicKey else {
             throw GatewayError.missingServerURL
         }
-        return .direct(client: GatewayAPIClient(serverURL: serverURL, apiToken: apiToken), payload: payload)
+        return .direct(
+            client: GatewayAPIClient(
+                serverURL: serverURL,
+                apiToken: apiToken,
+                directTransportPublicKey: directTransportPublicKey
+            ),
+            payload: payload
+        )
     }
 
     private func uploadHealthSyncRequest(_ request: HealthSyncRequest) async throws -> SyncUploadResult {
@@ -304,6 +312,7 @@ final class SyncCoordinator: ObservableObject {
     private struct SyncRequestContext {
         let serverURL: URL?
         let apiToken: String?
+        let directTransportPublicKey: String?
         let deviceID: String
         let agentName: String?
         let uploadHealthEnabled: Bool
@@ -315,6 +324,7 @@ final class SyncCoordinator: ObservableObject {
             if let relayOnboarding = settings.relayOnboarding {
                 self.serverURL = URL(string: relayOnboarding.relay_url)
                 self.apiToken = nil
+                self.directTransportPublicKey = nil
                 self.deviceID = relayOnboarding.source_device_id
                 self.agentName = relayOnboarding.agent_name
                 self.uploadHealthEnabled = settings.uploadHealthEnabled
@@ -333,8 +343,12 @@ final class SyncCoordinator: ObservableObject {
             guard let deviceID = settings.pairedDeviceID else {
                 throw GatewayError.missingPairedDevice
             }
+            guard let directTransportPublicKey = settings.directTransportPublicKey else {
+                throw GatewayError.invalidPairingURL
+            }
             self.serverURL = serverURL
             self.apiToken = token
+            self.directTransportPublicKey = directTransportPublicKey
             self.deviceID = deviceID
             self.agentName = settings.pairedAgentName
             self.uploadHealthEnabled = settings.uploadHealthEnabled
