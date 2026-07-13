@@ -136,15 +136,17 @@ vitalmcp ensure --manager systemd
 
 That command can repair a stopped receiver before the Agent loads MCP. If the host uses Docker, PM2, Task Scheduler, or a NAS vendor process manager instead of systemd, configure that process manager to run `vitalmcp daemon`; `ensure` only manages built-in launchd/systemd services.
 
-For Tailscale:
+For Tailscale, use the supported private HTTPS route (full requirements and physical-device checks: [Tailscale HTTPS Onboarding For iOS](tailscale-ios-onboarding.md)):
 
 ```bash
 vitalmcp setup \
   --agent generic \
   --manager systemd \
   --transport tailscale \
-  --tailscale-name healthlink.tailnet.ts.net
+  --tailscale-name receiver.example-tailnet.ts.net
 ```
+
+After consent, setup configures `tailscale serve --bg --yes --https=443 http://127.0.0.1:8787`. The pairing QR advertises `https://receiver.example-tailnet.ts.net`. Plain HTTP MagicDNS and raw `100.x` endpoints are not supported for iOS onboarding.
 
 If systemd is not available on the NAS, run the daemon under PM2, Docker Compose, or the NAS vendor's service manager.
 
@@ -161,7 +163,8 @@ vitalmcp status --db ~/.healthlink/healthlink.sqlite
 vitalmcp service status --manager systemd
 vitalmcp logs --manager systemd
 vitalmcp doctor --transport lan
-vitalmcp doctor --transport tailscale --tailscale-name healthlink.tailnet.ts.net
+vitalmcp doctor --transport tailscale --tailscale-name receiver.example-tailnet.ts.net
+tailscale serve status --json
 ```
 
 Privacy boundary: data stays on the user's home server or private mesh network. Tailscale keeps the receiver off the public internet.

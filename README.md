@@ -122,6 +122,7 @@ The planned one-command installer only bootstraps this package into a user-writa
 
 Common deployment choices are documented separately:
 
+- [iOS-compatible Tailscale HTTPS onboarding](docs/tailscale-ios-onboarding.md)
 - Mac local LAN mode (default): receiver, SQLite, and MCP run on the user's Mac.
 - Tailscale (optional): the same receiver stays private on the user's authorized tailnet for remote sync.
 - Home server / NAS / N100 mode: receiver and SQLite run on an always-on home machine over LAN or Tailscale, usually via `systemd`.

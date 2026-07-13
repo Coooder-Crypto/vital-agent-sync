@@ -1,5 +1,5 @@
 import { networkInterfaces, type NetworkInterfaceInfo } from "node:os";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync, type SpawnSyncReturns } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 
 export const TRANSPORT_PROVIDER_IDS = [
@@ -35,7 +35,15 @@ export type TransportProviderOptions = {
   port: number;
   serverUrl?: string;
   tailscaleName?: string;
+  tailscaleCommand?: string;
 };
+
+export type TailscaleServeInspection = {
+  status: "ready" | "missing" | "conflict" | "public" | "unavailable";
+  detail: string;
+};
+
+const TAILSCALE_HTTPS_PORT = 443;
 
 export function createTransportProvider(options: TransportProviderOptions): TransportProvider {
   const id = options.id ?? "lan";
@@ -116,53 +124,192 @@ function createLanTransportProvider(options: TransportProviderOptions): Transpor
 }
 
 function createTailscaleTransportProvider(options: TransportProviderOptions): TransportProvider {
+  const tailscaleCommand = options.tailscaleCommand ?? "tailscale";
   return {
     id: "tailscale",
     label: "Tailscale",
+    async start() {
+      if (options.serverUrl) {
+        requireSecureTailscaleServerUrl(options.serverUrl);
+        return;
+      }
+
+      const magicDnsName = requireTailscaleMagicDnsName(options);
+      assertTailscaleMagicDnsMatchesLocal(tailscaleCommand, magicDnsName);
+      const backendUrl = tailscaleBackendUrl(options.port);
+      const current = readTailscaleServeInspection(tailscaleCommand, magicDnsName, backendUrl);
+      if (current.status === "ready") {
+        return;
+      }
+      if (current.status === "conflict" || current.status === "public") {
+        throw new Error(current.detail);
+      }
+      if (current.status === "unavailable") {
+        throw new Error(`${current.detail} Tailscale 1.52 or newer with MagicDNS and HTTPS enabled is required.`);
+      }
+
+      const configured = runTailscale(tailscaleCommand, [
+        "serve",
+        "--bg",
+        "--yes",
+        `--https=${TAILSCALE_HTTPS_PORT}`,
+        backendUrl
+      ]);
+      if (configured.status !== 0) {
+        throw new Error(
+          `Could not configure the private Tailscale HTTPS endpoint. Run \`tailscale serve --bg --yes --https=${TAILSCALE_HTTPS_PORT} ${backendUrl}\` after enabling MagicDNS and HTTPS for the tailnet, then retry. ${commandFailureDetail(configured)}`
+        );
+      }
+
+      const verified = readTailscaleServeInspection(tailscaleCommand, magicDnsName, backendUrl);
+      if (verified.status !== "ready") {
+        throw new Error(`Tailscale Serve returned success but the expected private HTTPS route was not present. ${verified.detail}`);
+      }
+    },
     async getAdvertisedUrl() {
       if (options.serverUrl) {
-        return normalizeServerUrl(options.serverUrl);
+        return requireSecureTailscaleServerUrl(options.serverUrl);
       }
-      const magicDnsName = getTailscaleMagicDnsName(options);
-      if (magicDnsName) {
-        return `http://${magicDnsName}:${options.port}`;
-      }
-      const address = findTailscaleIpv4();
-      if (!address) {
-        throw new Error("Tailscale transport could not find a MagicDNS name or local 100.64.0.0/10 IPv4 address. Pass --tailscale-name, --server-url, or use --transport lan.");
-      }
-      return `http://${address}:${options.port}`;
+      return tailscaleAdvertisedUrl(requireTailscaleMagicDnsName(options));
     },
     async healthCheck() {
       if (options.serverUrl) {
-        return {
-          status: "warn",
-          detail: "Using explicit --server-url for Tailscale; native MagicDNS detection is not implemented yet.",
-          advertisedUrl: normalizeServerUrl(options.serverUrl)
-        };
+        try {
+          const advertisedUrl = requireSecureTailscaleServerUrl(options.serverUrl);
+          return {
+            status: "ok",
+            detail: `Using explicit secure Tailscale endpoint ${advertisedUrl}. Confirm it is private to the tailnet and has a certificate trusted by iOS.`,
+            advertisedUrl
+          };
+        } catch (error) {
+          return {
+            status: "fail",
+            detail: error instanceof Error ? error.message : String(error)
+          };
+        }
       }
-      const magicDnsName = getTailscaleMagicDnsName(options);
-      if (magicDnsName) {
-        return {
-          status: "ok",
-          detail: `Advertising http://${magicDnsName}:${options.port} from Tailscale MagicDNS.`,
-          advertisedUrl: `http://${magicDnsName}:${options.port}`
-        };
-      }
-      const address = findTailscaleIpv4();
-      if (!address) {
+
+      let magicDnsName: string;
+      try {
+        magicDnsName = requireTailscaleMagicDnsName(options);
+        assertTailscaleMagicDnsMatchesLocal(tailscaleCommand, magicDnsName);
+      } catch (error) {
         return {
           status: "fail",
-          detail: "No local Tailscale MagicDNS name or IPv4 address was found. Start Tailscale, pass --tailscale-name, pass --server-url, or use --transport lan."
+          detail: error instanceof Error ? error.message : String(error)
+        };
+      }
+
+      const advertisedUrl = tailscaleAdvertisedUrl(magicDnsName);
+      const inspection = readTailscaleServeInspection(tailscaleCommand, magicDnsName, tailscaleBackendUrl(options.port));
+      if (inspection.status === "ready") {
+        return {
+          status: "ok",
+          detail: `Advertising ${advertisedUrl} through private Tailscale Serve HTTPS to http://127.0.0.1:${options.port}.`,
+          advertisedUrl
         };
       }
       return {
-        status: "ok",
-        detail: `Advertising http://${address}:${options.port} from local Tailscale IPv4.`,
-        advertisedUrl: `http://${address}:${options.port}`
+        status: "fail",
+        detail: inspection.detail,
+        advertisedUrl
       };
     }
   };
+}
+
+function tailscaleAdvertisedUrl(magicDnsName: string): string {
+  return `https://${magicDnsName}`;
+}
+
+function tailscaleBackendUrl(port: number): string {
+  return `http://127.0.0.1:${port}`;
+}
+
+function requireSecureTailscaleServerUrl(serverUrl: string): string {
+  const normalized = normalizeServerUrl(serverUrl);
+  let parsed: URL;
+  try {
+    parsed = new URL(normalized);
+  } catch {
+    throw new Error(`Tailscale --server-url must be a valid HTTPS URL; received ${serverUrl}.`);
+  }
+  if (parsed.protocol !== "https:") {
+    throw new Error("Tailscale iOS onboarding requires an HTTPS --server-url. Plain HTTP MagicDNS and 100.x endpoints are not advertised because they are not a supported iOS ATS route.");
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error("Tailscale --server-url must not include URL credentials.");
+  }
+  return normalized;
+}
+
+function requireTailscaleMagicDnsName(options: TransportProviderOptions): string {
+  const magicDnsName = getTailscaleMagicDnsName(options);
+  if (!magicDnsName || !isTailscaleCertificateName(magicDnsName)) {
+    const address = findTailscaleIpv4();
+    const addressHint = address ? ` A local Tailscale IPv4 address (${address}) exists, but certificates are issued for MagicDNS names rather than 100.x addresses.` : "";
+    throw new Error(`Tailscale iOS onboarding requires a MagicDNS name ending in .ts.net so Tailscale Serve can publish a trusted HTTPS endpoint.${addressHint} Enable MagicDNS and tailnet HTTPS, start Tailscale, or pass --tailscale-name <device>.<tailnet>.ts.net.`);
+  }
+  return magicDnsName;
+}
+
+function isTailscaleCertificateName(value: string): boolean {
+  return value.toLowerCase().endsWith(".ts.net") && !value.includes(":") && !value.includes("/");
+}
+
+function assertTailscaleMagicDnsMatchesLocal(tailscaleCommand: string, advertisedName: string): void {
+  const detectedName = detectTailscaleMagicDnsName(tailscaleCommand);
+  if (detectedName && detectedName.toLowerCase() !== advertisedName.toLowerCase()) {
+    throw new Error(`Configured Tailscale name ${advertisedName} does not match this node's MagicDNS name ${detectedName}. Use the exact Self.DNSName from \`tailscale status --json\`; HealthLink will not change Serve configuration for a mismatched hostname.`);
+  }
+}
+
+function readTailscaleServeInspection(tailscaleCommand: string, magicDnsName: string, backendUrl: string): TailscaleServeInspection {
+  const result = runTailscale(tailscaleCommand, ["serve", "status", "--json"]);
+  if (result.status !== 0) {
+    return { status: "unavailable", detail: `Could not inspect Tailscale Serve. ${commandFailureDetail(result)}` };
+  }
+  return inspectTailscaleServeConfig(result.stdout, magicDnsName, backendUrl);
+}
+
+export function inspectTailscaleServeConfig(raw: string, magicDnsName: string, backendUrl: string): TailscaleServeInspection {
+  let parsed: {
+    TCP?: Record<string, { HTTPS?: boolean; HTTP?: boolean; TCPForward?: string }>;
+    Web?: Record<string, { Handlers?: Record<string, { Proxy?: string }> }>;
+    AllowFunnel?: Record<string, boolean>;
+  };
+  try {
+    parsed = JSON.parse(raw || "{}") as typeof parsed;
+  } catch {
+    return { status: "unavailable", detail: "Tailscale Serve status did not return valid JSON. Tailscale 1.52 or newer is required." };
+  }
+
+  const hostPort = `${magicDnsName}:${TAILSCALE_HTTPS_PORT}`;
+  const tcp = parsed.TCP?.[String(TAILSCALE_HTTPS_PORT)];
+  const rootProxy = parsed.Web?.[hostPort]?.Handlers?.["/"]?.Proxy;
+  if (parsed.AllowFunnel?.[hostPort]) {
+    return { status: "public", detail: `Tailscale Funnel is enabled for ${hostPort}. HealthLink will not overwrite or advertise a public route; disable Funnel on port ${TAILSCALE_HTTPS_PORT} before setup.` };
+  }
+  if (tcp?.HTTPS === true && rootProxy === backendUrl) {
+    return { status: "ready", detail: `Private HTTPS route ${tailscaleAdvertisedUrl(magicDnsName)} proxies to ${backendUrl}.` };
+  }
+  if (rootProxy && rootProxy !== backendUrl) {
+    return { status: "conflict", detail: `Tailscale Serve already uses ${hostPort}/ for ${rootProxy}. HealthLink will not overwrite that route; move the existing handler or pass a separate secure --server-url.` };
+  }
+  if (tcp && tcp.HTTPS !== true) {
+    return { status: "conflict", detail: `Tailscale Serve port ${TAILSCALE_HTTPS_PORT} is already configured for a non-HTTPS handler. HealthLink will not overwrite it.` };
+  }
+  return { status: "missing", detail: `Private Tailscale HTTPS is not configured. Run \`tailscale serve --bg --yes --https=${TAILSCALE_HTTPS_PORT} ${backendUrl}\`, then rerun pairing or doctor.` };
+}
+
+function runTailscale(command: string, args: string[]): SpawnSyncReturns<string> {
+  return spawnSync(command, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 5000 });
+}
+
+function commandFailureDetail(result: SpawnSyncReturns<string>): string {
+  if (result.error) return result.error.message;
+  const output = `${result.stderr ?? ""}\n${result.stdout ?? ""}`.trim().replace(/\s+/g, " ");
+  return output || `tailscale exited with status ${result.status ?? "unknown"}.`;
 }
 
 function createFutureTransportProvider(options: TransportProviderOptions & {
@@ -371,12 +518,12 @@ function getTailscaleMagicDnsName(options: TransportProviderOptions): string | u
   if (explicit) {
     return explicit;
   }
-  return detectTailscaleMagicDnsName();
+  return detectTailscaleMagicDnsName(options.tailscaleCommand ?? "tailscale");
 }
 
-function detectTailscaleMagicDnsName(): string | undefined {
+function detectTailscaleMagicDnsName(tailscaleCommand: string): string | undefined {
   try {
-    const raw = execFileSync("tailscale", ["status", "--json"], {
+    const raw = execFileSync(tailscaleCommand, ["status", "--json"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
       timeout: 1000
@@ -394,7 +541,7 @@ function detectTailscaleMagicDnsName(): string | undefined {
 
 function normalizeTailscaleName(value: string | undefined): string | undefined {
   const trimmed = value?.trim().replace(/^https?:\/\//, "").replace(/\/+$/, "").replace(/\.$/, "");
-  return trimmed || undefined;
+  return trimmed?.toLowerCase() || undefined;
 }
 
 function isTailscaleIpv4(address: string): boolean {

@@ -430,6 +430,9 @@ function parseArgs(argv: string[]): CliOptions {
   if (options.command === "setup" || options.command === "ensure") {
     options.useService = true;
   }
+  if (options.transportId === "tailscale" && !options.hostProvided) {
+    options.host = "127.0.0.1";
+  }
 
   return options;
 }
@@ -685,7 +688,7 @@ Usage:
 
 Core setup:
   setup --transport lan --agent <generic|hermes|openclaw|workbuddy> [--output json]  # Local Preview default
-  setup --transport tailscale --tailscale-name <host.tailnet.ts.net> --agent <agent> # optional private remote
+  setup --transport tailscale --tailscale-name <host.tailnet.ts.net> --agent <agent> # optional private HTTPS remote
   setup --transport self-hosted-relay --relay-url http://HOST:8790 --agent <agent>
   setup --transport relay --relay-url https://HOSTED-RELAY --agent <agent> [--output json] # future/experimental
   setup --resume --yes [--output json]
@@ -722,6 +725,8 @@ Service:
 Global:
   --db <path>        VitalMCP SQLite path
   --state-dir <path> Relay runtime state directory
+  --server-url <url> Explicit iPhone-reachable URL (HTTPS required for Tailscale)
+  --tailscale-name   MagicDNS name used by private Tailscale Serve HTTPS
   --output text|json Versioned Agent-safe command output
   --yes              Apply a reviewed setup plan
   --version, -v      Print version
@@ -950,7 +955,7 @@ async function executeBootstrapSetup(state: BootstrapState, options: CliOptions)
     }
   }
   return runBootstrapWorkflow(state, {
-    runtime_initialized: () => {
+    runtime_initialized: async () => {
       if (relayMode) {
         const mode = options.transportId === "relay" ? "hosted_relay" : "self_hosted_relay";
         const relayUrl = resolveDefaultRelayUrl({ mode, relayUrl: options.relayUrl });
@@ -963,6 +968,16 @@ async function executeBootstrapSetup(state: BootstrapState, options: CliOptions)
         });
         effectiveOptions = { ...options, relayUrl: relayConfig.relay_url };
         return;
+      }
+      if (options.transportId === "tailscale") {
+        const transport = createTransportProvider({
+          id: options.transportId,
+          bindHost: options.host,
+          port: options.port,
+          serverUrl: options.serverUrl,
+          tailscaleName: options.tailscaleName
+        });
+        await transport.start?.();
       }
       const database = openHealthLinkDatabase({ path: options.databasePath });
       database.close();

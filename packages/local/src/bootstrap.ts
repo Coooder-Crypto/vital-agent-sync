@@ -174,7 +174,9 @@ export function buildBootstrapPlan(config: BootstrapConfig): BootstrapPlanItem[]
       id: "initialize_runtime",
       description: config.service_mode === "relay_pull"
         ? "Initialize or reuse the private VitalMCP relay runtime and local database"
-        : "Initialize or reuse the private VitalMCP local database",
+        : config.transport_id === "tailscale"
+          ? "Initialize or reuse the private VitalMCP local database and configure tailnet-only Tailscale Serve HTTPS"
+          : "Initialize or reuse the private VitalMCP local database",
       persistent_change: true
     },
     {

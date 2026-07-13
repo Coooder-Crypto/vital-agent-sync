@@ -114,8 +114,10 @@ vitalmcp setup --agent generic --manager systemd
 Tailscale is the preferred private remote-access option for this mode:
 
 ```bash
-vitalmcp daemon --host 0.0.0.0 --port 8787 --transport tailscale --tailscale-name healthlink.tailnet.ts.net
+vitalmcp setup --transport tailscale --tailscale-name receiver.example-tailnet.ts.net --agent generic
 ```
+
+This configures a tailnet-only Tailscale Serve HTTPS route and advertises its trusted `.ts.net` URL to iOS. See [Tailscale HTTPS Onboarding For iOS](tailscale-ios-onboarding.md).
 
 This installs a user-level systemd service for the receiver, waits until it is reachable, and prints a pairing QR. If systemd is not available on the NAS, use PM2, Docker Compose, or the NAS vendor's process manager to keep the daemon running. Windows hosts are detected as manual until Task Scheduler or Windows Service support is added.
 
