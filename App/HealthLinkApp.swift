@@ -17,13 +17,13 @@ struct HealthLinkApp: App {
                 .environment(\.locale, settings.appLanguage.locale)
                 .onOpenURL { url in
                     Task {
-                        if url.scheme == "healthlink", url.host == "sync" {
+                        if AppDeepLinkScheme.isSupported(url.scheme), url.host?.lowercased() == "sync" {
                             let link = Self.syncDeepLink(from: url)
                             let succeeded = await syncCoordinator.sync(settings: settings, trigger: .automatic(reason: "deep_link"))
                             openSafeCallback(link.callbackURL, requestID: link.requestID, status: succeeded ? "ok" : "failed")
                             return
                         }
-                        if url.scheme == "healthlink", url.host == "status" {
+                        if AppDeepLinkScheme.isSupported(url.scheme), url.host?.lowercased() == "status" {
                             let link = Self.syncDeepLink(from: url)
                             openSafeCallback(link.callbackURL, requestID: link.requestID, status: settings.isPaired ? "paired" : "unpaired")
                             return
@@ -62,8 +62,8 @@ struct HealthLinkApp: App {
     }
 
     private static func pairingValue(from url: URL) -> String {
-        guard url.scheme == "healthlink",
-              url.host == "onboard",
+        guard AppDeepLinkScheme.isSupported(url.scheme),
+              url.host?.lowercased() == "onboard",
               let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let payload = components.queryItems?.first(where: { $0.name == "payload" })?.value,
               !payload.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {

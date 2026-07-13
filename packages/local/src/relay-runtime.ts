@@ -120,12 +120,12 @@ export function readRelayRuntimeConfig(options: Pick<RelayRuntimeOptions, "state
   const stateDir = resolveHomePath(options.stateDir ?? getDefaultStateDir());
   const configPath = getRelayConfigPath(stateDir);
   if (!existsSync(configPath)) {
-    throw new Error(`HealthLink relay runtime is not initialized at ${configPath}. Run healthlink-local setup --transport relay first.`);
+    throw new Error(`VitalMCP relay runtime is not initialized at ${configPath}. Run vitalmcp setup --transport relay first.`);
   }
   const parsed = JSON.parse(readFileSync(configPath, "utf8")) as unknown;
   const migrated = migrateRelayRuntimeConfig(parsed);
   if (!isRelayRuntimeConfig(migrated)) {
-    throw new Error(`HealthLink relay runtime config is invalid at ${configPath}.`);
+    throw new Error(`VitalMCP relay runtime config is invalid at ${configPath}.`);
   }
   if (migrated !== parsed) {
     writePrivateJsonFileAtomic(configPath, migrated);
@@ -138,7 +138,7 @@ export function buildRelayOnboardingPayload(
   options: Pick<RelayRuntimeOptions, "mode"> = {}
 ): RelayOnboardingPayload {
   if (config.source_device_unlinked_at) {
-    throw new Error("The configured relay source device is unlinked. Run healthlink-local relay rotate or relay reset before onboarding again.");
+    throw new Error("The configured relay source device is unlinked. Run vitalmcp relay rotate or relay reset before onboarding again.");
   }
   const mode = options.mode ?? config.relay_mode;
   const relayUrl = normalizeRelayUrlForMode(config.relay_url, mode);
@@ -167,7 +167,7 @@ export function formatRelayOnboarding(config: RelayRuntimeConfig, options: Pick<
   const onboardingLink = buildRelayOnboardingDeepLink(payload);
   const qr = renderTerminalQr(onboardingLink);
   const lines = [
-    "HealthLink relay onboarding",
+    "VitalMCP relay onboarding",
     `Protocol:    ${payload.protocol}`,
     `Mode:        ${payload.mode}`,
     `Relay:       ${payload.relay_url}`,
@@ -176,7 +176,7 @@ export function formatRelayOnboarding(config: RelayRuntimeConfig, options: Pick<
     `Fingerprint: ${payload.fingerprint}`,
     "",
     "Sensitive: this onboarding material contains upload authentication and relay access credentials.",
-    "Show it only to the HealthLink source device. Do not paste it into Agent chats, logs, or support tickets.",
+    "Show it only to the VitalMCP source device. Do not paste it into Agent chats, logs, or support tickets.",
     "",
     "Onboarding link:",
     onboardingLink,
@@ -198,7 +198,7 @@ export function encodeRelayOnboardingPayload(payload: RelayOnboardingPayload): s
 }
 
 export function buildRelayOnboardingDeepLink(payload: RelayOnboardingPayload): string {
-  const url = new URL("healthlink://onboard");
+  const url = new URL("vitalmcp://onboard");
   url.searchParams.set("payload", encodeRelayOnboardingPayload(payload));
   return url.toString();
 }
@@ -320,7 +320,7 @@ export function resolveDefaultRelayUrl(options: Pick<RelayRuntimeOptions, "mode"
   const configured = options.relayUrl ?? modeSpecific ?? process.env[HEALTHLINK_RELAY_URL_ENV];
   if (!configured && mode === "hosted_relay") {
     throw new Error(
-      `Hosted HealthLink relay URL is not configured. Pass --relay-url https://... or set ${HEALTHLINK_HOSTED_RELAY_URL_ENV}.`
+      `Hosted VitalMCP relay URL is not configured. Pass --relay-url https://... or set ${HEALTHLINK_HOSTED_RELAY_URL_ENV}.`
     );
   }
   return normalizeRelayUrlForMode(configured ?? DEFAULT_RELAY_URL, mode);
@@ -371,13 +371,13 @@ function chmodIfPossible(path: string, mode: number): void {
 export function normalizeRelayUrl(value: string): string {
   const url = new URL(value.trim());
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("HealthLink relay URL must use HTTP or HTTPS.");
+    throw new Error("VitalMCP relay URL must use HTTP or HTTPS.");
   }
   if (url.username || url.password) {
-    throw new Error("HealthLink relay URL must not contain embedded credentials.");
+    throw new Error("VitalMCP relay URL must not contain embedded credentials.");
   }
   if (url.search || url.hash) {
-    throw new Error("HealthLink relay URL must not contain a query string or fragment.");
+    throw new Error("VitalMCP relay URL must not contain a query string or fragment.");
   }
   return url.toString().replace(/\/+$/, "");
 }
@@ -388,7 +388,7 @@ export function normalizeRelayUrlForMode(
 ): string {
   const normalized = normalizeRelayUrl(value);
   if (mode === "hosted_relay" && new URL(normalized).protocol !== "https:") {
-    throw new Error("Hosted HealthLink relay URL must use HTTPS. Use self-hosted-relay mode for an HTTP relay you control.");
+    throw new Error("Hosted VitalMCP relay URL must use HTTPS. Use self-hosted-relay mode for an HTTP relay you control.");
   }
   return normalized;
 }

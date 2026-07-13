@@ -41,7 +41,7 @@ healthlink-ios
   pairing UI
   connected-agent management
 
-healthlink-local
+vitalmcp
   local daemon
   HTTP API
   SQLite store
@@ -87,7 +87,7 @@ iPhone
 Recommended command:
 
 ```bash
-npx -y healthlink-local setup
+npx -y vitalmcp setup
 ```
 
 The iOS app syncs summaries to the Mac receiver. The Agent reads the same SQLite database through MCP and does not need to reconnect after every iOS sync.
@@ -108,13 +108,13 @@ iPhone
 Recommended receiver command on Linux home servers:
 
 ```bash
-healthlink-local setup --agent generic --manager systemd
+vitalmcp setup --agent generic --manager systemd
 ```
 
 Tailscale is the preferred private remote-access option for this mode:
 
 ```bash
-healthlink-local daemon --host 0.0.0.0 --port 8787 --transport tailscale --tailscale-name healthlink.tailnet.ts.net
+vitalmcp daemon --host 0.0.0.0 --port 8787 --transport tailscale --tailscale-name healthlink.tailnet.ts.net
 ```
 
 This installs a user-level systemd service for the receiver, waits until it is reachable, and prints a pairing QR. If systemd is not available on the NAS, use PM2, Docker Compose, or the NAS vendor's process manager to keep the daemon running. Windows hosts are detected as manual until Task Scheduler or Windows Service support is added.
@@ -135,7 +135,7 @@ iPhone
 Recommended standalone compose generation command:
 
 ```bash
-healthlink-local print-docker-compose --server-url http://192.168.31.53:8787 > docker-compose.yml
+vitalmcp print-docker-compose --server-url http://192.168.31.53:8787 > docker-compose.yml
 ```
 
 Docker mode requires an explicit iPhone-reachable `server_url`. `127.0.0.1`, `localhost`, container names, and WSL-only IPs should not be used in pairing URLs.
@@ -156,7 +156,7 @@ iPhone
 Recommended receiver command behind a user-managed reverse proxy:
 
 ```bash
-healthlink-local daemon \
+vitalmcp daemon \
   --host 0.0.0.0 \
   --port 8787 \
   --transport public_https \
@@ -172,7 +172,7 @@ Future deployment work can add tunnel managers, an official published Docker ima
 The pairing flow should follow the shape of OAuth Device Code Flow, but the user-facing language should be "pairing code".
 
 ```text
-1. User runs `healthlink-local init` or asks an agent to run it.
+1. User runs `vitalmcp init` or asks an agent to run it.
 2. Gateway creates a short-lived pairing session.
 3. Gateway displays a QR link.
 4. iOS app scans the QR link.
@@ -191,7 +191,7 @@ Pairing session shape:
 ```json
 {
   "pairing_code": "8K2F-J91Q",
-  "pairing_url": "healthlink://pair?server=http://192.168.31.25:8787&code=8K2F-J91Q",
+  "pairing_url": "vitalmcp://pair?server=http://192.168.31.25:8787&code=8K2F-J91Q",
   "agent_name": "Desktop Assistant",
   "requested_scopes": [
     "health.daily.read",
@@ -384,7 +384,7 @@ For MVP, local HTTP can be allowed for LAN development. Production should prefer
 
 ### Milestone 1: Local Daemon
 
-- `healthlink-local`
+- `vitalmcp`
 - SQLite store
 - health sync endpoints
 - MCP query tools
@@ -409,8 +409,8 @@ Status: partially implemented. QR scanner, scope confirmation, manual sync, conn
 
 ### Milestone 3: Foolproof Agent Linking
 
-- `healthlink-local init`
-- `healthlink-local init --hermes`
+- `vitalmcp init`
+- `vitalmcp init --hermes`
 - QR page opened or printed automatically
 - `print-mcp-config`
 - `install-hermes`
@@ -464,7 +464,7 @@ Exit criteria:
 First useful demo:
 
 ```text
-User runs healthlink-local or npm run dev:local.
+User runs vitalmcp or npm run dev:local.
 Receiver shows pairing code.
 iOS app pairs with receiver.
 iOS app syncs Apple Health summaries.

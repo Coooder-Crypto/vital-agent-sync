@@ -1,4 +1,4 @@
-"CFBundleDisplayName" = "HealthLink";
-"NSHealthShareUsageDescription" = "HealthLink 会读取你选择授权的 Apple 健康数据，并将每日摘要同步到你授权的 Agent 服务器。";
-"NSCameraUsageDescription" = "HealthLink 会扫描本地 Agent 服务器显示的配对二维码。";
-"NSLocalNetworkUsageDescription" = "配对完成后，HealthLink 会连接你本地网络中的 Agent 服务器。";
+"CFBundleDisplayName" = "VitalMCP";
+"NSHealthShareUsageDescription" = "VitalMCP 会读取你选择授权的 Apple 健康数据，并将每日摘要同步到你授权的 Agent 服务器。";
+"NSCameraUsageDescription" = "VitalMCP 会扫描本地 Agent 服务器显示的配对二维码。";
+"NSLocalNetworkUsageDescription" = "配对完成后，VitalMCP 会连接你本地网络中的 Agent 服务器。";

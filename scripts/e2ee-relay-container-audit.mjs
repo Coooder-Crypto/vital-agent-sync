@@ -24,7 +24,7 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 
 try {
   ensureDockerDaemon();
-  run("healthlink-local build", "npm", ["run", "build", "--workspace", "healthlink-local"]);
+  run("vitalmcp build", "npm", ["run", "build", "--workspace", "vitalmcp"]);
   run("development Compose config", "docker", ["compose", "-f", developmentCompose, "config", "--quiet"]);
   run("production Compose config", "docker", [
     "compose",
@@ -49,7 +49,7 @@ try {
   validateCaddyfile();
   await verifyHardenedRelayContainer();
 
-  console.log("\nHealthLink E2EE relay container audit passed.");
+  console.log("\nVitalMCP E2EE relay container audit passed.");
 } finally {
   cleanup();
 }
@@ -120,7 +120,7 @@ function verifyRuntimeImage() {
     "packages/local/dist/cli.js",
     "--version"
   ]).trim();
-  assert(version === "healthlink-local 0.3.0", "Relay image contains the wrong healthlink-local version.");
+  assert(version === "vitalmcp 0.3.0", "Relay image contains the wrong vitalmcp version.");
   console.log(version);
 }
 

@@ -223,7 +223,7 @@ function parseJsonRecord(value: string, owner: string): Record<string, unknown> 
     return isRecord(parsed) ? parsed : {};
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    throw new Error(`${owner} config must be valid JSON for automatic HealthLink install. Use print-agent-config to merge manually if the config uses comments or JSON5 syntax. ${detail}`);
+    throw new Error(`${owner} config must be valid JSON for automatic VitalMCP install. Use print-agent-config to merge manually if the config uses comments or JSON5 syntax. ${detail}`);
   }
 }
 
@@ -233,7 +233,7 @@ function getCliCommandPath(): string {
     return resolve(dirname(currentFile), "cli.js");
   }
 
-  return "healthlink-local";
+  return "vitalmcp";
 }
 
 function resolveHomePath(path: string): string {
@@ -269,7 +269,7 @@ function uniqueBackupPath(configPath: string): string {
     }
   }
 
-  throw new Error("Could not allocate a unique HealthLink config backup path.");
+  throw new Error("Could not allocate a unique VitalMCP config backup path.");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

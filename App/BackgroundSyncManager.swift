@@ -2,7 +2,7 @@ import BackgroundTasks
 import Foundation
 
 enum BackgroundSyncManager {
-    static let appRefreshTaskIdentifier = "app.healthlink.ios.autosync"
+    static let appRefreshTaskIdentifier = "com.vitalmcp.ios.autosync"
 
     @MainActor
     static func scheduleAppRefresh(settings: GatewaySettings) {

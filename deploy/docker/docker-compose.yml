@@ -1,9 +1,9 @@
 services:
-  healthlink:
+  vitalmcp:
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
-    image: healthlink-local:dev
+    image: vitalmcp:dev
     restart: unless-stopped
     ports:
       - "8787:8787"

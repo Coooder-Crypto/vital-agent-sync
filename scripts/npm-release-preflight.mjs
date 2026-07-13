@@ -12,7 +12,7 @@ if (unknownArgs.length > 0) {
 
 const packagePath = join(root, "packages", "local", "package.json");
 const manifest = JSON.parse(readFileSync(packagePath, "utf8"));
-const tempDir = mkdtempSync(join(tmpdir(), "healthlink-npm-release-preflight-"));
+const tempDir = mkdtempSync(join(tmpdir(), "vitalmcp-npm-release-preflight-"));
 const npmCache = join(tempDir, "npm-cache");
 const npmEnv = {
   ...process.env,
@@ -30,7 +30,7 @@ try {
   if (!localOnly) {
     verifyRegistry(manifest);
   }
-  console.log("\nHealthLink npm release preflight passed.");
+  console.log("\nVitalMCP npm release preflight passed.");
   console.log(JSON.stringify({
     package: manifest.name,
     local_version: manifest.version,
@@ -43,11 +43,11 @@ try {
 }
 
 function assertReleaseManifest(value) {
-  if (value.name !== "healthlink-local" || value.version !== "0.3.0") {
-    throw new Error("Expected the release manifest to be healthlink-local@0.3.0.");
+  if (value.name !== "vitalmcp" || value.version !== "0.3.0") {
+    throw new Error("Expected the release manifest to be vitalmcp@0.3.0.");
   }
   if (value.private === true || value.publishConfig?.access !== "public") {
-    throw new Error("healthlink-local must be a public publishable package.");
+    throw new Error("vitalmcp must be a public publishable package.");
   }
 }
 
@@ -68,7 +68,7 @@ function runSecretScan() {
 }
 
 function assertCleanWorktree() {
-  if (process.env.HEALTHLINK_NPM_RELEASE_ALLOW_DIRTY === "1") {
+  if (process.env.VITALMCP_NPM_RELEASE_ALLOW_DIRTY === "1") {
     console.warn("Release preflight is allowing a dirty worktree by explicit environment override.");
     return;
   }
@@ -83,7 +83,7 @@ function assertCleanWorktree() {
   if (status.trim()) {
     throw new Error(
       "The non-website worktree is dirty. Commit or intentionally stage/review the release changes before publishing. " +
-      "For local script testing only, set HEALTHLINK_NPM_RELEASE_ALLOW_DIRTY=1."
+      "For local script testing only, set VITALMCP_NPM_RELEASE_ALLOW_DIRTY=1."
     );
   }
 }
@@ -93,14 +93,14 @@ function inspectPack() {
   const output = capture("npm", [
     "pack",
     "--workspace",
-    "healthlink-local",
+    "vitalmcp",
     "--pack-destination",
     tempDir,
     "--dry-run",
     "--json"
   ], { env: npmEnv, timeout: 120_000 });
   const artifact = JSON.parse(output)[0];
-  if (artifact?.name !== "healthlink-local" || artifact.version !== manifest.version) {
+  if (artifact?.name !== "vitalmcp" || artifact.version !== manifest.version) {
     throw new Error("npm pack reported an unexpected package or version.");
   }
   const paths = artifact.files.map((entry) => entry.path);
@@ -125,16 +125,31 @@ function verifyRegistry(value) {
   if (!publisher) {
     throw new Error("npm whoami returned an empty publisher identity.");
   }
-  const registryVersion = capture("npm", ["view", value.name, "version"], {
+  const registryResult = spawnSync("npm", ["view", value.name, "version"], {
+    cwd: root,
     env: npmEnv,
+    encoding: "utf8",
     timeout: 30_000
-  }).trim();
+  });
+  if (registryResult.error) {
+    throw registryResult.error;
+  }
+  if (registryResult.status !== 0) {
+    const registryError = `${registryResult.stdout ?? ""}\n${registryResult.stderr ?? ""}`;
+    if (/\bE404\b/.test(registryError)) {
+      console.log(JSON.stringify({ publisher, registry_version: null, first_publish: true }));
+      return;
+    }
+    process.stderr.write(registryResult.stderr ?? "");
+    throw new Error(`npm view exited with status ${registryResult.status ?? "unknown"}.`);
+  }
+  const registryVersion = registryResult.stdout.trim();
   if (compareVersions(value.version, registryVersion) <= 0) {
     throw new Error(
       `Local version ${value.version} must be greater than registry version ${registryVersion}.`
     );
   }
-  console.log(JSON.stringify({ publisher, registry_version: registryVersion }));
+  console.log(JSON.stringify({ publisher, registry_version: registryVersion, first_publish: false }));
 }
 
 function compareVersions(left, right) {

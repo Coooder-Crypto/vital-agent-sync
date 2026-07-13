@@ -20,7 +20,7 @@ HealthLink should support two first-class setup paths:
 Default consumer path
   HealthLink iOS
     -> hosted E2EE relay
-    -> healthlink-local pull/decrypt/ingest
+    -> vitalmcp pull/decrypt/ingest
     -> SQLite
     -> MCP
     -> OpenClaw / Hermes / generic Agent
@@ -30,7 +30,7 @@ Default consumer path
 Self-owned path
   HealthLink iOS
     -> self-hosted relay or direct gateway
-    -> healthlink-local
+    -> vitalmcp
     -> SQLite
     -> MCP
     -> Agent
@@ -46,14 +46,14 @@ Every Agent should use the same MCP data interface. Hermes is the current execut
 - Agent-specific adapters can guide the user through local setup and iOS onboarding without owning health data or cryptography.
 - The user does not need to expose a local port for hosted relay mode.
 - The iOS app can sync health summaries over outbound HTTPS.
-- The agent can answer health context questions through MCP after `healthlink-local pull`.
+- The agent can answer health context questions through MCP after `vitalmcp pull`.
 - Users can choose hosted relay, self-hosted relay, or direct gateway.
 
 ### Security
 
 - Hosted relay stores encrypted envelopes plus minimal tenant/revocation metadata, never health plaintext or local private keys.
 - Relay operators cannot decrypt health payloads.
-- Local private keys never leave `healthlink-local`.
+- Local private keys never leave `vitalmcp`.
 - iOS stores source-side pairing state, public encryption material, and source credentials in Keychain; it never receives local private keys.
 - Decrypted data is schema-validated before SQLite ingestion.
 - All generated reports and local state are documented as sensitive.
@@ -62,7 +62,7 @@ Every Agent should use the same MCP data interface. Hermes is the current execut
 
 - Existing direct `/health/sync` path remains functional.
 - Relay mode reuses existing normalized payload, ingestion, SQLite, and MCP query logic.
-- Agent skill logic shells out to `healthlink-local`; it does not implement crypto or store data itself.
+- Agent skill logic shells out to `vitalmcp`; it does not implement crypto or store data itself.
 - Self-hosted relay uses the same protocol as hosted relay.
 
 ## Milestone 0: Route Alignment And Documentation
@@ -121,7 +121,7 @@ Acceptance:
 
 Status: relay config/key generation, sensitive onboarding output, idempotent setup, malformed-config checks, atomic config replacement, `0700` default state/secrets/database directories, and `0600` config/key/cursor/health-SQLite/relay-SQLite files are implemented in `packages/local`. The packaged-runtime gate additionally proves these behaviors survive tarball installation outside the workspace.
 
-Goal: let `healthlink-local` initialize relay-mode local state without contacting a production relay.
+Goal: let `vitalmcp` initialize relay-mode local state without contacting a production relay.
 
 Work:
 
@@ -130,8 +130,8 @@ Work:
 - Add key generation command:
 
 ```bash
-healthlink-local setup --transport relay --agent hermes
-healthlink-local print-onboarding
+vitalmcp setup --transport relay --agent hermes
+vitalmcp print-onboarding
 ```
 
 Hosted mode requires an operator-provided HTTPS URL through `--relay-url` or `HEALTHLINK_HOSTED_RELAY_URL`. The localhost fallback is self-hosted-only.
@@ -220,7 +220,7 @@ Work:
 - Add relay server command:
 
 ```bash
-healthlink-local relay serve --host 0.0.0.0 --port 8790
+vitalmcp relay serve --host 0.0.0.0 --port 8790
 ```
 
 - Add relay API:
@@ -253,16 +253,16 @@ Acceptance:
 
 Status: fixture pull/decrypt/ingest path, automatic bounded-page draining, mobile-compatible HMAC envelopes, atomic failed/success cursor metadata, `pull --once`, foreground `pull --watch --interval-seconds`, and managed launchd/systemd `relay-pull` service mode are implemented.
 
-Goal: make `healthlink-local` pull encrypted envelopes, decrypt them, and write existing HealthLink SQLite tables.
+Goal: make `vitalmcp` pull encrypted envelopes, decrypt them, and write existing HealthLink SQLite tables.
 
 Work:
 
 - Add commands:
 
 ```bash
-healthlink-local pull
-healthlink-local pull --once
-healthlink-local relay status
+vitalmcp pull
+vitalmcp pull --once
+vitalmcp relay status
 ```
 
 - Pull flow:
@@ -325,16 +325,16 @@ Acceptance:
 
 Status: the Agent-neutral MCP surface is implemented, the Hermes config/skill installer is implemented, and `npm run audit:agent-adapters` proves a generic MCP tool call plus a real Hermes CLI handshake and discovery of all 12 tools. Portable skill output is parameterized by Agent. `export-skill --agent openclaw` remains an optional ClawHub package; its ClawHub dry-run succeeds, while account publication and listing install are deferred.
 
-Goal: provide native install and operation experiences for individual Agents without moving core logic out of MCP and `healthlink-local`.
+Goal: provide native install and operation experiences for individual Agents without moving core logic out of MCP and `vitalmcp`.
 
 Work:
 
 - [x] Create Agent-neutral skill content that instructs the agent to:
-  - install/check `healthlink-local`
+  - install/check `vitalmcp`
   - run relay setup
   - show onboarding QR/hex
   - ask user to sync in iOS
-  - run `healthlink-local pull`
+  - run `vitalmcp pull`
   - query MCP tools
   - suggest CronJobs for recurring pull/report
 - Include guardrails:
@@ -343,7 +343,7 @@ Work:
   - mention data freshness
   - explain local state directory
   - warn when saving summaries
-- [x] Add `healthlink-local print-skill --agent <agent>` and a Hermes-targeted installed skill.
+- [x] Add `vitalmcp print-skill --agent <agent>` and a Hermes-targeted installed skill.
 - [x] Add an optional OpenClaw/ClawHub package export.
 - [x] Add a repeatable generic MCP and Hermes CLI compatibility audit.
 
@@ -391,7 +391,7 @@ Acceptance:
 
 ## Milestone 9: MCP And Agent UX Polish
 
-Status: MCP/query metadata, `healthlink-local status`, `doctor`, skill freshness handling, daily/weekly report templates, and relay pull next-action prompting are implemented.
+Status: MCP/query metadata, `vitalmcp status`, `doctor`, skill freshness handling, daily/weekly report templates, and relay pull next-action prompting are implemented.
 
 Goal: make relay mode feel native once data is available.
 
@@ -402,7 +402,7 @@ Work:
   - latest source generated time
   - latest successful local pull
   - relay transport mode
-- [x] Add MCP tool or status field that suggests `healthlink-local pull` when data is stale.
+- [x] Add MCP tool or status field that suggests `vitalmcp pull` when data is stale.
 - [x] Add weekly/daily report templates.
 - [x] Add OpenClaw/Hermes skill instructions for freshness handling.
 - [x] Add optional deep link prompt from agent:
@@ -427,7 +427,7 @@ Goal: make open-source/self-owned deployment credible.
 Work:
 
 - [x] Add self-hosted relay Docker image and Compose file.
-- [x] Add `healthlink-local setup --transport self-hosted-relay --relay-url ...`.
+- [x] Add `vitalmcp setup --transport self-hosted-relay --relay-url ...`.
 - [x] Add migration docs from hosted to self-hosted.
 - [x] Add direct gateway vs relay comparison docs.
 - [x] Add test fixture generator for encrypted envelopes.
@@ -443,7 +443,7 @@ start relay
 
 Acceptance:
 
-- A developer can run the full relay path locally with `npm --workspace healthlink-local run relay:fixture-flow`.
+- A developer can run the full relay path locally with `npm --workspace vitalmcp run relay:fixture-flow`.
 - Hosted and self-hosted relay APIs stay compatible.
 - Docs make the tradeoffs explicit.
 
@@ -502,7 +502,7 @@ Tasks:
 2. [x] Add local runtime config skeleton under `~/.healthlink`.
 3. [x] Add crypto envelope types and a positive-path fixture.
 4. [x] Add a fake/self-host relay server that stores opaque envelopes.
-5. [x] Add `healthlink-local pull`.
+5. [x] Add `vitalmcp pull`.
 6. [x] Prove a fixture encrypted payload becomes MCP-readable health context.
 7. [x] Add negative crypto fixtures for tampering, bad signatures, stale timestamps, and replay.
 8. [x] Add relay TTL cleanup, rate limiting, and self-host Docker packaging.
@@ -515,7 +515,7 @@ Exit criteria:
 fixture HealthSyncPayload
   -> encrypt envelope
   -> POST relay
-  -> healthlink-local pull --once
+  -> vitalmcp pull --once
   -> SQLite rows
   -> get_daily_health_summary returns fixture values
 ```
@@ -580,7 +580,7 @@ This sprint avoids iOS, hosted infra, and OpenClaw packaging until the core rela
 - Defaults: 30-day envelope retention, 512 KiB envelope limit, 120 uploads/IP/minute, 1000 queued envelopes/user, and 5 active source devices/user.
 - Mobile control: deep links in v1; App Intents deferred.
 - Agent compatibility: generic MCP is the stable contract and Hermes is the current real-runtime audit target.
-- OpenClaw packaging: generated reviewable `SKILL.md` package from `healthlink-local`; ClawHub publication is an optional adapter release gate, not a core relay beta dependency.
+- OpenClaw packaging: generated reviewable `SKILL.md` package from `vitalmcp`; ClawHub publication is an optional adapter release gate, not a core relay beta dependency.
 
 ## Immediate Next Actions
 
@@ -588,6 +588,6 @@ This sprint avoids iOS, hosted infra, and OpenClaw packaging until the core rela
 2. [x] Run `npm run audit:agent-adapters`; generic MCP calls `healthlink_status` and Hermes v0.17.0 discovers all 12 tools.
 3. [ ] User device gate: validate the iOS relay path with the matching Xcode Beta on macOS 27 beta and the paired iOS 26.5 iPhone.
 4. [ ] Deploy a hosted relay beta environment, export its URL/API/metrics credentials, and run `npm run audit:relay-hosted -- --yes`; the wrapper performs passive and active audits without putting tokens in process arguments.
-5. [x] Commit/review the release worktree, run the authenticated `release:npm-preflight`, publish `healthlink-local@0.2.0`, confirm registry metadata, and smoke test an isolated global install plus encrypted fixture generation.
+5. [x] Commit/review the release worktree, run the authenticated `release:npm-preflight`, publish the historical `healthlink-local@0.2.0` release, confirm registry metadata, and smoke test an isolated global install plus encrypted fixture generation.
 6. [ ] Complete the hosted environment gate: HTTPS, edge rate limits, log redaction, backups, metrics access control, purge, retention cleanup, and distributed privacy docs. Website work remains out of scope for this execution.
 7. [ ] Optional adapter release: publish the generated OpenClaw package on ClawHub and smoke test installation from the listing when OpenClaw validation resumes.

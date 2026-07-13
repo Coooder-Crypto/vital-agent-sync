@@ -2,7 +2,7 @@
 "Sources" = "Sources";
 "Connection" = "Connection";
 "Settings" = "Settings";
-"HealthLink" = "HealthLink";
+"VitalMCP" = "VitalMCP";
 
 "Data Sources" = "Data Sources";
 "Allow Health Access" = "Allow Health Access";
@@ -38,12 +38,12 @@
 "Remove paired agent?" = "Remove paired agent?";
 "Remove Agent" = "Remove Agent";
 "Cancel" = "Cancel";
-"HealthLink will remove this pairing from the iPhone. If the receiver is reachable, it will also revoke the device token on the agent side." = "HealthLink will remove this pairing from the iPhone. If the receiver is reachable, it will also revoke the device token on the agent side.";
+"VitalMCP will remove this pairing from the iPhone. If the receiver is reachable, it will also revoke the device token on the agent side." = "VitalMCP will remove this pairing from the iPhone. If the receiver is reachable, it will also revoke the device token on the agent side.";
 
 "Connect your agent" = "Connect your agent";
 "Sync needs attention" = "Sync needs attention";
 "Ready for %@" = "Ready for %@";
-"Pair HealthLink with your local Agent receiver." = "Pair HealthLink with your local Agent receiver.";
+"Pair VitalMCP with your local Agent receiver." = "Pair VitalMCP with your local Agent receiver.";
 "Uploading your latest daily summaries." = "Uploading your latest daily summaries.";
 "Last sync %@." = "Last sync %@.";
 "Connected. Run the first sync when you are ready." = "Connected. Run the first sync when you are ready.";
@@ -149,11 +149,11 @@
 
 "First Sync" = "First Sync";
 "Grant Health access" = "Grant Health access";
-"Approve the Health categories HealthLink can summarize." = "Approve the Health categories HealthLink can summarize.";
+"Approve the Health categories VitalMCP can summarize." = "Approve the Health categories VitalMCP can summarize.";
 "Sync today and yesterday" = "Sync today and yesterday";
 "Send compact daily summaries to your paired Agent receiver." = "Send compact daily summaries to your paired Agent receiver.";
 "Ask your Agent" = "Ask your Agent";
-"The Agent reads from its local HealthLink store after sync completes." = "The Agent reads from its local HealthLink store after sync completes.";
+"The Agent reads from its local VitalMCP context after sync completes." = "The Agent reads from its local VitalMCP context after sync completes.";
 "Allow Health" = "Allow Health";
 "Sync Now" = "Sync Now";
 "Syncing" = "Syncing";
@@ -161,7 +161,7 @@
 "Encrypted sync queued" = "Encrypted sync queued";
 "Sync accepted" = "Sync accepted";
 "The paired receiver stored this sync for Agent tools." = "The paired receiver stored this sync for Agent tools.";
-"The relay accepted the encrypted envelope. Your Agent can read it after HealthLink Local pulls it." = "The relay accepted the encrypted envelope. Your Agent can read it after HealthLink Local pulls it.";
+"The relay accepted the encrypted envelope. Your Agent can read it after the local runtime pulls it." = "The relay accepted the encrypted envelope. Your Agent can read it after the local runtime pulls it.";
 "Sync failed" = "Sync failed";
 "Latest sync completed." = "Latest sync completed.";
 "Trigger" = "Trigger";
@@ -190,7 +190,9 @@
 "Setup incomplete" = "Setup incomplete";
 "Make sure the Agent receiver is running and this iPhone can reach the saved server URL." = "Make sure the Agent receiver is running and this iPhone can reach the saved server URL.";
 "Pair this iPhone with the Agent again to receive a fresh device token." = "Pair this iPhone with the Agent again to receive a fresh device token.";
-"Open iOS Settings and allow HealthLink to read the selected Health data." = "Open iOS Settings and allow HealthLink to read the selected Health data.";
+"Open iOS Settings and allow VitalMCP to read the selected Health data." = "Open iOS Settings and allow VitalMCP to read the selected Health data.";
+"Scan a VitalMCP pairing or relay onboarding QR to connect this iPhone." = "Scan a VitalMCP pairing or relay onboarding QR to connect this iPhone.";
+"This onboarding code contains access credentials. VitalMCP stores them in Keychain." = "This onboarding code contains access credentials. VitalMCP stores them in Keychain.";
 "Check Wi-Fi or cellular connectivity, then retry sync." = "Check Wi-Fi or cellular connectivity, then retry sync.";
 "Keep the Agent receiver online and retry when the network is stable." = "Keep the Agent receiver online and retry when the network is stable.";
 "Check the Agent receiver logs, then retry sync." = "Check the Agent receiver logs, then retry sync.";

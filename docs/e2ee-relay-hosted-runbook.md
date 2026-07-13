@@ -6,7 +6,7 @@ Use [e2ee-relay-release-audit.md](e2ee-relay-release-audit.md) as the beta relea
 
 ## Service Role
 
-The hosted relay is a ciphertext queue. It accepts encrypted HealthLink envelopes from mobile source apps, lets `healthlink-local pull` fetch queued envelopes, acknowledges processed envelopes, and purges user queues on request.
+The hosted relay is a ciphertext queue. It accepts encrypted HealthLink envelopes from mobile source apps, lets `vitalmcp pull` fetch queued envelopes, acknowledges processed envelopes, and purges user queues on request.
 
 The hosted relay must not decrypt, parse, log, or inspect health payload plaintext.
 
@@ -16,7 +16,7 @@ Set the hosted relay base URL for local setup before publishing beta onboarding 
 
 ```bash
 export HEALTHLINK_HOSTED_RELAY_URL=https://relay.example.com
-healthlink-local setup --transport relay --agent hermes
+vitalmcp setup --transport relay --agent hermes
 ```
 
 Use `--agent generic` for any MCP-compatible runtime without a dedicated installer. OpenClaw and future Agent adapters use the same relay state, pull service, SQLite database, and MCP tools.
@@ -89,7 +89,7 @@ docker compose -f deploy/relay/docker-compose.yml up --build -d
 For process-manager deployments, run the same command directly:
 
 ```bash
-healthlink-local relay serve \
+vitalmcp relay serve \
   --host 0.0.0.0 \
   --port 8790 \
   --db /data/relay.sqlite \
@@ -114,7 +114,7 @@ export HEALTHLINK_RELAY_MAX_DEVICES_PER_USER=5
 export HEALTHLINK_RELAY_TRUST_PROXY=false
 export HEALTHLINK_RELAY_API_TOKEN=<ios-and-local-runtime-random-token>
 export HEALTHLINK_RELAY_METRICS_TOKEN=<operator-only-random-token>
-healthlink-local relay serve
+vitalmcp relay serve
 ```
 
 Put this process behind managed HTTPS and infrastructure-level rate limits. The app-level controls above are a second line of defense, not a replacement for edge protection.
@@ -126,14 +126,14 @@ Set `HEALTHLINK_RELAY_TRUST_PROXY=true` only when the relay port is private and 
 Run the built-in relay audit after every deploy and before opening the relay to beta users:
 
 ```bash
-healthlink-local relay audit \
+vitalmcp relay audit \
   --relay-url https://relay.example.com
 ```
 
 The command above is passive. After it passes, run the opt-in active gate with the deployment API key:
 
 ```bash
-healthlink-local relay audit \
+vitalmcp relay audit \
   --relay-url https://relay.example.com \
   --active \
   --yes
@@ -171,7 +171,7 @@ The audit does not replace infrastructure review. HTTPS, edge rate limits, backu
 - `GET /v1/status`: health and aggregate queue status.
 - `GET /v1/metrics`: aggregate metrics and configured limits; must not include envelope bodies. Set `HEALTHLINK_RELAY_METRICS_TOKEN` or `--metrics-token` in hosted deployments so this endpoint requires `Authorization: Bearer <token>`.
 - `POST /v1/envelopes`: upload one encrypted envelope.
-- `GET /v1/envelopes?user_id=...&after=...&limit=25`: fetch a bounded page of unacked envelopes after a sequence cursor. The server caps pages at 25 and `healthlink-local pull` drains successive pages automatically.
+- `GET /v1/envelopes?user_id=...&after=...&limit=25`: fetch a bounded page of unacked envelopes after a sequence cursor. The server caps pages at 25 and `vitalmcp pull` drains successive pages automatically.
 - `POST /v1/envelopes/:envelope_id/ack`: acknowledge a processed envelope.
 - `POST /v1/purge`: delete all envelopes for one user.
 - `POST /v1/devices/:device_id/unlink`: revoke one source device and purge its envelopes.
@@ -235,7 +235,7 @@ Forbidden:
 2. Confirm no private keys exist on relay hosts.
 3. Reduce retention if necessary.
 4. Notify beta users that relay metadata and ciphertext may have been exposed.
-5. Advise affected users to run `healthlink-local relay rotate --yes` or `relay reset --yes`, then reconnect iOS with fresh onboarding.
+5. Advise affected users to run `vitalmcp relay rotate --yes` or `relay reset --yes`, then reconnect iOS with fresh onboarding.
 
 ## Deployment Checklist
 

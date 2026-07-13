@@ -205,7 +205,7 @@ final class GatewaySettings: ObservableObject {
         do {
             let response = try await GatewayAPIClient.confirmPairing(
                 link: preview.link,
-                deviceName: "HealthLink iOS",
+                deviceName: "VitalMCP iOS",
                 acceptedScopes: preview.status.requested_scopes
             )
 

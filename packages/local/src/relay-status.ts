@@ -71,7 +71,7 @@ export function getRelayLocalStatus(options: {
       last_failed_envelope_id: null,
       last_failed_at: null,
       last_error: error instanceof Error ? error.message : String(error),
-      suggested_next_action: "Relay runtime config is invalid. Re-run healthlink-local setup --transport relay."
+      suggested_next_action: "Relay runtime config is invalid. Re-run vitalmcp setup --transport relay."
     };
   }
 
@@ -91,7 +91,7 @@ export function getRelayLocalStatus(options: {
     last_failed_at: cursor.last_failed_at ?? null,
     last_error: cursor.last_error ?? null,
     suggested_next_action: config.source_device_unlinked_at
-      ? "The relay source device is unlinked. Run healthlink-local relay rotate --yes, print new onboarding, and reconnect iOS."
+      ? "The relay source device is unlinked. Run vitalmcp relay rotate --yes, print new onboarding, and reconnect iOS."
       : relayNextAction(cursor, failedAfterSuccess)
   };
 }
@@ -123,10 +123,10 @@ function readRelayCursor(stateDir: string): RelayCursor {
 
 function relayNextAction(cursor: RelayCursor, failedAfterSuccess: boolean): string {
   if (failedAfterSuccess) {
-    return "Run healthlink-local pull after resolving the failed relay envelope; failed envelopes are not acknowledged.";
+    return "Run vitalmcp pull after resolving the failed relay envelope; failed envelopes are not acknowledged.";
   }
   if (!cursor.last_successful_pull_at) {
-    return "Run healthlink-local pull after syncing from iOS to decrypt relay envelopes into the local MCP database.";
+    return "Run vitalmcp pull after syncing from iOS to decrypt relay envelopes into the local MCP database.";
   }
-  return "Relay pull is configured. Run healthlink-local pull when the user needs fresher iOS data.";
+  return "Relay pull is configured. Run vitalmcp pull when the user needs fresher iOS data.";
 }

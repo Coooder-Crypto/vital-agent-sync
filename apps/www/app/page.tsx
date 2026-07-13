@@ -15,8 +15,6 @@ import {
   ExternalLink,
   Fingerprint,
   Github,
-  KeyRound,
-  LockKeyhole,
   Menu,
   QrCode,
   RefreshCw,
@@ -32,7 +30,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import appIcon from "../../../Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png";
 import { usePageSnap, type SnapSection } from "./use-page-snap";
 
-const installCommand = "npx -y healthlink-local setup";
+const installCommand = "npx -y vitalmcp setup";
 const githubUrl = "https://github.com/Coooder-Crypto/health-link";
 
 const sections: SnapSection[] = [
@@ -58,22 +56,22 @@ const flowSteps = [
     number: "01",
     label: "Install",
     title: "Start the local runtime.",
-    body: "One published npm command starts the receiver, creates private keys, and prepares your Agent connection.",
+    body: "One published npm command starts the LAN receiver and prepares standard MCP config for your Agent.",
     icon: Terminal,
   },
   {
     number: "02",
     label: "Pair",
     title: "Scan one onboarding code.",
-    body: "Your iPhone verifies the local fingerprint before any health summary can leave the device.",
+    body: "Your iPhone saves the receiver address and scoped device credential from one short-lived pairing QR.",
     icon: QrCode,
   },
   {
     number: "03",
     label: "Sync",
-    title: "Only ciphertext crosses the relay.",
-    body: "Hosted or self-hosted, the relay delivers encrypted envelopes without seeing their contents.",
-    icon: LockKeyhole,
+    title: "Sync over your trusted network.",
+    body: "Use LAN by default, or your authorized Tailscale network when you need private remote access.",
+    icon: Server,
   },
   {
     number: "04",
@@ -110,31 +108,31 @@ const questions = [
 
 const modes = [
   {
-    label: "Hosted relay",
-    eyebrow: "Recommended",
-    icon: Cloud,
-    title: "The shortest private route.",
-    body: "HealthLink hosts delivery infrastructure that only sees encrypted envelopes. Your machine keeps the key.",
-    bullets: ["No inbound ports", "Outbound-only iPhone flow", "Portable MCP surface"],
-    path: ["iPhone", "Blind relay", "Your machine"],
-  },
-  {
-    label: "Self-hosted",
-    eyebrow: "Full ownership",
-    icon: Server,
-    title: "Own every network hop.",
-    body: "Run the same relay protocol on infrastructure you control while preserving local decryption.",
-    bullets: ["Docker-ready service", "Protocol compatible", "Your retention policy"],
-    path: ["iPhone", "Your relay", "Your machine"],
-  },
-  {
-    label: "Direct",
-    eyebrow: "Fully local",
+    label: "LAN",
+    eyebrow: "Local Preview default",
     icon: Database,
-    title: "Skip the relay entirely.",
-    body: "Send summaries to healthlink-local over LAN, Tailscale, or an HTTPS endpoint you operate.",
-    bullets: ["No hosted service", "Private network route", "Same local MCP tools"],
-    path: ["iPhone", "Private network", "Your machine"],
+    title: "Start on the network you trust.",
+    body: "Send summaries directly from iPhone to the VitalMCP receiver on your Mac or home server.",
+    bullets: ["No hosted service", "No account or payment", "Same local MCP tools"],
+    path: ["iPhone", "Trusted LAN", "Your machine"],
+  },
+  {
+    label: "Tailscale",
+    eyebrow: "Optional private remote",
+    icon: Server,
+    title: "Reach home without going public.",
+    body: "Use your own Tailscale account and authorized tailnet when the iPhone is away from the receiver's LAN.",
+    bullets: ["Tailscale app on both devices", "Authorized tailnet required", "No public receiver URL"],
+    path: ["iPhone", "Your tailnet", "Your machine"],
+  },
+  {
+    label: "Hosted relay",
+    eyebrow: "Future experiment",
+    icon: Cloud,
+    title: "Outside Local Preview.",
+    body: "The encrypted relay protocol remains under development, but hosted delivery is not available or recommended for Local Preview onboarding.",
+    bullets: ["Not required for setup", "No current hosted CTA", "Protocol work remains isolated"],
+    path: ["iPhone", "Future relay", "Your machine"],
   },
 ];
 
@@ -207,9 +205,9 @@ function PageHeader({ active, onNavigate }: { active: number; onNavigate: (index
     <>
       <header className={`global-header ${isDark ? "header-dark" : "header-light"}`}>
         <div className="header-inner page-width">
-          <button type="button" className="header-brand" onClick={() => navigate(0)} aria-label="Go to HealthLink overview">
+          <button type="button" className="header-brand" onClick={() => navigate(0)} aria-label="Go to VitalMCP overview">
             <BrandMark className="header-mark" priority />
-            <span className="header-brand-copy"><strong>HealthLink</strong><small>Private health context</small></span>
+            <span className="header-brand-copy"><strong>VitalMCP</strong><small>Private health context</small></span>
           </button>
 
           <nav className="header-nav" aria-label="Primary navigation">
@@ -226,11 +224,11 @@ function PageHeader({ active, onNavigate }: { active: number; onNavigate: (index
           </nav>
 
           <div className="header-actions">
-            <a className="header-github" href={githubUrl} target="_blank" rel="noreferrer" aria-label="HealthLink on GitHub" title="GitHub">
+            <a className="header-github" href={githubUrl} target="_blank" rel="noreferrer" aria-label="VitalMCP on GitHub" title="GitHub">
               <Github size={18} />
             </a>
             <button type="button" className="header-install" onClick={() => navigate(sections.length - 1)}>
-              <Terminal size={16} /><span>Install HealthLink</span>
+              <Terminal size={16} /><span>Start Local Preview</span>
             </button>
             <button type="button" className="header-menu-button" onClick={() => setMenuOpen((open) => !open)} aria-expanded={menuOpen} aria-label={menuOpen ? "Close section menu" : "Open section menu"}>
               {menuOpen ? <X size={19} /> : <Menu size={19} />}
@@ -298,28 +296,28 @@ function HeroPage({ copied, onCopy, onNavigate }: { copied: boolean; onCopy: () 
       <div className="hero-code" aria-hidden="true">HL/01</div>
       <motion.div className="page-width hero-page-inner" initial={false} animate="show" variants={{ show: { transition: { staggerChildren: reducedMotion ? 0 : 0.07 } } }}>
         <div className="hero-main">
-          <motion.p className="page-kicker" variants={item}><span /> HealthLink for MCP agents</motion.p>
+          <motion.p className="page-kicker" variants={item}><span /> VitalMCP for MCP agents</motion.p>
           <motion.h1 variants={item}>Apple Health context.<strong>Private by design.</strong></motion.h1>
-          <motion.p className="hero-lede" variants={item}>Fresh Apple Health summaries become scoped context for your agent. Encrypted on iPhone, decrypted on your machine.</motion.p>
+          <motion.p className="hero-lede" variants={item}>Fresh Apple Health summaries become scoped context for your agent. Start directly over trusted LAN; add your own Tailscale network for private remote access.</motion.p>
           <motion.div className="hero-actions" variants={item}>
-            <button type="button" className="button button-dark" onClick={() => onNavigate(7)}>Install HealthLink <ArrowRight size={17} /></button>
+            <button type="button" className="button button-dark" onClick={() => onNavigate(7)}>Start Local Preview <ArrowRight size={17} /></button>
             <button type="button" className="text-button" onClick={() => onNavigate(1)}>See the private route <ArrowDown size={16} /></button>
           </motion.div>
           <motion.div variants={item}><CommandBar copied={copied} onCopy={onCopy} /></motion.div>
         </div>
 
-        <motion.div className="hero-route" variants={item} aria-label="Encrypted route from Apple Health to your agent">
-          <RouteNode icon={Smartphone} label="Apple Health" detail="encrypted on iPhone" />
+        <motion.div className="hero-route" variants={item} aria-label="Local route from Apple Health to the VitalMCP runtime">
+          <RouteNode icon={Smartphone} label="Apple Health" detail="summarized on iPhone" />
           <RouteLine delay={false} />
-          <RouteNode icon={LockKeyhole} label="Blind relay" detail="ciphertext only" />
+          <RouteNode icon={Server} label="LAN / Tailscale" detail="your private network" />
           <RouteLine delay />
-          <RouteNode icon={Bot} label="Your agent" detail="decrypted locally" />
+          <RouteNode icon={Database} label="Local runtime" detail="SQLite and MCP" />
         </motion.div>
       </motion.div>
       <div className="hero-trust page-width">
-        <span><LockKeyhole size={15} /> End-to-end encrypted</span>
+        <span><Database size={15} /> User-owned receiver</span>
         <span><Code2 size={15} /> MCP native</span>
-        <span><Server size={15} /> Self-hostable</span>
+        <span><Server size={15} /> LAN first</span>
         <span><Fingerprint size={15} /> Source controlled</span>
       </div>
     </SnapPage>
@@ -336,11 +334,11 @@ function FirstRunPage() {
       <div className="page-width flow-page-inner">
         <div className="page-title-row">
           <PageTitle kicker="One guided first run" title="Install to answer, in four verified steps." />
-          <div className="page-stats"><span><strong>1</strong> Command</span><span><strong>1</strong> Scan</span><span><strong>0</strong> Plaintext hops</span></div>
+          <div className="page-stats"><span><strong>1</strong> Command</span><span><strong>1</strong> Scan</span><span><strong>0</strong> Hosted services</span></div>
         </div>
 
         <div className="flow-workbench">
-          <div className="flow-tabs" role="tablist" aria-label="HealthLink setup steps">
+          <div className="flow-tabs" role="tablist" aria-label="VitalMCP setup steps">
             {flowSteps.map((item, index) => (
               <button key={item.number} type="button" role="tab" aria-selected={active === index} onClick={() => setActive(index)}>
                 {active === index && <motion.i layoutId="flow-tab" />}
@@ -349,7 +347,7 @@ function FirstRunPage() {
             ))}
           </div>
           <div className="flow-window">
-            <div className="window-head"><span>LOCAL SETUP / HEALTHLINK</span><span><i /> {step.label.toUpperCase()}</span></div>
+            <div className="window-head"><span>LOCAL SETUP / VITALMCP</span><span><i /> {step.label.toUpperCase()}</span></div>
             <AnimatePresence mode="wait" initial={false}>
               <motion.div className="flow-window-body" key={active} initial={{ opacity: 0, y: reducedMotion ? 0 : 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: reducedMotion ? 0 : -8 }} transition={{ duration: reducedMotion ? 0 : 0.25 }}>
                 <div className="flow-copy"><p>{step.number} / 04</p><h3>{step.title}</h3><span>{step.body}</span></div>
@@ -367,8 +365,8 @@ function FlowVisual({ index }: { index: number }) {
   if (index === 0) {
     return (
       <div className="terminal-visual">
-        <p><span>TERMINAL</span>npx -y healthlink-local setup</p>
-        <p className="agent"><span>HEALTHLINK</span><Check size={15} /> Local runtime ready</p>
+        <p><span>TERMINAL</span>npx -y vitalmcp setup</p>
+        <p className="agent"><span>VITALMCP</span><Check size={15} /> Local runtime ready</p>
         <div><span><Check size={14} /> Runtime ready</span><span><Check size={14} /> Keys created</span><span><RefreshCw size={14} /> Awaiting iPhone</span></div>
       </div>
     );
@@ -387,11 +385,11 @@ function FlowVisual({ index }: { index: number }) {
     return (
       <div className="relay-visual">
         <RoutePoint icon={Smartphone} label="iPhone" />
-        <div className="encrypted-hop"><span><LockKeyhole size={13} /></span><i /></div>
-        <RoutePoint icon={Cloud} label="Relay" muted />
-        <div className="encrypted-hop"><span><LockKeyhole size={13} /></span><i /></div>
-        <RoutePoint icon={KeyRound} label="Local" />
-        <code>6d2f·a91c·88e0·4bf7</code>
+        <div className="encrypted-hop"><span><ShieldCheck size={13} /></span><i /></div>
+        <RoutePoint icon={Server} label="Trusted LAN" muted />
+        <div className="encrypted-hop"><span><ShieldCheck size={13} /></span><i /></div>
+        <RoutePoint icon={Database} label="Receiver" />
+        <code>192.168.x.x:8787</code>
       </div>
     );
   }
@@ -399,7 +397,7 @@ function FlowVisual({ index }: { index: number }) {
   return (
     <div className="answer-visual">
       <p><span>YOU</span>How ready am I for a hard workout today?</p>
-      <p><span>HEALTHLINK</span>Your recovery looks steady. Keep today&apos;s intensity moderate.</p>
+      <p><span>VITALMCP</span>Your recovery looks steady. Keep today&apos;s intensity moderate.</p>
       <div><span>Sleep 6h 42m</span><span>HRV 42 ms</span><span>Fresh 4m</span></div>
       <small><ShieldCheck size={14} /> Observed data separated from inference</small>
     </div>
@@ -415,18 +413,18 @@ function AgentAnswerPage() {
     <SnapPage id="agent-answer" className="agent-page">
       <div className="page-width agent-page-inner">
         <div className="agent-copy">
-          <PageTitle kicker="Useful on day one" title="Ask naturally. Keep the evidence visible." body="HealthLink checks freshness, returns only the context your Agent requests, and marks the line between observed data and inference." />
+          <PageTitle kicker="Useful on day one" title="Ask naturally. Keep the evidence visible." body="VitalMCP checks freshness, returns only the context your Agent requests, and marks the line between observed data and inference." />
           <div className="segmented-tabs" role="tablist" aria-label="Health question examples">
             {questions.map((item, index) => <button key={item.label} type="button" role="tab" aria-selected={active === index} onClick={() => setActive(index)}>{item.label}</button>)}
           </div>
         </div>
 
         <div className="agent-console">
-          <div className="window-head"><span><Bot size={16} /> MCP AGENT / HEALTHLINK</span><span><i /> FRESH DATA</span></div>
+          <div className="window-head"><span><Bot size={16} /> MCP AGENT / VITALMCP</span><span><i /> FRESH DATA</span></div>
           <AnimatePresence mode="wait" initial={false}>
             <motion.div className="console-body" key={active} initial={{ opacity: 0, y: reducedMotion ? 0 : 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: reducedMotion ? 0 : -8 }} transition={{ duration: reducedMotion ? 0 : 0.24 }} aria-live="polite">
               <div className="console-line"><span>YOU</span><p>{question.question}</p></div>
-              <div className="console-line answer"><span>HEALTHLINK</span><p>{question.answer}</p></div>
+              <div className="console-line answer"><span>VITALMCP</span><p>{question.answer}</p></div>
               <div className="fact-row">{question.facts.map((fact) => <span key={fact}>{fact}</span>)}</div>
             </motion.div>
           </AnimatePresence>
@@ -439,19 +437,19 @@ function AgentAnswerPage() {
 
 function PrivacyPage() {
   const ledger: [LucideIcon, string, string][] = [
-    [Smartphone, "iPhone", "Summarizes and encrypts"],
-    [Cloud, "Relay", "Sees ciphertext and delivery metadata"],
-    [KeyRound, "Your machine", "Keeps keys, SQLite, and MCP"],
-    [ShieldCheck, "Your agent", "Gets scoped summaries only"],
+    [Smartphone, "iPhone", "Creates compact Health summaries"],
+    [Server, "Private network", "Trusted LAN or your authorized tailnet"],
+    [Database, "Your machine", "Keeps SQLite and serves MCP"],
+    [Bot, "Your agent", "Gets scoped summaries only"],
   ];
 
   return (
     <SnapPage id="privacy" className="privacy-page">
-      <div className="privacy-word" aria-hidden="true">CIPHERTEXT</div>
+      <div className="privacy-word" aria-hidden="true">LOCAL FIRST</div>
       <div className="page-width privacy-page-inner">
         <div className="privacy-copy">
-          <PageTitle kicker="The trust boundary" title="The cloud can forward it. The cloud cannot read it." body="Encrypted envelopes may wait in the relay. Decryption, normalized storage, and agent access stay in your local runtime." light />
-          <div className="privacy-proof"><LockKeyhole size={18} /><span><strong>Private key location</strong>Your machine, always</span></div>
+          <PageTitle kicker="The Local Preview boundary" title="Your receiver. Your network. Your data." body="LAN sends directly to your machine. Optional Tailscale uses your authorized tailnet. No VitalMCP-hosted service sits in the default route." light />
+          <div className="privacy-proof"><Database size={18} /><span><strong>Health context location</strong>Your machine, always</span></div>
         </div>
         <div className="privacy-ledger">
           {ledger.map(([Icon, label, value], index) => <div className="ledger-row" key={label}><span>{String(index + 1).padStart(2, "0")}</span><i><Icon size={18} /></i><strong>{label}</strong><p>{value}</p></div>)}
@@ -469,7 +467,7 @@ function DeployPage() {
   return (
     <SnapPage id="deploy" className="deploy-page">
       <div className="page-width deploy-page-inner">
-        <div className="page-title-row compact"><PageTitle kicker="One protocol, three modes" title="Start simple. Keep the exit door open." body="Change the network route without changing what your agent sees." /></div>
+        <div className="page-title-row compact"><PageTitle kicker="Local Preview routes" title="LAN first. Tailscale when you roam." body="Change the private network route without changing what your agent sees. Hosted relay remains a future experiment." /></div>
         <div className="deploy-tabs" role="tablist" aria-label="Deployment mode">
           {modes.map((item, index) => (
             <button key={item.label} type="button" role="tab" aria-selected={active === index} onClick={() => setActive(index)}>
@@ -487,7 +485,7 @@ function DeployPage() {
           </AnimatePresence>
           <div className="deploy-route">
             {mode.path.map((point, index) => <div key={point}><span>{String(index + 1).padStart(2, "0")}</span><strong>{point}</strong>{index < mode.path.length - 1 && <i />}</div>)}
-            <p><LockKeyhole size={15} /> Private key remains on your machine</p>
+            <p><ShieldCheck size={15} /> Health context remains on your machine</p>
           </div>
         </div>
       </div>
@@ -505,7 +503,7 @@ function ProductPage() {
         </div>
         <div className="product-composite">
           <div className="report-frame">
-            <div className="window-head"><span>HEALTHLINK / CONTEXT</span><span><i /> LOCAL</span></div>
+            <div className="window-head"><span>VITALMCP / CONTEXT</span><span><i /> LOCAL</span></div>
             <div className="report-body">
               <div className="report-heading"><span>FRIDAY, JUL 11</span><h3>Morning context</h3></div>
               <div className="report-score"><strong>82</strong><span>Recovery<br />steady</span></div>
@@ -515,9 +513,9 @@ function ProductPage() {
           </div>
           <div className="phone-frame">
             <i className="phone-island" />
-            <div className="phone-head"><BrandMark className="phone-brand-mark" /><strong>HealthLink</strong><small>Secure</small></div>
-            <div className="phone-sync"><span><Check size={28} /></span><h3>Sync complete</h3><p>Today&apos;s summary is encrypted and ready for your agent.</p></div>
-            <div className="phone-meta"><span><small>ROUTE</small><strong>E2EE relay</strong></span><span><small>UPDATED</small><strong>Just now</strong></span></div>
+            <div className="phone-head"><BrandMark className="phone-brand-mark" /><strong>VitalMCP</strong><small>Secure</small></div>
+            <div className="phone-sync"><span><Check size={28} /></span><h3>Sync complete</h3><p>Today&apos;s summary is stored in your local runtime and ready for your agent.</p></div>
+            <div className="phone-meta"><span><small>ROUTE</small><strong>Trusted LAN</strong></span><span><small>UPDATED</small><strong>Just now</strong></span></div>
           </div>
         </div>
       </div>
@@ -530,7 +528,7 @@ function BuildersPage({ onNavigate }: { onNavigate: (index: number) => void }) {
     <SnapPage id="builders" className="builders-page">
       <div className="page-width builders-page-inner">
         <div className="builders-copy">
-          <PageTitle kicker="Portable by design" title="Agent-neutral. MCP underneath." body="Hermes, OpenClaw, and other MCP clients use the same local runtime. HealthLink keeps crypto, storage, and health semantics outside any single Agent." />
+          <PageTitle kicker="Portable by design" title="Agent-neutral. MCP underneath." body="Hermes, OpenClaw, and other MCP clients use the same local runtime. VitalMCP keeps crypto, storage, and health semantics outside any single Agent." />
           <div className="builder-links"><a href={githubUrl} target="_blank" rel="noreferrer">Explore the repository <ExternalLink size={15} /></a><button type="button" onClick={() => onNavigate(4)}>Compare deployment modes <ArrowRight size={15} /></button></div>
           <div className="builder-facts"><span><ShieldCheck size={15} /> Scoped by default</span><span><Zap size={15} /> Freshness attached</span></div>
         </div>
@@ -550,12 +548,12 @@ function FinalPage({ copied, onCopy, onNavigate }: { copied: boolean; onCopy: ()
       <div className="final-code" aria-hidden="true">HL/08</div>
       <div className="page-width final-page-inner">
         <p className="page-kicker light"><span /> Give your agent better context</p>
-        <h2>Start with one command.</h2>
-        <p>HealthLink detects supported Agents or prints standard MCP config for the client you already use.</p>
+        <h2>Start locally with one command.</h2>
+        <p>LAN is the zero-account default. VitalMCP detects supported Agents or prints standard MCP config for any compatible client; add your own Tailscale network only when you need private remote access.</p>
         <CommandBar copied={copied} onCopy={onCopy} inverse />
         <button type="button" className="back-to-top" onClick={() => onNavigate(0)}>Back to overview <ArrowRight size={15} /></button>
       </div>
-      <footer className="page-width final-footer"><span><BrandMark className="footer-brand-mark" /> HealthLink</span><p>Private Apple Health context for MCP-compatible agents.</p><div><a href={githubUrl}>GitHub</a><button type="button" onClick={() => onNavigate(3)}>Privacy</button><button type="button" onClick={() => onNavigate(4)}>Self-host</button></div></footer>
+      <footer className="page-width final-footer"><span><BrandMark className="footer-brand-mark" /> VitalMCP</span><p>Private Apple Health context for MCP-compatible agents.</p><div><a href={githubUrl}>GitHub</a><button type="button" onClick={() => onNavigate(3)}>Privacy</button><button type="button" onClick={() => onNavigate(4)}>Self-host</button></div></footer>
     </SnapPage>
   );
 }
@@ -569,7 +567,7 @@ function PageTitle({ kicker, title, body, light = false }: { kicker: string; tit
 }
 
 function CommandBar({ copied, onCopy, inverse = false }: { copied: boolean; onCopy: () => void; inverse?: boolean }) {
-  return <div className={`command-bar ${inverse ? "inverse" : ""}`}><span>$</span><code>{installCommand}</code><button type="button" onClick={onCopy} aria-label="Copy HealthLink setup command">{copied ? <Check size={17} /> : <Copy size={17} />}<strong>{copied ? "Copied" : "Copy"}</strong></button></div>;
+  return <div className={`command-bar ${inverse ? "inverse" : ""}`}><span>$</span><code>{installCommand}</code><button type="button" onClick={onCopy} aria-label="Copy VitalMCP setup command">{copied ? <Check size={17} /> : <Copy size={17} />}<strong>{copied ? "Copied" : "Copy"}</strong></button></div>;
 }
 
 function BrandMark({ className, priority = false }: { className: string; priority?: boolean }) {

@@ -6,10 +6,10 @@ import { fileURLToPath } from "node:url";
 import { getDefaultDatabasePath } from "./database.js";
 import type { TransportProviderId } from "./transports.js";
 
-export const HEALTHLINK_LAUNCHD_LABEL = "com.healthlink.local";
-export const HEALTHLINK_SYSTEMD_UNIT = "healthlink-local.service";
-export const HEALTHLINK_RELAY_PULL_LAUNCHD_LABEL = "com.healthlink.local.relay-pull";
-export const HEALTHLINK_RELAY_PULL_SYSTEMD_UNIT = "healthlink-relay-pull.service";
+export const VITALMCP_LAUNCHD_LABEL = "com.vitalmcp.local";
+export const VITALMCP_SYSTEMD_UNIT = "vitalmcp.service";
+export const VITALMCP_RELAY_PULL_LAUNCHD_LABEL = "com.vitalmcp.local.relay-pull";
+export const VITALMCP_RELAY_PULL_SYSTEMD_UNIT = "vitalmcp-relay-pull.service";
 
 export type ServiceManagerId = "auto" | "launchd" | "systemd" | "manual";
 export type HealthLinkServiceMode = "receiver" | "relay_pull";
@@ -145,7 +145,7 @@ export function buildSystemdUnit(options: LaunchdServiceOptions): string {
   const command = buildServiceProgramArguments(options, paths.databasePath)
     .map(quoteSystemdArg)
     .join(" ");
-  const description = options.mode === "relay_pull" ? "HealthLink Relay Puller" : "HealthLink Local Receiver";
+  const description = options.mode === "relay_pull" ? "VitalMCP Relay Puller" : "VitalMCP Local Receiver";
 
   return `[Unit]
 Description=${description}
@@ -228,7 +228,7 @@ export function startLaunchdService(options: LaunchdServiceOptions): HealthLinkS
   const paths = getLaunchdServicePaths(options);
   const label = serviceLaunchdLabel(options.mode ?? "receiver");
   if (!existsSync(paths.plistPath)) {
-    throw new Error(`HealthLink launchd service is not installed: ${paths.plistPath}`);
+    throw new Error(`VitalMCP launchd service is not installed: ${paths.plistPath}`);
   }
   runLaunchctl(["bootstrap", launchdDomain(), paths.plistPath], { allowFailure: true });
   runLaunchctl(["kickstart", "-k", `${launchdDomain()}/${label}`], { allowFailure: true });
@@ -268,7 +268,7 @@ export function startSystemdService(options: LaunchdServiceOptions): HealthLinkS
   const paths = getSystemdServicePaths(options);
   const unit = serviceSystemdUnit(options.mode ?? "receiver");
   if (!existsSync(paths.configPath)) {
-    throw new Error(`HealthLink systemd service is not installed: ${paths.configPath}`);
+    throw new Error(`VitalMCP systemd service is not installed: ${paths.configPath}`);
   }
   runSystemctl(["--user", "daemon-reload"], { allowFailure: true });
   runSystemctl(["--user", "start", unit]);
@@ -471,13 +471,13 @@ function isSystemdServiceRunning(mode: HealthLinkServiceMode): boolean {
 
 function assertMacOSLaunchd(platform: NodeJS.Platform = process.platform): void {
   if (platform !== "darwin") {
-    throw new Error("HealthLink service install/start/stop/uninstall currently supports macOS launchd only. Use healthlink-local daemon with systemd, Docker, PM2, or another process manager on remote hosts.");
+    throw new Error("VitalMCP service install/start/stop/uninstall currently supports macOS launchd only. Use vitalmcp daemon with systemd, Docker, PM2, or another process manager on remote hosts.");
   }
 }
 
 function assertLinuxSystemd(): void {
   if (process.platform !== "linux") {
-    throw new Error("HealthLink systemd service management is only available on Linux. Use --manager launchd on macOS, or run healthlink-local daemon under your own process manager.");
+    throw new Error("VitalMCP systemd service management is only available on Linux. Use --manager launchd on macOS, or run vitalmcp daemon under your own process manager.");
   }
 }
 
@@ -528,11 +528,11 @@ function readSystemdServiceLog(options: { lines?: number; mode?: HealthLinkServi
 }
 
 function serviceLaunchdLabel(mode: HealthLinkServiceMode): string {
-  return mode === "relay_pull" ? HEALTHLINK_RELAY_PULL_LAUNCHD_LABEL : HEALTHLINK_LAUNCHD_LABEL;
+  return mode === "relay_pull" ? VITALMCP_RELAY_PULL_LAUNCHD_LABEL : VITALMCP_LAUNCHD_LABEL;
 }
 
 function serviceSystemdUnit(mode: HealthLinkServiceMode): string {
-  return mode === "relay_pull" ? HEALTHLINK_RELAY_PULL_SYSTEMD_UNIT : HEALTHLINK_SYSTEMD_UNIT;
+  return mode === "relay_pull" ? VITALMCP_RELAY_PULL_SYSTEMD_UNIT : VITALMCP_SYSTEMD_UNIT;
 }
 
 function launchdDomain(): string {
@@ -544,7 +544,7 @@ function getDaemonCommandPrefix(cliCommand?: string): string[] {
     return [cliCommand];
   }
   const cliPath = getCliCommandPath();
-  return cliPath === "healthlink-local" ? [cliPath] : [process.execPath, cliPath];
+  return cliPath === "vitalmcp" ? [cliPath] : [process.execPath, cliPath];
 }
 
 function getCliCommandPath(): string {
@@ -552,7 +552,7 @@ function getCliCommandPath(): string {
   if (currentFile.endsWith("/dist/service.js")) {
     return resolve(dirname(currentFile), "cli.js");
   }
-  return "healthlink-local";
+  return "vitalmcp";
 }
 
 function resolveHomePath(path: string, home: string): string {
@@ -567,9 +567,9 @@ function resolveHomePath(path: string, home: string): string {
 
 function manualServiceMessage(platform = process.platform): string {
   if (platform === "win32") {
-    return "Windows background service installation is not implemented yet. Run healthlink-local daemon manually, use Docker/PM2, or wait for Task Scheduler/Windows Service support.";
+    return "Windows background service installation is not implemented yet. Run vitalmcp daemon manually, use Docker/PM2, or wait for Task Scheduler/Windows Service support.";
   }
-  return "No native background service manager is available for this platform. Run healthlink-local daemon manually or use systemd, Docker, PM2, or another process manager.";
+  return "No native background service manager is available for this platform. Run vitalmcp daemon manually or use systemd, Docker, PM2, or another process manager.";
 }
 
 function quoteSystemdArg(value: string): string {

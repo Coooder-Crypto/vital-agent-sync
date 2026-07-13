@@ -30,7 +30,7 @@ async function main(): Promise<void> {
       stateDir,
       relayUrl,
       relayApiToken,
-      agentName: "HealthLink Fixture Flow",
+      agentName: "VitalMCP Fixture Flow",
       mode: "self_hosted_relay"
     });
     const envelope = buildRelayFixtureEnvelope({

@@ -8,12 +8,12 @@ RUN apt-get -o Acquire::Retries=3 update \
 
 COPY package*.json ./
 COPY packages/local/package*.json packages/local/
-RUN npm ci --workspace healthlink-local --include-workspace-root
+RUN npm ci --workspace vitalmcp --include-workspace-root
 
 COPY tsconfig.base.json ./
 COPY packages/local packages/local
-RUN npm run build --workspace healthlink-local \
-  && npm prune --omit=dev --workspace healthlink-local --include-workspace-root \
+RUN npm run build --workspace vitalmcp \
+  && npm prune --omit=dev --workspace vitalmcp --include-workspace-root \
   && npm cache clean --force
 
 FROM node:22-bookworm-slim

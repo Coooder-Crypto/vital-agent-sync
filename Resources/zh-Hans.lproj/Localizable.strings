@@ -2,7 +2,7 @@
 "Sources" = "数据源";
 "Connection" = "连接";
 "Settings" = "设置";
-"HealthLink" = "HealthLink";
+"VitalMCP" = "VitalMCP";
 
 "Data Sources" = "数据源";
 "Allow Health Access" = "允许健康访问";
@@ -38,12 +38,12 @@
 "Remove paired agent?" = "移除已配对 Agent？";
 "Remove Agent" = "移除 Agent";
 "Cancel" = "取消";
-"HealthLink will remove this pairing from the iPhone. If the receiver is reachable, it will also revoke the device token on the agent side." = "HealthLink 会从这台 iPhone 移除配对。如果接收端可访问，也会撤销 Agent 侧的设备令牌。";
+"VitalMCP will remove this pairing from the iPhone. If the receiver is reachable, it will also revoke the device token on the agent side." = "VitalMCP 会从这台 iPhone 移除配对。如果接收端可访问，也会撤销 Agent 侧的设备令牌。";
 
 "Connect your agent" = "连接你的 Agent";
 "Sync needs attention" = "同步需要处理";
 "Ready for %@" = "已准备好连接 %@";
-"Pair HealthLink with your local Agent receiver." = "将 HealthLink 与本地 Agent 接收器配对。";
+"Pair VitalMCP with your local Agent receiver." = "将 VitalMCP 与本地 Agent 接收器配对。";
 "Uploading your latest daily summaries." = "正在上传最新每日摘要。";
 "Last sync %@." = "上次同步 %@。";
 "Connected. Run the first sync when you are ready." = "已连接。准备好后可以进行首次同步。";
@@ -149,11 +149,11 @@
 
 "First Sync" = "首次同步";
 "Grant Health access" = "授权健康访问";
-"Approve the Health categories HealthLink can summarize." = "批准 HealthLink 可以汇总的健康数据类别。";
+"Approve the Health categories VitalMCP can summarize." = "批准 VitalMCP 可以汇总的健康数据类别。";
 "Sync today and yesterday" = "同步今天和昨天";
 "Send compact daily summaries to your paired Agent receiver." = "把紧凑的每日摘要发送给已配对的 Agent 接收器。";
 "Ask your Agent" = "询问你的 Agent";
-"The Agent reads from its local HealthLink store after sync completes." = "同步完成后，Agent 会从本地 HealthLink 存储读取数据。";
+"The Agent reads from its local VitalMCP context after sync completes." = "同步完成后，Agent 会读取本地 VitalMCP 上下文。";
 "Allow Health" = "授权健康";
 "Sync Now" = "立即同步";
 "Syncing" = "同步中";
@@ -161,7 +161,7 @@
 "Encrypted sync queued" = "加密同步已排队";
 "Sync accepted" = "同步已接收";
 "The paired receiver stored this sync for Agent tools." = "已配对的接收器已保存这次同步，Agent 工具可以读取。";
-"The relay accepted the encrypted envelope. Your Agent can read it after HealthLink Local pulls it." = "Relay 已接收加密信封。HealthLink Local 拉取后，你的 Agent 才能读取。";
+"The relay accepted the encrypted envelope. Your Agent can read it after the local runtime pulls it." = "Relay 已接收加密信封。本地运行时拉取后，你的 Agent 才能读取。";
 "Sync failed" = "同步失败";
 "Latest sync completed." = "最近一次同步已完成。";
 "Trigger" = "触发方式";
@@ -190,7 +190,9 @@
 "Setup incomplete" = "设置未完成";
 "Make sure the Agent receiver is running and this iPhone can reach the saved server URL." = "确认 Agent 接收器正在运行，并且这台 iPhone 可以访问已保存的服务器地址。";
 "Pair this iPhone with the Agent again to receive a fresh device token." = "重新把这台 iPhone 与 Agent 配对，以获取新的设备令牌。";
-"Open iOS Settings and allow HealthLink to read the selected Health data." = "打开 iOS 设置，允许 HealthLink 读取所选健康数据。";
+"Open iOS Settings and allow VitalMCP to read the selected Health data." = "打开 iOS 设置，允许 VitalMCP 读取所选健康数据。";
+"Scan a VitalMCP pairing or relay onboarding QR to connect this iPhone." = "扫描 VitalMCP 配对或 Relay 引导二维码以连接这台 iPhone。";
+"This onboarding code contains access credentials. VitalMCP stores them in Keychain." = "此引导代码包含访问凭证，VitalMCP 会将其存储在钥匙串中。";
 "Check Wi-Fi or cellular connectivity, then retry sync." = "检查 Wi-Fi 或蜂窝网络连接，然后重试同步。";
 "Keep the Agent receiver online and retry when the network is stable." = "保持 Agent 接收器在线，并在网络稳定后重试。";
 "Check the Agent receiver logs, then retry sync." = "检查 Agent 接收器日志，然后重试同步。";
