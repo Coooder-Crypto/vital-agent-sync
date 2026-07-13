@@ -171,6 +171,7 @@ enum AppDeepLinkScheme {
 struct PairingLink {
     let serverURL: URL
     let pairingCode: String
+    let directTransportPublicKey: String
 
     init(rawValue: String) throws {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -183,6 +184,7 @@ struct PairingLink {
         let queryItems = components.queryItems ?? []
         let serverValue = queryItems.first { $0.name == "server" }?.value
         let codeValue = queryItems.first { $0.name == "code" }?.value
+        let keyValue = queryItems.first { $0.name == "key" }?.value
 
         guard let serverValue,
               let serverURL = URL(string: serverValue),
@@ -196,8 +198,15 @@ struct PairingLink {
             throw GatewayError.invalidPairingURL
         }
 
+        guard let keyValue,
+              let publicKey = try? Data(base64URLEncoded: keyValue),
+              publicKey.count == 32 else {
+            throw GatewayError.invalidPairingURL
+        }
+
         self.serverURL = serverURL
         self.pairingCode = codeValue.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        self.directTransportPublicKey = publicKey.base64URLEncodedString()
     }
 }
 
@@ -230,6 +239,174 @@ struct PairingPreview: Identifiable {
 
     let link: PairingLink
     let status: PairingStatusResponse
+}
+
+enum DirectTransportPurpose: String, Codable {
+    case pairingStatus = "pair.status"
+    case pairingConfirm = "pair.confirm"
+    case healthSync = "health.sync"
+    case deviceRevoke = "device.revoke"
+}
+
+struct DirectEncryptedEnvelope: Codable {
+    let protocolVersion: String
+    let request_id: String
+    let created_at: String
+    let purpose: DirectTransportPurpose
+    let crypto: DirectEnvelopeCrypto
+
+    enum CodingKeys: String, CodingKey {
+        case protocolVersion = "protocol"
+        case request_id
+        case created_at
+        case purpose
+        case crypto
+    }
+}
+
+struct DirectEnvelopeCrypto: Codable {
+    let alg: String
+    let sender_public_key_x25519: String
+    let nonce: String
+    let tag: String
+    let ciphertext: String
+}
+
+struct DirectTransportExchange {
+    let envelope: DirectEncryptedEnvelope
+    fileprivate let ephemeralPrivateKey: Curve25519.KeyAgreement.PrivateKey
+    fileprivate let receiverPublicKey: Data
+}
+
+enum DirectTransportCrypto {
+    static let protocolVersion = "vitalmcp-direct-v1"
+    static let algorithm = "x25519-hkdf-sha256-chacha20poly1305"
+
+    static func makeRequest<T: Encodable>(
+        purpose: DirectTransportPurpose,
+        payload: T,
+        receiverPublicKey: String,
+        requestID: String = "req_\(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased())",
+        createdAt: Date = Date(),
+        ephemeralPrivateKey: Curve25519.KeyAgreement.PrivateKey = .init(),
+        nonceData: Data? = nil
+    ) throws -> DirectTransportExchange {
+        let receiverKeyData = try Data(base64URLEncoded: receiverPublicKey)
+        guard receiverKeyData.count == 32 else {
+            throw GatewayError.invalidPairingURL
+        }
+        let receiverKey = try Curve25519.KeyAgreement.PublicKey(rawRepresentation: receiverKeyData)
+        let sharedSecret = try ephemeralPrivateKey.sharedSecretFromKeyAgreement(with: receiverKey)
+        let requestKey = deriveKey(sharedSecret, direction: "request")
+        let nonceData = nonceData ?? Data((0..<12).map { _ in UInt8.random(in: 0...255) })
+        let nonce = try ChaChaPoly.Nonce(data: nonceData)
+        let senderPublicKey = ephemeralPrivateKey.publicKey.rawRepresentation.base64URLEncodedString()
+        let createdAtValue = ISO8601DateFormatter.gatewayDateTimeWithFractionalSeconds.string(from: createdAt)
+        let aad = try authenticatedData(
+            requestID: requestID,
+            createdAt: createdAtValue,
+            purpose: purpose,
+            senderPublicKey: senderPublicKey
+        )
+        let sealed = try ChaChaPoly.seal(
+            canonicalJSONData(payload),
+            using: requestKey,
+            nonce: nonce,
+            authenticating: aad
+        )
+        return DirectTransportExchange(
+            envelope: DirectEncryptedEnvelope(
+                protocolVersion: protocolVersion,
+                request_id: requestID,
+                created_at: createdAtValue,
+                purpose: purpose,
+                crypto: DirectEnvelopeCrypto(
+                    alg: algorithm,
+                    sender_public_key_x25519: senderPublicKey,
+                    nonce: nonceData.base64URLEncodedString(),
+                    tag: sealed.tag.base64URLEncodedString(),
+                    ciphertext: sealed.ciphertext.base64URLEncodedString()
+                )
+            ),
+            ephemeralPrivateKey: ephemeralPrivateKey,
+            receiverPublicKey: receiverKeyData
+        )
+    }
+
+    static func decryptResponse<T: Decodable>(
+        _ envelope: DirectEncryptedEnvelope,
+        exchange: DirectTransportExchange,
+        as type: T.Type
+    ) throws -> T {
+        guard envelope.protocolVersion == protocolVersion,
+              envelope.crypto.alg == algorithm,
+              envelope.request_id == exchange.envelope.request_id,
+              envelope.purpose == exchange.envelope.purpose,
+              let senderKey = try? Data(base64URLEncoded: envelope.crypto.sender_public_key_x25519),
+              senderKey == exchange.receiverPublicKey else {
+            throw GatewayError.invalidServerResponse(-1)
+        }
+        let receiverKey = try Curve25519.KeyAgreement.PublicKey(rawRepresentation: senderKey)
+        let sharedSecret = try exchange.ephemeralPrivateKey.sharedSecretFromKeyAgreement(with: receiverKey)
+        let responseKey = deriveKey(sharedSecret, direction: "response")
+        let nonceData = try Data(base64URLEncoded: envelope.crypto.nonce)
+        let nonce = try ChaChaPoly.Nonce(data: nonceData)
+        let sealed = try ChaChaPoly.SealedBox(
+            nonce: nonce,
+            ciphertext: Data(base64URLEncoded: envelope.crypto.ciphertext),
+            tag: Data(base64URLEncoded: envelope.crypto.tag)
+        )
+        let aad = try authenticatedData(
+            requestID: envelope.request_id,
+            createdAt: envelope.created_at,
+            purpose: envelope.purpose,
+            senderPublicKey: envelope.crypto.sender_public_key_x25519
+        )
+        let plaintext = try ChaChaPoly.open(sealed, using: responseKey, authenticating: aad)
+        return try JSONDecoder().decode(type, from: plaintext)
+    }
+
+    private static func deriveKey(_ sharedSecret: SharedSecret, direction: String) -> SymmetricKey {
+        sharedSecret.hkdfDerivedSymmetricKey(
+            using: SHA256.self,
+            salt: Data(),
+            sharedInfo: Data("\(protocolVersion) \(direction)".utf8),
+            outputByteCount: 32
+        )
+    }
+
+    private static func authenticatedData(
+        requestID: String,
+        createdAt: String,
+        purpose: DirectTransportPurpose,
+        senderPublicKey: String
+    ) throws -> Data {
+        struct AAD: Encodable {
+            let protocolVersion: String
+            let request_id: String
+            let created_at: String
+            let purpose: DirectTransportPurpose
+            let alg: String
+            let sender_public_key_x25519: String
+
+            enum CodingKeys: String, CodingKey {
+                case protocolVersion = "protocol"
+                case request_id
+                case created_at
+                case purpose
+                case alg
+                case sender_public_key_x25519
+            }
+        }
+        return try canonicalJSONData(AAD(
+            protocolVersion: protocolVersion,
+            request_id: requestID,
+            created_at: createdAt,
+            purpose: purpose,
+            alg: algorithm,
+            sender_public_key_x25519: senderPublicKey
+        ))
+    }
 }
 
 struct RelayOnboardingPayload: Codable, Identifiable {

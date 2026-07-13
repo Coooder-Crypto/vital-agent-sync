@@ -127,8 +127,10 @@ VitalMCP exposes one product flow with LAN first, Tailscale as the optional priv
 This is the Local Preview default for new users.
 
 ```text
-iPhone -> http://192.168.x.x:8787 -> vitalmcp -> SQLite -> MCP -> Agent
+iPhone -> encrypted direct envelope over LAN -> vitalmcp decrypts -> SQLite -> MCP -> Agent
 ```
+
+LAN uses receiver-pinned application-layer encryption for pairing credentials, device tokens, and Health summaries. It is not network-layer E2EE: the user-owned local VitalMCP receiver is the trusted decrypting endpoint. See [direct-lan-security.md](direct-lan-security.md).
 
 Pros:
 
@@ -196,6 +198,8 @@ The relay is a transport layer, not a data platform. It stores opaque, bounded, 
 - To revoke/reset a source connection, call MCP `revoke_source_device`, remove the saved connection in the iOS app, and pair again. This preserves local SQLite history.
 
 Generic MCP clients remain supported through the printed MCP configuration; no OpenClaw or other marketplace listing is required.
+
+The direct protocol is unchanged inside Tailscale: the WireGuard tunnel adds network protection, while the same receiver-pinned application envelope prevents direct credentials and Health summaries from appearing as HTTP plaintext.
 
 ## CLI Shape
 

@@ -163,8 +163,8 @@ const bootstrapStateSchema = z.object({
   last_error_message: z.string().min(1).optional()
 });
 
-const sensitiveKeyPattern = /(?:private|secret|token|credential|authorization|ciphertext|envelope|payload|raw|sqlite_rows?)/i;
-const sensitiveValuePattern = /-----BEGIN [^-]*PRIVATE KEY-----|healthlink-e2ee-v1:|healthlink:\/\/onboard\?payload=|\b[A-Za-z0-9_-]{43}\b/i;
+const sensitiveKeyPattern = /(?:private|secret|token|credential|authorization|ciphertext|envelope|payload|pairing_(?:code|url)|raw|sqlite_rows?)/i;
+const sensitiveValuePattern = /-----BEGIN [^-]*PRIVATE KEY-----|healthlink-e2ee-v1:|healthlink:\/\/onboard\?payload=|(?:vitalmcp|healthlink):\/\/pair\?|\b[A-Za-z0-9_-]{43}\b/i;
 
 export function buildBootstrapPlan(config: BootstrapConfig): BootstrapPlanItem[] {
   const agentLabel = config.agent_id === "generic" ? "print generic MCP configuration" : `configure ${config.agent_id} MCP`;

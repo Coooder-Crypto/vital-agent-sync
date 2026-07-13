@@ -1193,8 +1193,6 @@ async function printPairingSession(options: CliOptions): Promise<void> {
   const loopback = `http://127.0.0.1:${options.port}`;
   console.log("");
   console.log("Pair with iPhone:");
-  console.log(`Pairing code: ${response.pairing_code}`);
-  console.log(`Pairing URL:  ${response.pairing_url}`);
   console.log(`Expires:      ${Math.round(response.expires_in_seconds / 60)} minutes`);
   console.log("");
   if (qr.rendered) {
@@ -1202,7 +1200,7 @@ async function printPairingSession(options: CliOptions): Promise<void> {
     console.log(qr.text);
   } else {
     console.log(`Scan QR: terminal is too narrow (${qr.requiredColumns} columns needed).`);
-    console.log(`Open ${loopback}/pair to scan the browser QR, or paste the Pairing URL in the app.`);
+    console.log(`Open ${loopback}/pair on the receiver host to scan the browser QR.`);
   }
   console.log("");
   console.log("Next:");

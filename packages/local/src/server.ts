@@ -4,13 +4,20 @@ import { z } from "zod";
 import { openHealthLinkDatabase } from "./database.js";
 import { listDevices, revokeDevice } from "./devices.js";
 import {
+  DirectTransportError,
+  claimDirectRequest,
+  decryptDirectRequest,
+  encryptDirectResponse,
+  loadOrCreateDirectTransportKey
+} from "./direct-transport.js";
+import {
   HealthIngestError,
   authenticateDevice,
   getHealthStatus,
   ingestValidatedHealthSync
 } from "./health-ingest.js";
 import { PairingError, PairingStore } from "./pairing.js";
-import { SOURCE_PLATFORMS, listSourceDevices, revokeSourceDevice } from "./source-devices.js";
+import { SOURCE_PLATFORMS, listSourceDevices } from "./source-devices.js";
 import { type TerminalQrRenderResult, renderTerminalQr } from "./terminal-qr.js";
 import { createTransportProvider, TRANSPORT_PROVIDER_IDS, type TransportProviderId } from "./transports.js";
 
@@ -42,7 +49,8 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
   const database = openHealthLinkDatabase({
     path: options.databasePath
   });
-  const pairings = new PairingStore(database);
+  const directTransportKey = loadOrCreateDirectTransportKey(database.path);
+  const pairings = new PairingStore(database, directTransportKey.publicKeyRaw);
 
   app.addHook("onClose", async () => {
     await transport.stop?.();
@@ -61,68 +69,14 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
     source_devices: listSourceDevices(database)
   }));
 
-  app.post("/devices/:device_id/revoke", async (request, reply) => {
-    const params = deviceParamsSchema.safeParse(request.params);
-    if (!params.success) {
-      return reply.code(400).send(errorResponse("invalid_params", "device_id is required."));
+  app.post("/devices/:device_id/revoke", plaintextDirectTransportDisabled);
+  app.post("/source-devices/:source_device_id/revoke", plaintextDirectTransportDisabled);
+  app.post("/health/sync", plaintextDirectTransportDisabled);
+
+  app.get("/pair", async (request, reply) => {
+    if (!isLoopbackAddress(request.ip)) {
+      return reply.code(403).send(errorResponse("local_pairing_only", "Pairing sessions can only be created from the receiver host."));
     }
-
-    try {
-      const device = authenticateDevice(database, request.headers.authorization);
-      if (device.device_id !== params.data.device_id) {
-        return reply.code(403).send(errorResponse("device_mismatch", "Device token cannot revoke another device."));
-      }
-
-      const revoked = revokeDevice(database, params.data.device_id);
-      if (!revoked) {
-        return reply.code(404).send(errorResponse("device_not_found", "Device was not found."));
-      }
-
-      return {
-        ok: true,
-        device: revoked
-      };
-    } catch (error) {
-      return sendHealthIngestError(reply, error);
-    }
-  });
-
-  app.post("/source-devices/:source_device_id/revoke", async (request, reply) => {
-    const params = sourceDeviceParamsSchema.safeParse(request.params);
-    if (!params.success) {
-      return reply.code(400).send(errorResponse("invalid_params", "source_device_id is required."));
-    }
-
-    try {
-      const device = authenticateDevice(database, request.headers.authorization);
-      if (device.device_id !== params.data.source_device_id) {
-        return reply.code(403).send(errorResponse("source_device_mismatch", "Source device token cannot revoke another source device."));
-      }
-
-      const revoked = revokeSourceDevice(database, params.data.source_device_id);
-      if (!revoked) {
-        return reply.code(404).send(errorResponse("source_device_not_found", "Source device was not found."));
-      }
-
-      return {
-        ok: true,
-        source_device: revoked
-      };
-    } catch (error) {
-      return sendHealthIngestError(reply, error);
-    }
-  });
-
-  app.post("/health/sync", async (request, reply) => {
-    try {
-      const device = authenticateDevice(database, request.headers.authorization);
-      return ingestValidatedHealthSync(database, device, request.body);
-    } catch (error) {
-      return sendHealthIngestError(reply, error);
-    }
-  });
-
-  app.get("/pair", async (_request, reply) => {
     const session = pairings.createSession({
       serverUrl: advertisedUrl,
       agentName,
@@ -146,6 +100,9 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
   });
 
   app.post("/pair/start", async (request, reply) => {
+    if (!isLoopbackAddress(request.ip)) {
+      return reply.code(403).send(errorResponse("local_pairing_only", "Pairing sessions can only be created from the receiver host."));
+    }
     const body = startPairingSchema.safeParse(request.body ?? {});
     if (!body.success) {
       return reply.code(400).send(errorResponse("invalid_payload", body.error.issues[0]?.message ?? "Invalid payload."));
@@ -158,29 +115,36 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
     });
   });
 
-  app.get("/pair/status/:pairing_code", async (request, reply) => {
-    const params = pairingStatusParamsSchema.safeParse(request.params);
-    if (!params.success) {
-      return reply.code(400).send(errorResponse("invalid_params", "pairing_code is required."));
+  app.get("/pair/status/:pairing_code", plaintextDirectTransportDisabled);
+  app.post("/pair/confirm", plaintextDirectTransportDisabled);
+
+  app.post("/v1/direct", async (request, reply) => {
+    let decrypted: ReturnType<typeof decryptDirectRequest>;
+    try {
+      decrypted = decryptDirectRequest({ key: directTransportKey, envelope: request.body });
+      claimDirectRequest(database, decrypted.envelope.request_id, decrypted.envelope.created_at);
+    } catch (error) {
+      if (error instanceof DirectTransportError) {
+        return reply
+          .code(error.code === "replayed_envelope" ? 409 : 400)
+          .send(errorResponse(error.code, error.message));
+      }
+      throw error;
     }
 
     try {
-      return pairings.getStatus(params.data.pairing_code);
+      const result = handleDirectRequest(database, pairings, decrypted.envelope.purpose, decrypted.plaintext);
+      return encryptDirectResponse(decrypted.response, result);
     } catch (error) {
-      return sendPairingError(reply, error);
-    }
-  });
-
-  app.post("/pair/confirm", async (request, reply) => {
-    const body = confirmPairingSchema.safeParse(request.body);
-    if (!body.success) {
-      return reply.code(400).send(errorResponse("invalid_payload", body.error.issues[0]?.message ?? "Invalid payload."));
-    }
-
-    try {
-      return pairings.confirm(body.data);
-    } catch (error) {
-      return sendPairingError(reply, error);
+      if (error instanceof PairingError) {
+        return reply
+          .code(error.code === "pairing_not_found" ? 404 : 409)
+          .send(errorResponse(error.code, error.message));
+      }
+      if (error instanceof z.ZodError) {
+        return reply.code(400).send(errorResponse("invalid_payload", "Encrypted direct request payload is invalid."));
+      }
+      return sendHealthIngestError(reply, error);
     }
   });
 
@@ -210,24 +174,71 @@ const startPairingSchema = z.object({
   server_url: z.string().url().optional()
 });
 
-const pairingStatusParamsSchema = z.object({
-  pairing_code: z.string().min(1)
-});
-
-const deviceParamsSchema = z.object({
-  device_id: z.string().min(1)
-});
-
-const sourceDeviceParamsSchema = z.object({
-  source_device_id: z.string().min(1)
-});
-
 const confirmPairingSchema = z.object({
   pairing_code: z.string().min(1),
   device_name: z.string().trim().min(1).max(120),
   device_platform: z.enum(SOURCE_PLATFORMS),
   accepted_scopes: z.array(z.string().min(1)).min(1)
 });
+
+const directPairingStatusSchema = z.object({
+  pairing_code: z.string().min(1)
+});
+
+const directHealthSyncSchema = z.object({
+  device_token: z.string().min(1),
+  payload: z.unknown()
+});
+
+const directDeviceRevokeSchema = z.object({
+  device_token: z.string().min(1),
+  device_id: z.string().min(1)
+});
+
+export function handleDirectRequest(
+  database: ReturnType<typeof openHealthLinkDatabase>,
+  pairings: PairingStore,
+  purpose: ReturnType<typeof decryptDirectRequest>["envelope"]["purpose"],
+  plaintext: unknown
+): unknown {
+  switch (purpose) {
+  case "pair.status":
+    return pairings.getStatus(directPairingStatusSchema.parse(plaintext).pairing_code);
+  case "pair.confirm":
+    return pairings.confirm(confirmPairingSchema.parse(plaintext));
+  case "health.sync": {
+    const body = directHealthSyncSchema.parse(plaintext);
+    const device = authenticateDevice(database, `Bearer ${body.device_token}`);
+    return ingestValidatedHealthSync(database, device, body.payload);
+  }
+  case "device.revoke": {
+    const body = directDeviceRevokeSchema.parse(plaintext);
+    const device = authenticateDevice(database, `Bearer ${body.device_token}`);
+    if (device.device_id !== body.device_id) {
+      throw new HealthIngestError("device_mismatch", "Device token cannot revoke another device.");
+    }
+    const revoked = revokeDevice(database, body.device_id);
+    if (!revoked) {
+      throw new HealthIngestError("invalid_token", "Device was not found.");
+    }
+    return { ok: true, device: revoked };
+  }
+  }
+}
+
+function plaintextDirectTransportDisabled(_request: unknown, reply: {
+  code: (statusCode: number) => { send: (payload: unknown) => unknown };
+}): unknown {
+  return reply.code(426).send(errorResponse(
+    "encrypted_direct_transport_required",
+    "Direct pairing and health sync require the encrypted vitalmcp-direct-v1 transport."
+  ));
+}
+
+export function isLoopbackAddress(address: string): boolean {
+  const normalized = address.toLowerCase();
+  return normalized === "127.0.0.1" || normalized === "::1" || normalized === "::ffff:127.0.0.1";
+}
 
 function sendPairingError(reply: {
   code: (statusCode: number) => { send: (payload: unknown) => unknown };
@@ -305,8 +316,6 @@ function printStartupInfo(
   if (initialSession) {
     console.log("");
     console.log("Pair with iPhone:");
-    console.log(`Pairing code: ${initialSession.pairing_code}`);
-    console.log(`Pairing URL:  ${initialSession.pairing_url}`);
     console.log(`Expires:      ${Math.round(initialSession.expires_in_seconds / 60)} minutes`);
     if (initialQr) {
       console.log("");
@@ -315,7 +324,7 @@ function printStartupInfo(
         console.log(initialQr.text);
       } else {
         console.log(`Scan QR: terminal is too narrow (${initialQr.requiredColumns} columns needed).`);
-        console.log(`Open ${loopback}/pair to scan the browser QR, or paste the Pairing URL in the app.`);
+        console.log(`Open ${loopback}/pair on the receiver host to scan the browser QR.`);
       }
     }
   }

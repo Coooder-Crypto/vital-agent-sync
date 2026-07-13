@@ -79,6 +79,15 @@ function migrate(sqlite: BetterSqliteDatabase): void {
     create index if not exists idx_pairing_sessions_expires_at
       on pairing_sessions(expires_at);
 
+    create table if not exists direct_transport_requests (
+      request_id text primary key,
+      created_at text not null,
+      received_at text not null
+    );
+
+    create index if not exists idx_direct_transport_requests_received_at
+      on direct_transport_requests(received_at);
+
     create table if not exists devices (
       id text primary key,
       name text not null,

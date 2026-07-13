@@ -49,7 +49,10 @@ export type ConfirmPairingResult = {
 };
 
 export class PairingStore {
-  constructor(private readonly database: HealthLinkDatabase) {}
+  constructor(
+    private readonly database: HealthLinkDatabase,
+    private readonly directPublicKey?: string
+  ) {}
 
   createSession(input: {
     serverUrl: string;
@@ -65,6 +68,9 @@ export class PairingStore {
     pairingUrl.searchParams.set("server", input.serverUrl);
     pairingUrl.searchParams.set("code", code);
     pairingUrl.searchParams.set("transport", input.transport ?? "lan");
+    if (this.directPublicKey) {
+      pairingUrl.searchParams.set("key", this.directPublicKey);
+    }
 
     const now = new Date();
     const session: PairingRecord = {
