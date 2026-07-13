@@ -100,6 +100,7 @@ import { renderTerminalQr } from "../src/terminal-qr.js";
 import {
   createTransportProvider,
   getServerUrlDiagnostics,
+  inspectTailscaleServeConfig,
   parseLinuxRouteSource,
   parseSshConnectionLocalAddress,
   selectLanAdvertisedHost
@@ -2190,7 +2191,7 @@ test("removing or upgrading a Skill preserves runtime identity, history, and gen
   }
 });
 
-test("Transport providers keep LAN default and allow explicit future URLs", async () => {
+test("Transport providers keep LAN default and require secure iOS-compatible Tailscale URLs", async () => {
   const lan = createTransportProvider({
     id: "lan",
     bindHost: "127.0.0.1",
@@ -2207,7 +2208,7 @@ test("Transport providers keep LAN default and allow explicit future URLs", asyn
     serverUrl: "https://healthlink.example.ts.net/"
   });
   assert.equal(await tailscale.getAdvertisedUrl(), "https://healthlink.example.ts.net");
-  assert.equal((await tailscale.healthCheck?.())?.status, "warn");
+  assert.equal((await tailscale.healthCheck?.())?.status, "ok");
 
   const tailscaleMagicDns = createTransportProvider({
     id: "tailscale",
@@ -2215,8 +2216,16 @@ test("Transport providers keep LAN default and allow explicit future URLs", asyn
     port: 8787,
     tailscaleName: "healthlink.tailnet.ts.net."
   });
-  assert.equal(await tailscaleMagicDns.getAdvertisedUrl(), "http://healthlink.tailnet.ts.net:8787");
-  assert.match((await tailscaleMagicDns.healthCheck?.())?.detail ?? "", /MagicDNS/);
+  assert.equal(await tailscaleMagicDns.getAdvertisedUrl(), "https://healthlink.tailnet.ts.net");
+
+  const insecureTailscale = createTransportProvider({
+    id: "tailscale",
+    bindHost: "0.0.0.0",
+    port: 8787,
+    serverUrl: "http://100.86.131.13:8787"
+  });
+  await assert.rejects(() => insecureTailscale.getAdvertisedUrl(), /requires an HTTPS --server-url/);
+  assert.equal((await insecureTailscale.healthCheck?.())?.status, "fail");
 
   const cloudflare = createTransportProvider({
     id: "cloudflare",
@@ -2224,6 +2233,85 @@ test("Transport providers keep LAN default and allow explicit future URLs", asyn
     port: 8787
   });
   await assert.rejects(() => cloudflare.getAdvertisedUrl(), /not implemented/);
+});
+
+test("Tailscale transport configures and verifies a private Serve HTTPS route", async () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-tailscale-serve-test-"));
+  try {
+    const command = join(tempDir, "tailscale");
+    const marker = join(tempDir, "configured");
+    const log = join(tempDir, "calls.log");
+    writeFileSync(command, `#!/bin/sh
+printf '%s\\n' "$*" >> '${log}'
+if [ "$1" = "status" ]; then
+  printf '%s\\n' '{"BackendState":"Running","Self":{"DNSName":"healthlink.tailnet.ts.net."}}'
+  exit 0
+fi
+if [ "$1" = "serve" ] && [ "$2" = "status" ]; then
+  if [ -f '${marker}' ]; then
+    printf '%s\\n' '{"TCP":{"443":{"HTTPS":true}},"Web":{"healthlink.tailnet.ts.net:443":{"Handlers":{"/":{"Proxy":"http://127.0.0.1:8787"}}}}}'
+  else
+    printf '%s\\n' '{}'
+  fi
+  exit 0
+fi
+touch '${marker}'
+`, "utf8");
+    chmodSync(command, 0o755);
+
+    const mismatched = createTransportProvider({
+      id: "tailscale",
+      bindHost: "0.0.0.0",
+      port: 8787,
+      tailscaleName: "another.tailnet.ts.net",
+      tailscaleCommand: command
+    });
+    await assert.rejects(() => mismatched.start?.(), /does not match this node's MagicDNS name/);
+    assert.equal(existsSync(marker), false);
+
+    const tailscale = createTransportProvider({
+      id: "tailscale",
+      bindHost: "0.0.0.0",
+      port: 8787,
+      tailscaleCommand: command
+    });
+    assert.equal((await tailscale.healthCheck?.())?.status, "fail");
+    await tailscale.start?.();
+    assert.equal(await tailscale.getAdvertisedUrl(), "https://healthlink.tailnet.ts.net");
+    const health = await tailscale.healthCheck?.();
+    assert.equal(health?.status, "ok");
+    assert.match(health?.detail ?? "", /private Tailscale Serve HTTPS/);
+    assert.match(readFileSync(log, "utf8"), /serve --bg --yes --https=443 http:\/\/127\.0\.0\.1:8787/);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("Tailscale Serve inspection refuses conflicting or public routes", () => {
+  const conflict = inspectTailscaleServeConfig(JSON.stringify({
+    TCP: { "443": { HTTPS: true } },
+    Web: { "healthlink.tailnet.ts.net:443": { Handlers: { "/": { Proxy: "http://127.0.0.1:9999" } } } }
+  }), "healthlink.tailnet.ts.net", "http://127.0.0.1:8787");
+  assert.equal(conflict.status, "conflict");
+  assert.match(conflict.detail, /will not overwrite/);
+
+  const funnel = inspectTailscaleServeConfig(JSON.stringify({
+    TCP: { "443": { HTTPS: true } },
+    Web: { "healthlink.tailnet.ts.net:443": { Handlers: { "/": { Proxy: "http://127.0.0.1:8787" } } } },
+    AllowFunnel: { "healthlink.tailnet.ts.net:443": true }
+  }), "healthlink.tailnet.ts.net", "http://127.0.0.1:8787");
+  assert.equal(funnel.status, "public");
+  assert.match(funnel.detail, /will not overwrite or advertise a public route/);
+});
+
+test("iOS ATS remains narrow while Tailscale onboarding uses trusted HTTPS", () => {
+  const infoPlist = readFileSync(resolve(packageRoot, "..", "..", "App", "Info.plist"), "utf8");
+  const projectYaml = readFileSync(resolve(packageRoot, "..", "..", "project.yml"), "utf8");
+  for (const source of [infoPlist, projectYaml]) {
+    assert.match(source, /NSAllowsLocalNetworking/);
+    assert.doesNotMatch(source, /NSAllowsArbitraryLoads/);
+    assert.doesNotMatch(source, /NSExceptionDomains/);
+  }
 });
 
 test("LAN advertised host prefers SSH server address and default-route source before interface scan", () => {
@@ -3102,6 +3190,51 @@ test("portable installer selects macOS, Linux, and WSL shell profiles without a 
     }
   } finally {
     rmSync(rootTemp, { recursive: true, force: true });
+  }
+});
+
+test("CLI doctor reports the verified iOS-compatible Tailscale HTTPS endpoint", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-cli-tailscale-doctor-"));
+  try {
+    const fakeBin = join(tempDir, "bin");
+    mkdirSync(fakeBin, { recursive: true });
+    const tailscale = join(fakeBin, "tailscale");
+    writeFileSync(tailscale, `#!/bin/sh
+if [ "$1" = "status" ]; then
+  printf '%s\\n' '{"BackendState":"Running","Self":{"DNSName":"healthlink.tailnet.ts.net."}}'
+  exit 0
+fi
+if [ "$1" = "serve" ] && [ "$2" = "status" ]; then
+  printf '%s\\n' '{"TCP":{"443":{"HTTPS":true}},"Web":{"healthlink.tailnet.ts.net:443":{"Handlers":{"/":{"Proxy":"http://127.0.0.1:8787"}}}}}'
+  exit 0
+fi
+exit 1
+`, "utf8");
+    chmodSync(tailscale, 0o755);
+    const cliPath = join(packageRoot, "src", "cli.ts");
+    const result = spawnSync(process.execPath, [
+      "--import", "tsx", cliPath,
+      "doctor",
+      "--transport", "tailscale",
+      "--tailscale-name", "healthlink.tailnet.ts.net",
+      "--manager", "manual",
+      "--db", join(tempDir, "healthlink.sqlite"),
+      "--output", "json"
+    ], {
+      env: { ...process.env, HOME: tempDir, PATH: `${fakeBin}:${process.env.PATH ?? ""}` },
+      encoding: "utf8"
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const output = JSON.parse(result.stdout) as {
+      status: string;
+      details: { checks: Array<{ status: string; label: string; detail: string }> };
+    };
+    const transport = output.details.checks.find((check) => check.label === "Tailscale transport");
+    assert.equal(output.status, "complete");
+    assert.equal(transport?.status, "OK");
+    assert.match(transport?.detail ?? "", /https:\/\/healthlink\.tailnet\.ts\.net/);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
   }
 });
 

@@ -11,7 +11,7 @@ Implemented in the local MVP branch:
 - Generic MCP config output.
 - Hermes MCP config install and optional HealthLink skill install.
 - Agent adapter and transport provider interfaces.
-- LAN default transport and Tailscale IPv4 detection.
+- LAN default transport and private Tailscale Serve HTTPS advertisement.
 - E2EE Hosted/Self-hosted Relay runtime, onboarding, pull, and lifecycle controls.
 - OpenClaw package export and Agent adapter compatibility audits.
 - Foreground auto-sync and best-effort BGAppRefresh scheduling in the iOS app.
@@ -305,16 +305,19 @@ They must not change:
 - MCP tool behavior
 - agent adapter behavior
 
-### Tailscale MagicDNS
+### Tailscale Serve HTTPS
 
-Current support detects local Tailscale IPv4 addresses and supports MagicDNS through `--tailscale-name`, `HEALTHLINK_TAILSCALE_NAME`, or best-effort `tailscale status --json` detection. MagicDNS support includes:
+Current support requires a MagicDNS certificate name through `--tailscale-name`, `HEALTHLINK_TAILSCALE_NAME`, or best-effort `tailscale status --json` detection. The provider:
 
-- optional hostname discovery through Tailscale status output or a user-provided hostname
-- URL shape such as `http://machine.tailnet.ts.net:8787`
-- `doctor --transport tailscale` checks for local address and hostname consistency
-- a fallback to explicit `--server-url` when hostname discovery is unavailable
+- configures `tailscale serve --bg --yes --https=443 http://127.0.0.1:<receiver-port>` after setup consent
+- defaults the receiver listener to loopback when the user did not explicitly pass `--host`
+- advertises `https://machine.tailnet.ts.net`
+- verifies the HTTPS listener and root proxy with `tailscale serve status --json`
+- refuses to overwrite a conflicting root handler or use a port exposed by Funnel
+- accepts an explicit endpoint only when `--server-url` uses HTTPS
+- makes `doctor --transport tailscale` fail with actionable MagicDNS, HTTPS, Serve, and ACL guidance
 
-Do not block Tailscale use on MagicDNS; the current 100.64.0.0/10 URL path is valid.
+There is deliberately no HTTP or raw `100.64.0.0/10` fallback. Tailscale encrypts mesh traffic, but a qualified `.ts.net` HTTP URL is not an iOS ATS-compatible endpoint. See [Tailscale HTTPS Onboarding For iOS](tailscale-ios-onboarding.md).
 
 ### Cloudflare Tunnel
 

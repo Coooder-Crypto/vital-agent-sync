@@ -272,6 +272,8 @@ Tasks:
   - local Tailscale IP
   - reachability hints
 - [x] Add Tailscale MagicDNS name support.
+- [x] Publish and verify a private Tailscale Serve HTTPS endpoint for iOS ATS compatibility.
+- [x] Fail safely on missing MagicDNS/HTTPS, conflicting Serve handlers, or Funnel exposure.
 - [x] Add tunnel provider design:
   - Cloudflare Tunnel
   - ngrok

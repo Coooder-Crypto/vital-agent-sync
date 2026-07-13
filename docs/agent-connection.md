@@ -158,7 +158,7 @@ Prerequisites:
 vitalmcp setup --transport tailscale --tailscale-name my-mac.tailnet.ts.net
 ```
 
-VitalMCP can also try to read Tailscale MagicDNS from `tailscale status --json`, or fall back to the local 100.64.0.0/10 address when available. It does not install Tailscale, create an account, or authorize devices.
+VitalMCP verifies a tailnet-only Tailscale Serve HTTPS route to the loopback receiver and advertises its trusted `.ts.net` URL. It fails safely rather than advertising plain HTTP or a raw `100.x` address. It does not install Tailscale, create an account, or authorize devices. See [Tailscale HTTPS Onboarding For iOS](tailscale-ios-onboarding.md).
 
 ### Mode C: Public HTTPS
 
