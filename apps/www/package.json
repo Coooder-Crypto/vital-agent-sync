@@ -1,5 +1,5 @@
 {
-  "name": "@healthlink/www",
+  "name": "vital-agent-sync-www",
   "version": "0.1.0",
   "private": true,
   "scripts": {

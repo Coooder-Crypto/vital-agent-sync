@@ -1,4 +1,4 @@
-# HealthLink Website Media Plan
+# Vital Agent Sync Website Media Plan
 
 The homepage exposes stable `data-media-slot` hooks so production captures can replace the current code-native placeholders without changing layout.
 

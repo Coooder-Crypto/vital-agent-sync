@@ -150,7 +150,7 @@ const genericAgentAdapter: AgentAdapter = {
       id: "generic",
       available: true,
       installed: true,
-      detail: "Generic agents use the printed mcpServers JSON; VitalMCP does not write agent-specific config."
+      detail: "Generic agents use the printed mcpServers JSON; Vital Agent Sync does not write agent-specific config."
     };
   },
   installMcp(config) {
@@ -193,7 +193,7 @@ const hermesAgentAdapter: AgentAdapter = {
       configPath: result.configPath,
       backupPath: result.backupPath,
       server: result.server,
-      message: `VitalMCP MCP installed for Hermes in ${result.configPath}`
+      message: `Vital Agent Sync MCP installed for Hermes in ${result.configPath}`
     };
   },
   installSkill(options) {
@@ -246,7 +246,7 @@ const openClawAgentAdapter: AgentAdapter = {
       configPath: result.configPath,
       backupPath: result.backupPath,
       server: result.server,
-      message: `VitalMCP MCP installed for OpenClaw in ${result.configPath}`
+      message: `Vital Agent Sync MCP installed for OpenClaw in ${result.configPath}`
     };
   },
   formatMcpConfig(config) {
@@ -292,7 +292,7 @@ const workBuddyAgentAdapter: AgentAdapter = {
       configPath: result.configPath,
       backupPath: result.backupPath,
       server: result.server,
-      message: `VitalMCP MCP installed for WorkBuddy in ${result.configPath}`
+      message: `Vital Agent Sync MCP installed for WorkBuddy in ${result.configPath}`
     };
   },
   formatMcpConfig(config) {

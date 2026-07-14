@@ -134,7 +134,7 @@ struct HomeView: View {
                     .padding(.bottom, 28)
                 }
             }
-            .navigationTitle("VitalMCP")
+            .navigationTitle("Vital Agent Sync")
             .navigationBarTitleDisplayMode(.inline)
         }
     }
@@ -347,7 +347,7 @@ struct SettingsView: View {
                 }
 
                 Section("About") {
-                    LabeledContent("App", value: "VitalMCP")
+                    LabeledContent("App", value: "Vital Agent Sync")
                     LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "-")
                 }
             }
@@ -434,7 +434,7 @@ struct ConnectionView: View {
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("VitalMCP will remove this pairing from the iPhone. If the receiver is reachable, it will also revoke the device token on the agent side.")
+                Text("Vital Agent Sync will remove this pairing from the iPhone. If the receiver is reachable, it will also revoke the device token on the agent side.")
             }
             .onAppear {
                 scheduleDeferredReceiverCheck()
@@ -582,7 +582,7 @@ struct HomeHeroPanel: View {
 
     private var subtitle: LocalizedStringKey {
         if !isPaired {
-            return "Pair VitalMCP with your local Agent receiver."
+            return "Pair Vital Agent Sync with your local Agent receiver."
         }
         if isSyncing {
             return "Uploading your latest daily summaries."
@@ -691,7 +691,7 @@ struct FirstSyncGuidePanel: View {
                 FirstSyncStepRow(
                     index: 1,
                     title: "Grant Health access",
-                    detail: "Approve the Health categories VitalMCP can summarize.",
+                    detail: "Approve the Health categories Vital Agent Sync can summarize.",
                     systemImage: "heart.text.square"
                 )
 
@@ -705,7 +705,7 @@ struct FirstSyncGuidePanel: View {
                 FirstSyncStepRow(
                     index: 3,
                     title: "Ask your Agent",
-                    detail: "The Agent reads from its local VitalMCP context after sync completes.",
+                    detail: "The Agent reads from its local Vital Agent Sync context after sync completes.",
                     systemImage: "sparkles"
                 )
 
@@ -949,7 +949,7 @@ struct ConnectionStatusPanel: View {
             }
             return settings.serverURLText.isEmpty ? "Connected" : settings.serverURLText
         }
-        return String(localized: "Scan a VitalMCP pairing or relay onboarding QR to connect this iPhone.")
+        return String(localized: "Scan a Vital Agent Sync pairing or relay onboarding QR to connect this iPhone.")
     }
 
     private var badgeTitle: LocalizedStringKey {
@@ -1114,7 +1114,7 @@ struct PairingConfirmationView: View {
                         systemImage: "lock.shield"
                     )
                     Label(
-                        "LAN mode is not network-layer E2EE; the local VitalMCP receiver is the trusted decrypting endpoint.",
+                        "LAN mode is not network-layer E2EE; the local Vital Agent Sync receiver is the trusted decrypting endpoint.",
                         systemImage: "network"
                     )
                 }
@@ -1175,7 +1175,7 @@ struct RelayOnboardingConfirmationView: View {
                 Section("Privacy Boundary") {
                     Label("Health summaries are encrypted before they are sent to the relay.", systemImage: "lock")
                     Label("The relay stores encrypted envelopes. Your local runtime decrypts them after vitalmcp pull.", systemImage: "tray.and.arrow.down")
-                    Label("This onboarding code contains access credentials. VitalMCP stores them in Keychain.", systemImage: "key")
+                    Label("This onboarding code contains access credentials. Vital Agent Sync stores them in Keychain.", systemImage: "key")
                     Label("Do not share your local ~/.healthlink/secrets folder.", systemImage: "exclamationmark.shield")
                 }
                 .font(.footnote)

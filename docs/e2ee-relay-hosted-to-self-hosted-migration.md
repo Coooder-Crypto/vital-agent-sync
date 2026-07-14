@@ -1,6 +1,6 @@
 # Hosted Relay To Self-Hosted Relay Migration
 
-This guide moves a HealthLink relay setup from the hosted relay to a user-owned relay without changing the local SQLite/MCP data model.
+This guide moves a Vital Agent Sync relay setup from the hosted relay to a user-owned relay without changing the local SQLite/MCP data model.
 
 ## What Changes
 
@@ -83,7 +83,7 @@ The command authenticates to the old relay using the current config, revokes and
 
 ## Pair iOS Again
 
-Scan the new onboarding QR or open the generated `vitalmcp://onboard?...` deep link in VitalMCP iOS.
+Scan the new onboarding QR or open the generated `vitalmcp://onboard?...` deep link in Vital Agent iOS app.
 
 Confirm in iOS:
 

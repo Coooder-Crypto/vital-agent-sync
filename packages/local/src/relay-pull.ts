@@ -156,7 +156,7 @@ export function ensureRelaySourceDevice(database: HealthLinkDatabase, config: Re
     )
   `).run({
     id: config.source_device_id,
-    name: "VitalMCP Relay Source",
+    name: "Vital Agent Sync Relay Source",
     tokenHash: `relay:${config.user_id}`,
     scopesJson: JSON.stringify(config.requested_scopes),
     createdAt: new Date().toISOString()
@@ -166,7 +166,7 @@ export function ensureRelaySourceDevice(database: HealthLinkDatabase, config: Re
 function relayAuthenticatedDevice(config: RelayRuntimeConfig): AuthenticatedDevice {
   return {
     device_id: config.source_device_id,
-    device_name: "VitalMCP Relay Source",
+    device_name: "Vital Agent Sync Relay Source",
     scopes: config.requested_scopes
   };
 }
@@ -224,7 +224,7 @@ function readRelayCursor(stateDir: string): RelayCursor {
   }
   const parsed = JSON.parse(readFileSync(cursorPath, "utf8")) as unknown;
   if (!isRelayCursor(parsed)) {
-    throw new Error(`VitalMCP relay cursor is invalid at ${cursorPath}.`);
+    throw new Error(`Vital Agent Sync relay cursor is invalid at ${cursorPath}.`);
   }
   return parsed;
 }

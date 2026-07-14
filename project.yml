@@ -20,13 +20,13 @@ targets:
     info:
       path: App/Info.plist
       properties:
-        CFBundleDisplayName: VitalMCP
-        CFBundleName: VitalMCP
+        CFBundleDisplayName: Vital Agent
+        CFBundleName: Vital Agent
         CFBundleShortVersionString: $(MARKETING_VERSION)
         LSRequiresIPhoneOS: true
-        NSHealthShareUsageDescription: VitalMCP reads selected Apple Health data to sync daily summaries to your authorized agent server.
-        NSCameraUsageDescription: VitalMCP scans pairing QR codes shown by your local Agent server.
-        NSLocalNetworkUsageDescription: VitalMCP connects to your local Agent server on your network after you approve pairing.
+        NSHealthShareUsageDescription: Vital Agent Sync reads selected Apple Health data to sync daily summaries to your authorized agent server.
+        NSCameraUsageDescription: Vital Agent Sync scans pairing QR codes shown by your local Agent server.
+        NSLocalNetworkUsageDescription: Vital Agent Sync connects to your local Agent server on your network after you approve pairing.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         BGTaskSchedulerPermittedIdentifiers:

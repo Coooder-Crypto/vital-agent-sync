@@ -1,15 +1,15 @@
-# HealthLink E2EE Relay Technical Route
+# Vital Agent Sync E2EE Relay Technical Route
 
-This document defines the next HealthLink architecture direction: keep HealthLink MCP-native and source-owned, while adding an end-to-end encrypted relay transport and Agent-specific onboarding adapters. The goal is to improve setup UX without coupling HealthLink to any one Agent. For the canonical install and onboarding state machine, see [agent-first-onboarding.md](agent-first-onboarding.md). For staged relay execution, see [e2ee-relay-implementation-plan.md](e2ee-relay-implementation-plan.md).
+This document defines the next Vital Agent Sync architecture direction: keep Vital Agent Sync MCP-native and source-owned, while adding an end-to-end encrypted relay transport and Agent-specific onboarding adapters. The goal is to improve setup UX without coupling Vital Agent Sync to any one Agent. For the canonical install and onboarding state machine, see [agent-first-onboarding.md](agent-first-onboarding.md). For staged relay execution, see [e2ee-relay-implementation-plan.md](e2ee-relay-implementation-plan.md).
 
-The product shape can learn from existing Apple Health sync products for agents, but HealthLink must use its own protocol, code, schemas, copy, assets, and branding.
+The product shape can learn from existing Apple Health sync products for agents, but Vital Agent Sync must use its own protocol, code, schemas, copy, assets, and branding.
 
 ## Summary
 
-Current HealthLink is a direct receiver model:
+Current Vital Agent Sync is a direct receiver model:
 
 ```text
-HealthLink iOS
+Vital Agent iOS app
   -> POST /health/sync
   -> vitalmcp HTTP receiver
   -> SQLite
@@ -20,7 +20,7 @@ HealthLink iOS
 The target model adds an E2EE pull relay transport:
 
 ```text
-HealthLink iOS
+Vital Agent iOS app
   -> encrypt normalized health payload
   -> hosted or self-hosted relay stores opaque ciphertext
   -> vitalmcp pulls ciphertext
@@ -30,7 +30,7 @@ HealthLink iOS
   -> Agent
 ```
 
-OpenClaw, Hermes, Codex, Claude, and other agents should continue to consume HealthLink through MCP. Agent-specific skills should install, initialize, trigger sync, and explain results; they should not become the core data layer.
+OpenClaw, Hermes, Codex, Claude, and other agents should continue to consume Vital Agent Sync through MCP. Agent-specific skills should install, initialize, trigger sync, and explain results; they should not become the core data layer.
 
 ## Product Goals
 
@@ -110,7 +110,7 @@ Default consumer UX.
 ```text
 iPhone
   -> HTTPS outbound
-  -> HealthLink hosted relay
+  -> Vital Agent Sync hosted relay
   -> vitalmcp pull
   -> ~/.healthlink/healthlink.sqlite
   -> MCP stdio
@@ -438,7 +438,7 @@ They must not implement relay cryptography, ingest health payloads, fork the too
 
 Agent-first setup does not change this boundary. Skills invoke the shared bootstrap, present a redacted plan, offer one onboarding action, and verify the first sync through MCP. The website installer and marketplace packages are distribution surfaces over the same setup state.
 
-The repeatable compatibility gate is `npm run audit:agent-adapters`. It calls `healthlink_status` through a generic MCP client, installs Hermes config and skill state into a temporary HOME, then uses the locally installed Hermes CLI to connect and discover all 12 HealthLink tools. An Agent-specific marketplace package is not required for this gate.
+The repeatable compatibility gate is `npm run audit:agent-adapters`. It calls `healthlink_status` through a generic MCP client, installs Hermes config and skill state into a temporary HOME, then uses the locally installed Hermes CLI to connect and discover all 12 Vital Agent Sync tools. An Agent-specific marketplace package is not required for this gate.
 
 ## Optional OpenClaw Adapter
 
@@ -453,7 +453,7 @@ The skill should guide the user through:
 install vitalmcp
   -> run setup --agent openclaw --transport relay
   -> show QR or hex onboarding payload
-  -> ask user to onboard HealthLink iOS
+  -> ask user to onboard Vital Agent iOS app
   -> run pull after first iOS sync
   -> call MCP tools for analysis
   -> suggest CronJobs for recurring pull/report
@@ -488,13 +488,13 @@ Supported trigger shape:
 
 ```text
 Agent mobile app
-  -> opens HealthLink deep link
-  -> HealthLink syncs
+  -> opens Vital Agent Sync deep link
+  -> Vital Agent Sync syncs
   -> local runtime pulls/ingests
   -> Agent reads MCP
 ```
 
-If OpenClaw later exposes a stable node command extension model, HealthLink can add a node bridge with control commands only:
+If OpenClaw later exposes a stable node command extension model, Vital Agent Sync can add a node bridge with control commands only:
 
 ```text
 healthlink.status
@@ -555,7 +555,7 @@ Move code into a package only when there are two callers or a boundary becomes h
 
 ## Security Requirements
 
-HealthLink should publish an explicit threat model before hosted relay launch.
+Vital Agent Sync should publish an explicit threat model before hosted relay launch.
 
 Required guarantees:
 
@@ -636,10 +636,10 @@ Operational requirements:
 
 ## Positioning
 
-HealthLink should not be positioned as an OpenClaw clone or an OpenClaw-only Apple Health app. The stronger positioning is:
+Vital Agent Sync should not be positioned as an OpenClaw clone or an OpenClaw-only Apple Health app. The stronger positioning is:
 
 ```text
-HealthLink is a private Apple Health gateway for MCP-compatible agents.
+Vital Agent Sync is a private Apple Health gateway for MCP-compatible agents.
 It keeps the data model, relay protocol, and MCP surface portable, then
 adds replaceable adapters for Hermes, OpenClaw, and future Agent runtimes.
 ```

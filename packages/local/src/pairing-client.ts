@@ -32,10 +32,10 @@ export async function requestPairingSession(options: PairingClientOptions): Prom
     });
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    throw new Error(`VitalMCP receiver is not reachable at ${endpoint}. Run vitalmcp service start or vitalmcp setup first. ${detail}`);
+    throw new Error(`Vital Agent Sync receiver is not reachable at ${endpoint}. Run vitalmcp service start or vitalmcp setup first. ${detail}`);
   }
   if (!response.ok) {
-    throw new Error(`VitalMCP receiver rejected pairing request: HTTP ${response.status}`);
+    throw new Error(`Vital Agent Sync receiver rejected pairing request: HTTP ${response.status}`);
   }
   const body = await response.json() as {
     pairing_code?: unknown;
@@ -43,7 +43,7 @@ export async function requestPairingSession(options: PairingClientOptions): Prom
     expires_in_seconds?: unknown;
   };
   if (typeof body.pairing_code !== "string" || typeof body.pairing_url !== "string" || typeof body.expires_in_seconds !== "number") {
-    throw new Error("VitalMCP receiver returned an invalid pairing response.");
+    throw new Error("Vital Agent Sync receiver returned an invalid pairing response.");
   }
   return {
     pairing_code: body.pairing_code,

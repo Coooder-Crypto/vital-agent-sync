@@ -1,4 +1,4 @@
-"CFBundleDisplayName" = "VitalMCP";
-"NSHealthShareUsageDescription" = "VitalMCP reads selected Apple Health data to sync daily summaries to your authorized agent server.";
-"NSCameraUsageDescription" = "VitalMCP scans pairing QR codes shown by your local Agent server.";
-"NSLocalNetworkUsageDescription" = "VitalMCP connects to your local Agent server on your network after you approve pairing.";
+"CFBundleDisplayName" = "Vital Agent";
+"NSHealthShareUsageDescription" = "Vital Agent Sync reads selected Apple Health data to sync daily summaries to your authorized agent server.";
+"NSCameraUsageDescription" = "Vital Agent Sync scans pairing QR codes shown by your local Agent server.";
+"NSLocalNetworkUsageDescription" = "Vital Agent Sync connects to your local Agent server on your network after you approve pairing.";

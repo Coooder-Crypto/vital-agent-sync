@@ -5,7 +5,7 @@ import CryptoKit
 final class PairingAndPayloadTests: XCTestCase {
     private let directPublicKey = Data(repeating: 7, count: 32).base64URLEncodedString()
 
-    func testPairingLinkAcceptsVitalMCPAndLegacySchemesWithPinnedTransportKey() throws {
+    func testPairingLinkAcceptsVitalAgentSyncAndLegacySchemesWithPinnedTransportKey() throws {
         for scheme in [AppDeepLinkScheme.primary, AppDeepLinkScheme.legacy] {
             let link = try PairingLink(
                 rawValue: "\(scheme)://pair?server=http://192.168.1.25:8787&code=ab12-cd34&key=\(directPublicKey)"

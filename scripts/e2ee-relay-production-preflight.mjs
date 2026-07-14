@@ -8,7 +8,7 @@ const caddyfilePath = resolve(root, "deploy", "relay", "Caddyfile");
 const domain = requireDomain(process.env.HEALTHLINK_RELAY_DOMAIN);
 const relayApiToken = requireToken("HEALTHLINK_RELAY_API_TOKEN");
 const metricsToken = requireToken("HEALTHLINK_RELAY_METRICS_TOKEN");
-const image = requirePinnedImage(process.env.HEALTHLINK_RELAY_IMAGE ?? "healthlink-relay:0.3.0");
+const image = requirePinnedImage(process.env.HEALTHLINK_RELAY_IMAGE ?? "healthlink-relay:0.4.0");
 
 if (relayApiToken === metricsToken) {
   throw new Error("HEALTHLINK_RELAY_API_TOKEN and HEALTHLINK_RELAY_METRICS_TOKEN must be different values.");
@@ -36,7 +36,7 @@ verifyRelayService(relay);
 verifyCaddyService(caddy);
 verifyCaddyfile();
 
-console.log("VitalMCP production relay preflight passed.");
+console.log("Vital Agent Sync production relay preflight passed.");
 console.log(JSON.stringify({
   domain,
   relay_url: `https://${domain}`,

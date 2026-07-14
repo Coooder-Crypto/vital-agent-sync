@@ -1,6 +1,6 @@
 # vitalmcp
 
-Local Agent-side runtime for VitalMCP.
+Local Agent-side runtime for Vital Agent Sync.
 
 This package provides:
 
@@ -39,7 +39,7 @@ vitalmcp setup --resume --yes --output json
 vitalmcp status --output json
 ```
 
-LAN is the Local Preview default and needs only a reachable trusted network shared by the iPhone and receiver. It does not ask for a relay URL, VPS, domain, VitalMCP account, or payment method. Without `--yes`, non-interactive setup stops at `awaiting_consent` and does not write Agent config or install/start services. Existing compatible `~/.healthlink` runtime state and history are reused across Skill upgrades.
+LAN is the Local Preview default and needs only a reachable trusted network shared by the iPhone and receiver. It does not ask for a relay URL, VPS, domain, Vital Agent Sync account, or payment method. Without `--yes`, non-interactive setup stops at `awaiting_consent` and does not write Agent config or install/start services. Existing compatible `~/.healthlink` runtime state and history are reused across Skill upgrades.
 
 Tailscale is an optional private remote path for users who install and sign in to Tailscale on both devices and authorize them on the same tailnet:
 
@@ -56,9 +56,9 @@ curl -fsSL https://<healthlink-domain>/install.sh | sh
 vitalmcp setup
 ```
 
-The installer writes to `~/.vitalmcp/npm-global`, manages one marked shell PATH block, never uses sudo, and preserves local VitalMCP data under `~/.healthlink` on `install.sh --uninstall`.
+The installer writes to `~/.vitalmcp/npm-global`, manages one marked shell PATH block, never uses sudo, and preserves local Vital Agent Sync data under `~/.healthlink` on `install.sh --uninstall`.
 
-This auto-selects the current platform's service manager, auto-detects a supported Agent config when possible, installs the background receiver, starts it, and prints a 10-minute iPhone pairing QR. If Hermes is detected, it writes the Hermes MCP config and installs the VitalMCP Hermes skill. After the first successful pair and sync, the terminal can close.
+This auto-selects the current platform's service manager, auto-detects a supported Agent config when possible, installs the background receiver, starts it, and prints a 10-minute iPhone pairing QR. If Hermes is detected, it writes the Hermes MCP config and installs the Vital Agent Sync Hermes skill. After the first successful pair and sync, the terminal can close.
 
 For a global install:
 
@@ -90,9 +90,9 @@ The container gate requires a running Docker daemon. It builds the relay image, 
 
 The package gate creates the publishable tarball, installs it into a temporary global prefix with a private npm cache, then uses only that installed binary for relay fixture upload/pull, SQLite status, active audit, and OpenClaw Skill export. The cold install prints a 15-second heartbeat and has a five-minute timeout with bounded npm fetch retries. It removes the temporary install, secrets, databases, cache, and child processes on completion, failure, or interruption.
 
-The Agent adapter gate requires a local Hermes CLI. It uses a temporary HOME, calls `healthlink_status` through a generic MCP client, installs isolated Hermes config and skill files, and verifies that Hermes connects and discovers all 12 VitalMCP tools. It does not modify the user's normal Hermes configuration.
+The Agent adapter gate requires a local Hermes CLI. It uses a temporary HOME, calls `healthlink_status` through a generic MCP client, installs isolated Hermes config and skill files, and verifies that Hermes connects and discovers all 12 Vital Agent Sync tools. It does not modify the user's normal Hermes configuration.
 
-The secret gate scans tracked and unignored non-website release files for private keys, common provider tokens, literal VitalMCP credentials, real `.env` files, local SQLite/Keychain artifacts, and runtime secret paths. It runs a built-in rule self-test first and reports only rule IDs plus locations, never suspected values. `release:npm-preflight` runs this gate automatically.
+The secret gate scans tracked and unignored non-website release files for private keys, common provider tokens, literal Vital Agent Sync credentials, real `.env` files, local SQLite/Keychain artifacts, and runtime secret paths. It runs a built-in rule self-test first and reports only rule IDs plus locations, never suspected values. `release:npm-preflight` runs this gate automatically.
 
 Before deploying a real hosted relay, set `HEALTHLINK_RELAY_DOMAIN`, separate API/metrics tokens, and a pinned image, then run `npm run preflight:relay-production`. It parses the final Compose model without starting services or printing token values. After deployment, set `HEALTHLINK_HOSTED_RELAY_URL` and run `npm run audit:relay-hosted -- --yes`; the wrapper keeps tokens out of command arguments and runs both passive and disposable-tenant active audits. Before publishing npm, use `npm run release:npm-preflight`; it checks the worktree, artifact, npm identity, and registry version but never publishes.
 
@@ -130,7 +130,7 @@ npx -y vitalmcp mcp
 npx -y vitalmcp print-mcp-config
 npx -y vitalmcp print-agent-config --agent generic
 npx -y vitalmcp print-agent-config --agent openclaw
-npx -y vitalmcp setup --agent workbuddy --workbuddy-project ~/VitalMCP
+npx -y vitalmcp setup --agent workbuddy --workbuddy-project ~/VitalAgentSync
 npx -y vitalmcp print-docker-compose --server-url http://192.168.31.53:8787
 # Future/experimental relay operator commands (not the Local Preview onboarding path)
 npx -y vitalmcp print-relay-docker-compose
@@ -178,7 +178,7 @@ For Agent startup hooks, use the idempotent receiver check:
 npx -y vitalmcp ensure
 ```
 
-`ensure` installs the platform service if missing, starts it if stopped, waits for `/health/status`, and then prints service status. It does not rewrite Agent config, install skills, or print a pairing QR. Use it when an Agent wants to make sure VitalMCP is available before loading MCP tools.
+`ensure` installs the platform service if missing, starts it if stopped, waits for `/health/status`, and then prints service status. It does not rewrite Agent config, install skills, or print a pairing QR. Use it when an Agent wants to make sure Vital Agent Sync is available before loading MCP tools.
 
 If the QR expires, do not reinstall the service. Print a fresh pairing code:
 
@@ -186,7 +186,7 @@ If the QR expires, do not reinstall the service. Print a fresh pairing code:
 npx -y vitalmcp pair
 ```
 
-By default, `setup` and `ensure` start at port `8787`. If that port is already occupied and no VitalMCP receiver is reachable there, the CLI automatically picks the next available port, writes that port into the background service, and prints a QR using the selected port. Pass `--port` when you need a fixed port:
+By default, `setup` and `ensure` start at port `8787`. If that port is already occupied and no Vital Agent Sync receiver is reachable there, the CLI automatically picks the next available port, writes that port into the background service, and prints a QR using the selected port. Pass `--port` when you need a fixed port:
 
 ```bash
 npx -y vitalmcp setup --port 8788
@@ -219,7 +219,7 @@ npm run dev:local
 Expected output:
 
 ```text
-VitalMCP running
+Vital Agent Sync running
 
 Pairing page: http://127.0.0.1:8787/pair
 LAN address:  http://192.168.x.x:8787
@@ -227,7 +227,7 @@ Local API:    http://127.0.0.1:8787
 Database:     ~/.healthlink/healthlink.sqlite
 ```
 
-Open the pairing page or scan the terminal QR code with VitalMCP iOS, approve the pairing, then sync from the iOS app.
+Open the pairing page or scan the terminal QR code with the Vital Agent app, approve the pairing, then sync from the iOS app.
 
 For the background receiver, use:
 
@@ -258,7 +258,7 @@ This usually means the daemon failed during startup, Node.js is not available fr
 
 Pairing is persistent. After the first setup, the iOS app keeps the server URL, device ID, and device token, while `vitalmcp` stores synced summaries in the same SQLite database used by MCP. The Agent does not need to reload MCP after every sync; it reads the latest database rows the next time a tool is called.
 
-The v0.1 delivery promise is manual Sync Now plus catch-up when the iOS app is active or returns to the foreground. iOS background opportunities are best-effort. VitalMCP does not promise a daily or weekly delivery schedule, an exact interval, or a guaranteed background time.
+The v0.1 delivery promise is manual Sync Now plus catch-up when the iOS app is active or returns to the foreground. iOS background opportunities are best-effort. Vital Agent Sync does not promise a daily or weekly delivery schedule, an exact interval, or a guaranteed background time.
 
 ## Agent Integration
 
@@ -328,7 +328,7 @@ Agents only need `/reload-mcp` or a restart when the MCP config, database path, 
 
 MCP is the stable integration surface. Skills are optional instructions for agents that support them.
 
-A VitalMCP Skill should tell the agent to:
+A Vital Agent Sync Skill should tell the agent to:
 
 - use `get_personal_context` first for broad health, recovery, exercise, or activity questions
 - use lower-level tools for specific follow-up questions
@@ -348,25 +348,25 @@ npx -y vitalmcp install-hermes
 npx -y vitalmcp install-hermes-skill
 npx -y vitalmcp init --agent hermes
 npx -y vitalmcp init --agent openclaw
-npx -y vitalmcp init --agent workbuddy --workbuddy-project ~/VitalMCP
+npx -y vitalmcp init --agent workbuddy --workbuddy-project ~/VitalAgentSync
 npx -y vitalmcp init --hermes --install-skill
 npx -y vitalmcp doctor --agent hermes
 npx -y vitalmcp doctor --agent openclaw
-npx -y vitalmcp doctor --agent workbuddy --workbuddy-project ~/VitalMCP
+npx -y vitalmcp doctor --agent workbuddy --workbuddy-project ~/VitalAgentSync
 npx -y vitalmcp doctor --transport lan
 ```
 
 `print-mcp-config`, `print-agent-config --agent generic`, and `print-agent-config --agent workbuddy` print standard `mcpServers.healthlink` JSON. WorkBuddy setup writes project-scoped configuration only: pass `--workbuddy-project <dir>` to merge `<dir>/workbuddy.mcp.json`, or `--workbuddy-config <path>` for an explicit file. Existing JSON fields and other MCP servers are preserved, invalid JSON is rejected, and an existing file receives a timestamped backup. Restart WorkBuddy after configuration changes. `print-agent-config --agent hermes` prints a Hermes-style `mcp_servers.healthlink` YAML snippet. `print-agent-config --agent openclaw` prints an OpenClaw-style `mcp.servers.healthlink` JSON snippet. `install-hermes` backs up `~/.hermes/config.yaml`, writes `mcp_servers.healthlink`, and uses the same local database and tool surface as `vitalmcp mcp`. `init --agent hermes` and `init --hermes` perform the same Hermes install step as part of the foreground pairing flow. `init --agent openclaw` backs up and writes `~/.openclaw/openclaw.json` when it is valid JSON; use `--openclaw-config <path>` for a custom file.
 
-WorkBuddy officially documents `workbuddy.mcp.json` in the project root with the standard `mcpServers` shape. VitalMCP deliberately does not write `~/.workbuddy/models.json`, which configures models rather than MCP servers. See the [WorkBuddy MCP setup guide](https://docs.cloudbase.net/en/ai/cloudbase-ai-toolkit/ide-setup/workbuddy). WorkBuddy Skill export and model-side privacy guidance are tracked separately in [issue #90](https://github.com/Coooder-Crypto/health-link/issues/90).
+WorkBuddy officially documents `workbuddy.mcp.json` in the project root with the standard `mcpServers` shape. Vital Agent Sync deliberately does not write `~/.workbuddy/models.json`, which configures models rather than MCP servers. See the [WorkBuddy MCP setup guide](https://docs.cloudbase.net/en/ai/cloudbase-ai-toolkit/ide-setup/workbuddy). WorkBuddy Skill export and model-side privacy guidance are tracked separately in [issue #90](https://github.com/Coooder-Crypto/health-link/issues/90).
 
-`print-skill` prints portable VitalMCP Skill Markdown parameterized for `generic`, `hermes`, `openclaw`, or `workbuddy`; setup commands and mobile trigger sources follow the selected adapter. `install-hermes-skill` writes the Hermes-targeted form to `~/.hermes/skills/health/vitalmcp-personal-context/SKILL.md` with a timestamped backup when replacing an existing file. `setup` auto-detects Hermes and installs the Hermes MCP config and Skill by default when Hermes config is present. Use `setup --agent hermes` to force Hermes, or `init --hermes --install-skill` when you want the same Skill install behavior in the foreground flow. As an optional marketplace adapter, `export-skill --agent openclaw --output-dir ./vitalmcp-openclaw-skill` writes a ClawHub/OpenClaw-ready package with `SKILL.md` and `README.md`; generic MCP works without a Skill or marketplace listing.
+`print-skill` prints portable Vital Agent Sync Skill Markdown parameterized for `generic`, `hermes`, `openclaw`, or `workbuddy`; setup commands and mobile trigger sources follow the selected adapter. `install-hermes-skill` writes the Hermes-targeted form to `~/.hermes/skills/health/vitalmcp-personal-context/SKILL.md` with a timestamped backup when replacing an existing file. `setup` auto-detects Hermes and installs the Hermes MCP config and Skill by default when Hermes config is present. Use `setup --agent hermes` to force Hermes, or `init --hermes --install-skill` when you want the same Skill install behavior in the foreground flow. As an optional marketplace adapter, `export-skill --agent openclaw --output-dir ./vitalmcp-openclaw-skill` writes a ClawHub/OpenClaw-ready package with `SKILL.md` and `README.md`; generic MCP works without a Skill or marketplace listing.
 
 Use `status` to inspect the local database and paired source devices. Use `doctor` to check Node.js, the SQLite database, MCP command generation, the selected Agent adapter, the selected transport provider, the platform service manager, and local receiver reachability.
 
 Transport providers are selected with `--transport`. `lan` is the Local Preview default. `tailscale` is the optional user-managed private remote path and can advertise the local 100.64.0.0/10 IPv4 address when Tailscale is active. `relay` and `self-hosted-relay` are future/experimental Local Preview paths that initialize the E2EE relay runtime instead of the direct receiver; use `pull` to decrypt relay envelopes into the local MCP database. Future direct transports such as `cloudflare`, `ngrok`, and `public_https` can be selected for diagnostics and can advertise an explicit endpoint with `--server-url` until their native provider implementations land.
 
-For Tailscale MagicDNS, pass `--tailscale-name <host.tailnet.ts.net>` or set `HEALTHLINK_TAILSCALE_NAME`. The user must install and sign in to Tailscale on the iPhone and receiver, and both devices must belong to the same authorized tailnet. If no name is provided, VitalMCP attempts to read `tailscale status --json` and falls back to the local Tailscale IPv4 address.
+For Tailscale MagicDNS, pass `--tailscale-name <host.tailnet.ts.net>` or set `HEALTHLINK_TAILSCALE_NAME`. The user must install and sign in to Tailscale on the iPhone and receiver, and both devices must belong to the same authorized tailnet. If no name is provided, Vital Agent Sync attempts to read `tailscale status --json` and falls back to the local Tailscale IPv4 address.
 
 The source-device API is available at `/source-devices` and `/source-devices/:source_device_id/revoke`. The older `/devices` endpoints and MCP tools remain for compatibility with the current iOS app and older agent configs.
 
@@ -374,15 +374,15 @@ The source-device API is available at `/source-devices` and `/source-devices/:so
 
 `print-relay-docker-compose` prints a Docker Compose file for a self-hosted E2EE relay. The relay stores opaque encrypted envelopes plus hashed tenant/revocation metadata in `/data/relay.sqlite`; it does not decrypt health payloads. Pair the local runtime against that relay with `setup --transport self-hosted-relay --relay-url <relay-url>`. Relay setup installs a separate `relay-pull` background service on launchd/systemd platforms. `pull --once` is the explicit one-shot form; `pull --watch --interval-seconds 300` keeps polling from a foreground process or external supervisor.
 
-Future/experimental hosted relay deployments must set `HEALTHLINK_HOSTED_RELAY_URL` or pass `--relay-url` before running `setup --transport relay`; the URL must use HTTPS. `HEALTHLINK_RELAY_URL` is a generic configured fallback, and `--relay-url` always takes precedence. VitalMCP intentionally fails before writing setup state when a hosted URL is absent or insecure. Self-hosted relay mode may use HTTP on a user-controlled network and defaults to `http://127.0.0.1:8790` for local development.
+Future/experimental hosted relay deployments must set `HEALTHLINK_HOSTED_RELAY_URL` or pass `--relay-url` before running `setup --transport relay`; the URL must use HTTPS. `HEALTHLINK_RELAY_URL` is a generic configured fallback, and `--relay-url` always takes precedence. Vital Agent Sync intentionally fails before writing setup state when a hosted URL is absent or insecure. Self-hosted relay mode may use HTTP on a user-controlled network and defaults to `http://127.0.0.1:8790` for local development.
 
 Relay server deployments can also set `HEALTHLINK_RELAY_HOST`, `HEALTHLINK_RELAY_PORT`, `HEALTHLINK_RELAY_DB`, `HEALTHLINK_RELAY_RETENTION_DAYS`, `HEALTHLINK_RELAY_MAX_ENVELOPE_BYTES`, `HEALTHLINK_RELAY_MAX_UPLOADS_PER_MINUTE`, `HEALTHLINK_RELAY_MAX_QUEUED_ENVELOPES_PER_USER`, `HEALTHLINK_RELAY_MAX_DEVICES_PER_USER`, `HEALTHLINK_RELAY_TRUST_PROXY`, `HEALTHLINK_RELAY_API_TOKEN`, and `HEALTHLINK_RELAY_METRICS_TOKEN`; explicit CLI flags override these environment values. Enable trust-proxy mode only when port 8790 is private behind a trusted proxy that rebuilds `X-Forwarded-For`. Data/lifecycle endpoints always require the generated per-runtime `relay_access_token` as `Authorization: Bearer <token>` and store only its SHA-256 hash. When a deployment API token is set, clients additionally send it through `X-HealthLink-Relay-API-Key`. When a metrics token is set, `/v1/metrics` requires its separate `Authorization: Bearer <token>`.
 
-The onboarding QR, `vitalmcp://onboard` link, and `healthlink-e2ee-v1:` text code contain `upload_auth_secret`, `relay_access_token`, and sometimes `relay_api_token`. Transfer them only to the intended VitalMCP source device; do not paste them into Agent chat, logs, memory, issue trackers, or support messages.
+The onboarding QR, `vitalmcp://onboard` link, and `healthlink-e2ee-v1:` text code contain `upload_auth_secret`, `relay_access_token`, and sometimes `relay_api_token`. Transfer them only to the intended Vital Agent Sync source device; do not paste them into Agent chat, logs, memory, issue trackers, or support messages.
 
 ## Background Service And Deployment Methods
 
-VitalMCP deployment is about where the receiver, SQLite database, and MCP process run. The Agent type is configured separately through `--agent` or `print-agent-config`.
+Vital Agent Sync deployment is about where the receiver, SQLite database, and MCP process run. The Agent type is configured separately through `--agent` or `print-agent-config`.
 
 `setup`, `ensure`, and `service` choose a manager automatically:
 
@@ -415,7 +415,7 @@ For an always-on Linux home server, `setup --manager systemd` writes `~/.config/
 vitalmcp setup --agent generic --manager systemd
 ```
 
-For SSH-based LAN installs, HealthLink tries to advertise the server address automatically. It checks the SSH session's local address first, then the default route source address, then non-virtual LAN interfaces. For example, `ssh jarvis@192.168.31.53` should usually produce a pairing URL using `http://192.168.31.53:8787`.
+For SSH-based LAN installs, Vital Agent Sync tries to advertise the server address automatically. It checks the SSH session's local address first, then the default route source address, then non-virtual LAN interfaces. For example, `ssh jarvis@192.168.31.53` should usually produce a pairing URL using `http://192.168.31.53:8787`.
 
 If the printed pairing URL uses an address the iPhone cannot reach, pass the URL explicitly:
 

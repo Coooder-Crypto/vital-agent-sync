@@ -1,4 +1,4 @@
-# HealthLink Hosted Relay Beta Runbook
+# Vital Agent Sync Hosted Relay Beta Runbook
 
 This runbook describes the hosted relay beta operating boundary. The same API and envelope protocol are used by self-hosted relay.
 
@@ -6,7 +6,7 @@ Use [e2ee-relay-release-audit.md](e2ee-relay-release-audit.md) as the beta relea
 
 ## Service Role
 
-The hosted relay is a ciphertext queue. It accepts encrypted HealthLink envelopes from mobile source apps, lets `vitalmcp pull` fetch queued envelopes, acknowledges processed envelopes, and purges user queues on request.
+The hosted relay is a ciphertext queue. It accepts encrypted Vital Agent Sync envelopes from mobile source apps, lets `vitalmcp pull` fetch queued envelopes, acknowledges processed envelopes, and purges user queues on request.
 
 The hosted relay must not decrypt, parse, log, or inspect health payload plaintext.
 

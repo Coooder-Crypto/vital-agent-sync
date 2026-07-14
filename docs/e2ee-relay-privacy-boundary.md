@@ -1,10 +1,10 @@
-# HealthLink Relay Privacy Boundary
+# Vital Agent Sync Relay Privacy Boundary
 
 This document is user-facing language for the relay route. It should guide product copy, onboarding screens, README text, and support answers.
 
 ## Short Version
 
-HealthLink relay mode is designed so the relay forwards encrypted envelopes. The relay should not be able to read Apple Health summaries. Your local `vitalmcp` runtime owns the private keys, decrypts data, stores it in your SQLite database, and exposes it to your chosen Agent through MCP.
+Vital Agent Sync relay mode is designed so the relay forwards encrypted envelopes. The relay should not be able to read Apple Health summaries. Your local `vitalmcp` runtime owns the private keys, decrypts data, stores it in your SQLite database, and exposes it to your chosen Agent through MCP.
 
 ## What Each Mode Means
 
@@ -15,7 +15,7 @@ Use this when you want the easiest setup and do not want to expose a local port.
 Data path:
 
 ```text
-iPhone -> HealthLink hosted relay -> vitalmcp pull -> SQLite -> MCP -> Agent
+iPhone -> Vital Agent Sync hosted relay -> vitalmcp pull -> SQLite -> MCP -> Agent
 ```
 
 The hosted relay can see:
@@ -74,7 +74,7 @@ Do not paste private keys or complete onboarding values into OpenClaw, Hermes, c
 
 ## What Agents Can Read
 
-Agents should read HealthLink data through MCP tools, not by opening SQLite directly. MCP tools return scoped summaries such as daily health, sleep trend, workout load, recovery signals, source device status, and freshness metadata.
+Agents should read Vital Agent Sync data through MCP tools, not by opening SQLite directly. MCP tools return scoped summaries such as daily health, sleep trend, workout load, recovery signals, source device status, and freshness metadata.
 
 Agents should mention freshness when answering health-context questions. If data is stale, the expected next step is:
 
@@ -104,7 +104,7 @@ Do promise:
 
 Use:
 
-> HealthLink relay forwards encrypted health envelopes. Your local HealthLink runtime decrypts them and stores summaries on your machine for MCP-compatible agents.
+> Vital Agent Sync relay forwards encrypted health envelopes. Your local Vital Agent Sync runtime decrypts them and stores summaries on your machine for MCP-compatible agents.
 
 Use:
 
@@ -112,7 +112,7 @@ Use:
 
 Use:
 
-> Keep your `~/.healthlink/secrets` folder private. HealthLink and your Agent should never ask you to paste those private keys.
+> Keep your `~/.healthlink/secrets` folder private. Vital Agent Sync and your Agent should never ask you to paste those private keys.
 
 Avoid:
 

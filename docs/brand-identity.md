@@ -1,11 +1,11 @@
-# VitalMCP Brand Identity
+# Vital Agent Sync Brand Identity
 
 ## Current Decision
 
-- Product brand: `VitalMCP`
-- App Store working name: `VitalMCP: Health for Agents`
-- App Store working subtitle: `Private Health for AI Agents`
-- iOS home-screen name: `VitalMCP`
+- Product brand: `Vital Agent Sync`
+- App Store working name: `Vital Agent Sync`
+- App Store working subtitle: `Private Apple Health Bridge`
+- iOS home-screen name: `Vital Agent`
 - Production Bundle ID: `com.vitalmcp.ios`
 - Primary iOS deep-link scheme: `vitalmcp://`
 - npm package and CLI: `vitalmcp`
@@ -28,8 +28,8 @@ The following non-npm identifiers remain unchanged because they are persisted pa
 - callback metadata source: `healthlink`
 - Xcode project, target, Swift module, and unit-test target names
 
-VitalMCP iOS registers and accepts both `vitalmcp://` and `healthlink://`. The current `vitalmcp` runtime generates the primary scheme; legacy links remain accepted at the protocol boundary.
+The Vital Agent iOS app registers and accepts both `vitalmcp://` and `healthlink://`. The current `vitalmcp` runtime generates the primary scheme; legacy links remain accepted at the protocol boundary.
 
 ## Pre-Release Migration Note
 
-Changing the Bundle ID from `app.healthlink.ios` to `com.vitalmcp.ios` makes this a separate development install and changes its default Keychain access group. Before physical-device validation, remove the old development build if necessary, install the VitalMCP build, and pair the iPhone again. The previously published `healthlink-local` npm package is not a supported migration path; publish and document `vitalmcp` as the only current CLI. There are no production users to migrate at this stage.
+Changing the Bundle ID from `app.healthlink.ios` to `com.vitalmcp.ios` makes this a separate development install and changes its default Keychain access group. Before physical-device validation, remove the old development build if necessary, install Vital Agent, and pair the iPhone again. The previously published `healthlink-local` npm package is not a supported migration path; publish and document `vitalmcp` as the only current CLI. There are no production users to migrate at this stage.

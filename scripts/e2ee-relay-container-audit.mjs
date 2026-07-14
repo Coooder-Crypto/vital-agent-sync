@@ -49,7 +49,7 @@ try {
   validateCaddyfile();
   await verifyHardenedRelayContainer();
 
-  console.log("\nVitalMCP E2EE relay container audit passed.");
+  console.log("\nVital Agent Sync E2EE relay container audit passed.");
 } finally {
   cleanup();
 }
@@ -120,7 +120,7 @@ function verifyRuntimeImage() {
     "packages/local/dist/cli.js",
     "--version"
   ]).trim();
-  assert(version === "vitalmcp 0.3.0", "Relay image contains the wrong vitalmcp version.");
+  assert(version === "vitalmcp 0.4.0", "Relay image contains the wrong vitalmcp version.");
   console.log(version);
 }
 

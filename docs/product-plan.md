@@ -1,6 +1,6 @@
-# HealthLink Product Plan
+# Vital Agent Sync Product Plan
 
-HealthLink is a user-owned personal data bridge for AI agents. It lets a user connect authorized phone, watch, and feedback data to local or cloud-hosted agents without making every agent implement HealthKit, pairing, permissions, and privacy controls.
+Vital Agent Sync is a user-owned personal data bridge for AI agents. It lets a user connect authorized phone, watch, and feedback data to local or cloud-hosted agents without making every agent implement HealthKit, pairing, permissions, and privacy controls.
 
 The product is not an agent. It is an agent data gateway.
 
@@ -9,8 +9,8 @@ The product is not an agent. It is an agent data gateway.
 The target experience:
 
 ```text
-User asks an agent or runs a command to install HealthLink.
-HealthLink starts a receiver and shows a QR code.
+User asks an agent or runs a command to install Vital Agent Sync.
+Vital Agent Sync starts a receiver and shows a QR code.
 iOS app scans the QR code and pairs with the receiver.
 User chooses which data to expose and grants Apple permissions once.
 iOS app syncs compact summaries manually or automatically.
@@ -67,7 +67,7 @@ The first implementation can combine `local`, `mcp`, and `sdk` into one npm pack
 
 ## Common Deployment Methods
 
-HealthLink deployment is about where the receiver, database, and MCP process run. Agent runtime choice is a separate adapter concern.
+Vital Agent Sync deployment is about where the receiver, database, and MCP process run. Agent runtime choice is a separate adapter concern.
 
 The first supported methods are documented in [deployment-methods.md](deployment-methods.md):
 
@@ -78,7 +78,7 @@ Best for first-time setup, local MCP-compatible agents, and developer machines.
 ```text
 iPhone
   -> same Wi-Fi / LAN
-  -> macOS HealthLink receiver
+  -> macOS Vital Agent Sync receiver
   -> ~/.healthlink/healthlink.sqlite
   -> MCP stdio
   -> MCP-compatible Agent
@@ -129,7 +129,7 @@ Best for NAS/N100, WSL, Windows Docker Desktop, and users who prefer container-m
 iPhone
   -> host LAN / Tailscale / HTTPS URL
   -> Docker host port 8787
-  -> HealthLink receiver container
+  -> Vital Agent Sync receiver container
   -> /data/healthlink.sqlite mounted volume
   -> MCP-compatible Agent on the host or shared volume
 ```
@@ -167,7 +167,7 @@ vitalmcp daemon \
 
 This mode requires the user to provide HTTPS, DNS, persistence, and server hardening. Health summaries leave the phone and home network, but remain on infrastructure controlled by the user.
 
-Future deployment work can add tunnel managers, an official published Docker image, remote MCP over HTTPS, and a HealthLink-hosted relay. Those are intentionally not part of the first deployment pass.
+Future deployment work can add tunnel managers, an official published Docker image, remote MCP over HTTPS, and a Vital Agent Sync-hosted relay. Those are intentionally not part of the first deployment pass.
 
 ## Pairing Flow
 
@@ -257,7 +257,7 @@ request_refresh
 
 MCP remains the core protocol. A skill is an optional agent-specific usage guide.
 
-HealthLink should ship a portable skill document, with Hermes as the first supported target. The skill should:
+Vital Agent Sync should ship a portable skill document, with Hermes as the first supported target. The skill should:
 
 - trigger on natural-language questions about personal status, recovery, exercise readiness, and activity
 - call `get_personal_context` first
@@ -265,7 +265,7 @@ HealthLink should ship a portable skill document, with Hermes as the first suppo
 - report data freshness
 - avoid diagnosis, prescriptions, and unsupported medical claims
 
-This should be additive. A generic MCP-compatible agent should still work without installing a HealthLink skill.
+This should be additive. A generic MCP-compatible agent should still work without installing a Vital Agent Sync skill.
 
 ## Scope Model
 
@@ -417,14 +417,14 @@ Status: partially implemented. QR scanner, scope confirmation, manual sync, conn
 - `print-mcp-config`
 - `install-hermes`
 - `status` and `doctor`
-- optional HealthLink skill installer
+- optional Vital Agent Sync skill installer
 - generic MCP config docs for other agents
 
 Exit criteria:
 
 - A user can install the receiver with one command.
 - The iOS app can pair by scanning, without copying URL/token text.
-- An agent can query HealthLink without hand-authoring MCP JSON.
+- An agent can query Vital Agent Sync without hand-authoring MCP JSON.
 - After the first reload/restart, new iOS syncs are visible to the agent without reconnecting.
 
 ### Milestone 4: Common Deployment Methods

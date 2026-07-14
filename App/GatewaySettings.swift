@@ -210,7 +210,7 @@ final class GatewaySettings: ObservableObject {
         do {
             let response = try await GatewayAPIClient.confirmPairing(
                 link: preview.link,
-                deviceName: "VitalMCP iOS",
+                deviceName: "Vital Agent iOS",
                 acceptedScopes: preview.status.requested_scopes
             )
 

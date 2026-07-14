@@ -1,9 +1,9 @@
 # Tailscale HTTPS Onboarding For iOS
 
-HealthLink supports private cross-network pairing through Tailscale Serve:
+Vital Agent Sync supports private cross-network pairing through Tailscale Serve:
 
 ```text
-HealthLink iOS
+Vital Agent iOS app
   -> Tailscale on the iPhone
   -> https://<device>.<tailnet>.ts.net
   -> Tailscale Serve terminates trusted TLS
@@ -11,7 +11,7 @@ HealthLink iOS
   -> healthlink-local receiver
 ```
 
-This route stays inside the tailnet. HealthLink does not use Tailscale Funnel and refuses to replace a conflicting Serve root handler or advertise a port where Funnel is enabled.
+This route stays inside the tailnet. Vital Agent Sync does not use Tailscale Funnel and refuses to replace a conflicting Serve root handler or advertise a port where Funnel is enabled.
 
 ## Requirements
 
@@ -32,7 +32,7 @@ healthlink-local setup --transport tailscale --agent generic
 healthlink-local setup --resume --yes
 ```
 
-After setup consent, HealthLink detects the host's MagicDNS name, defaults the receiver bind address to `127.0.0.1`, and configures and verifies:
+After setup consent, Vital Agent Sync detects the host's MagicDNS name, defaults the receiver bind address to `127.0.0.1`, and configures and verifies:
 
 ```bash
 tailscale serve --bg --yes --https=443 http://127.0.0.1:8787
@@ -56,7 +56,7 @@ healthlink-local setup \
   --agent generic
 ```
 
-Plain `http://<device>.<tailnet>.ts.net` is not a supported iOS route. A `.ts.net` name is a qualified domain, so the app's narrow `NSAllowsLocalNetworking` ATS setting does not exempt plain HTTP. HealthLink deliberately does not add `NSAllowsArbitraryLoads` or a `.ts.net` exception. Tailscale's trusted HTTPS certificate is the supported path.
+Plain `http://<device>.<tailnet>.ts.net` is not a supported iOS route. A `.ts.net` name is a qualified domain, so the app's narrow `NSAllowsLocalNetworking` ATS setting does not exempt plain HTTP. Vital Agent Sync deliberately does not add `NSAllowsArbitraryLoads` or a `.ts.net` exception. Tailscale's trusted HTTPS certificate is the supported path.
 
 ## Diagnostics
 
@@ -74,8 +74,8 @@ Common failures:
 
 - **No `.ts.net` name:** enable MagicDNS and HTTPS certificates, confirm Tailscale is running, then retry. A discovered `100.64.0.0/10` address is not used as a certificate name.
 - **Serve requests approval:** open the Tailscale consent URL shown by the command, enable HTTPS for the tailnet, then rerun setup.
-- **Existing root handler:** HealthLink will not overwrite it. Move that handler, use another node, or pass another private HTTPS `--server-url`.
-- **Funnel enabled on 443:** disable Funnel before setup. HealthLink does not publish the receiver to the public internet.
+- **Existing root handler:** Vital Agent Sync will not overwrite it. Move that handler, use another node, or pass another private HTTPS `--server-url`.
+- **Funnel enabled on 443:** disable Funnel before setup. Vital Agent Sync does not publish the receiver to the public internet.
 - **Safari cannot connect:** confirm both devices are on the same tailnet, check ACLs/grants, then run `healthlink-local service status` and `healthlink-local logs`.
 - **Certificate or ATS failure:** confirm the QR contains `https://` and the exact `.ts.net` MagicDNS name. Do not replace it with HTTP, a raw `100.x` URL, or a self-signed certificate.
 

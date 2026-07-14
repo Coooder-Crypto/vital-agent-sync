@@ -145,7 +145,7 @@ export function buildSystemdUnit(options: LaunchdServiceOptions): string {
   const command = buildServiceProgramArguments(options, paths.databasePath)
     .map(quoteSystemdArg)
     .join(" ");
-  const description = options.mode === "relay_pull" ? "VitalMCP Relay Puller" : "VitalMCP Local Receiver";
+  const description = options.mode === "relay_pull" ? "Vital Agent Sync Relay Puller" : "Vital Agent Sync Local Receiver";
 
   return `[Unit]
 Description=${description}
@@ -228,7 +228,7 @@ export function startLaunchdService(options: LaunchdServiceOptions): HealthLinkS
   const paths = getLaunchdServicePaths(options);
   const label = serviceLaunchdLabel(options.mode ?? "receiver");
   if (!existsSync(paths.plistPath)) {
-    throw new Error(`VitalMCP launchd service is not installed: ${paths.plistPath}`);
+    throw new Error(`Vital Agent Sync launchd service is not installed: ${paths.plistPath}`);
   }
   runLaunchctl(["bootstrap", launchdDomain(), paths.plistPath], { allowFailure: true });
   runLaunchctl(["kickstart", "-k", `${launchdDomain()}/${label}`], { allowFailure: true });
@@ -268,7 +268,7 @@ export function startSystemdService(options: LaunchdServiceOptions): HealthLinkS
   const paths = getSystemdServicePaths(options);
   const unit = serviceSystemdUnit(options.mode ?? "receiver");
   if (!existsSync(paths.configPath)) {
-    throw new Error(`VitalMCP systemd service is not installed: ${paths.configPath}`);
+    throw new Error(`Vital Agent Sync systemd service is not installed: ${paths.configPath}`);
   }
   runSystemctl(["--user", "daemon-reload"], { allowFailure: true });
   runSystemctl(["--user", "start", unit]);
@@ -471,13 +471,13 @@ function isSystemdServiceRunning(mode: HealthLinkServiceMode): boolean {
 
 function assertMacOSLaunchd(platform: NodeJS.Platform = process.platform): void {
   if (platform !== "darwin") {
-    throw new Error("VitalMCP service install/start/stop/uninstall currently supports macOS launchd only. Use vitalmcp daemon with systemd, Docker, PM2, or another process manager on remote hosts.");
+    throw new Error("Vital Agent Sync service install/start/stop/uninstall currently supports macOS launchd only. Use vitalmcp daemon with systemd, Docker, PM2, or another process manager on remote hosts.");
   }
 }
 
 function assertLinuxSystemd(): void {
   if (process.platform !== "linux") {
-    throw new Error("VitalMCP systemd service management is only available on Linux. Use --manager launchd on macOS, or run vitalmcp daemon under your own process manager.");
+    throw new Error("Vital Agent Sync systemd service management is only available on Linux. Use --manager launchd on macOS, or run vitalmcp daemon under your own process manager.");
   }
 }
 

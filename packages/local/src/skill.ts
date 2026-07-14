@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
 export const HEALTHLINK_SKILL_NAME = "vitalmcp-personal-context";
-export const HEALTHLINK_SKILL_VERSION = "0.3.0";
+export const HEALTHLINK_SKILL_VERSION = "0.4.0";
 
 export type SkillInstallOptions = {
   hermesHome?: string;
@@ -34,9 +34,15 @@ export function buildHealthLinkSkillMarkdown(options: HealthLinkSkillOptions = {
   const targetAgent = agent !== "generic" ? `\nTarget agent: ${agentDisplayName(agent)}.\n` : "";
   const agentSubject = agent === "generic" ? "the user's MCP-compatible Agent" : agentDisplayName(agent);
   const triggerSource = agent === "generic" ? "agent" : agent;
+  const skillTitle = agent === "workbuddy"
+    ? "Vital Agent Sync for WorkBuddy"
+    : "Vital Agent Sync Personal Context";
+  const skillDescription = agent === "workbuddy"
+    ? "Connect private Apple Health context to WorkBuddy through the local vitalmcp runtime."
+    : "Use Vital Agent Sync MCP for personal health, recovery, and activity context.";
   return `---
 name: ${HEALTHLINK_SKILL_NAME}
-description: Use VitalMCP MCP for personal health, recovery, and activity context.
+description: ${skillDescription}
 version: ${HEALTHLINK_SKILL_VERSION}
 metadata:
   openclaw:
@@ -56,20 +62,20 @@ metadata:
     tags: [vitalmcp, mcp, personal-context, health]
 ---
 
-# VitalMCP Personal Context
+# ${skillTitle}
 
 ## Overview
 
-Use this skill when the user asks about their personal status, energy, recovery, sleep, workout readiness, or recent activity. VitalMCP is a user-controlled data gateway, not a medical provider.
+Use this skill when the user asks about their personal status, energy, recovery, sleep, workout readiness, or recent activity. Vital Agent Sync is a user-controlled data gateway, not a medical provider.
 ${targetAgent}
 
-VitalMCP data comes from MCP tools. Do not invent health, sleep, workout, or recovery facts that are not present in tool output.
+Vital Agent Sync data comes from MCP tools. Do not invent health, sleep, workout, or recovery facts that are not present in tool output.
 
 ## After Skill Installation
 
-Proactively offer to initialize VitalMCP. Do not wait for the user to discover setup commands.
+Proactively offer to initialize Vital Agent Sync. Do not wait for the user to discover setup commands.
 
-1. Explain that VitalMCP will create private local state, configure one shared MCP server, install a local receiver service, and create one iOS pairing action. LAN is the Local Preview default.
+1. Explain that Vital Agent Sync will create private local state, configure one shared MCP server, install a local receiver service, and create one iOS pairing action. LAN is the Local Preview default.
 2. Ask whether the user wants to review the setup plan.
 3. Run the machine-readable setup command without \`--yes\`. Summarize only the returned redacted \`plan\` entries.
 4. After explicit approval, resume with \`--yes\`.
@@ -84,7 +90,7 @@ The Skill is an orchestration layer. Removing or upgrading it must not remove \`
 - The user asks "How am I today?", "Should I exercise?", "Am I recovered?", or similar.
 - The user asks for analysis that may benefit from sleep, activity, heart-rate, HRV, VO2 max, blood oxygen, respiratory rate, body temperature, body composition, or workout context.
 - The user asks whether recent sync data is available.
-- The user asks to revoke, inspect, or troubleshoot connected VitalMCP source devices.
+- The user asks to revoke, inspect, or troubleshoot connected Vital Agent Sync source devices.
 
 Do not use this skill for diagnosis, prescriptions, emergency advice, or unsupported medical claims.
 
@@ -99,14 +105,14 @@ Do not use this skill for diagnosis, prescriptions, emergency advice, or unsuppo
    - \`get_weekly_summary\` for compact 7-day health, activity, and recovery summaries.
    - \`healthlink_status\`, \`list_source_devices\`, and \`revoke_source_device\` for setup and troubleshooting.
    - \`list_devices\` and \`revoke_device\` only as legacy aliases when an older agent flow expects those names.
-   - \`record_feedback\` only when the user explicitly gives feedback, a correction, or a preference that should improve future VitalMCP analysis.
+   - \`record_feedback\` only when the user explicitly gives feedback, a correction, or a preference that should improve future Vital Agent Sync analysis.
 3. Mention data freshness before analysis when the answer depends on recency.
-4. If the latest sync is stale or missing, say that plainly and suggest syncing VitalMCP.
+4. If the latest sync is stale or missing, say that plainly and suggest syncing Vital Agent Sync.
 5. In relay mode, call or suggest \`vitalmcp pull\` before freshness-sensitive analysis when \`healthlink_status.relay.suggested_next_action\` indicates a pull is needed.
 
 ## Agent Setup Flow
 
-When the user asks ${agentSubject} to install or connect VitalMCP, keep the core logic in \`vitalmcp\`. Do not implement transport logic, parse private keys, or store health data inside the skill.
+When the user asks ${agentSubject} to install or connect Vital Agent Sync, keep the core logic in \`vitalmcp\`. Do not implement transport logic, parse private keys, or store health data inside the skill.
 
 ### Local Preview: LAN By Default
 
@@ -114,13 +120,13 @@ When the user asks ${agentSubject} to install or connect VitalMCP, keep the core
    \`\`\`bash
    vitalmcp --version
    \`\`\`
-   If the command is missing or outside the compatible 0.3.x range, use the pinned package fallback for this Skill version:
+   If the command is missing or outside the compatible 0.4.x range, use the pinned package fallback for this Skill version:
    \`\`\`bash
-   npx -y vitalmcp@0.3.0 --version
+   npx -y vitalmcp@0.4.0 --version
    \`\`\`
-   Select one runtime command for the whole flow: use \`vitalmcp\` when the installed version is compatible; otherwise prefix every local CLI invocation below with \`npx -y vitalmcp@0.3.0\`. Do not switch runners midway through setup, and do not use an unpinned \`npx\` package.
+   Select one runtime command for the whole flow: use \`vitalmcp\` when the installed version is compatible; otherwise prefix every local CLI invocation below with \`npx -y vitalmcp@0.4.0\`. Do not switch runners midway through setup, and do not use an unpinned \`npx\` package.
    Do not use \`sudo npm install -g\`.
-2. Explain that LAN requires the iPhone and receiver to share a reachable trusted network. It does not require a relay URL, VPS, domain, VitalMCP account, or payment method. Request a redacted setup plan:
+2. Explain that LAN requires the iPhone and receiver to share a reachable trusted network. It does not require a relay URL, VPS, domain, Vital Agent Sync account, or payment method. Request a redacted setup plan:
    \`\`\`bash
    vitalmcp setup --transport lan --agent ${agent} --output json
    \`\`\`
@@ -132,7 +138,7 @@ When the user asks ${agentSubject} to install or connect VitalMCP, keep the core
    \`\`\`bash
    vitalmcp pair
    \`\`\`
-5. Ask the user to scan the pairing QR in VitalMCP iOS, grant Apple Health access, and run Sync Now.
+5. Ask the user to scan the pairing QR in the Vital Agent app, grant Apple Health access, and run Sync Now.
 6. Resume setup to observe the first ingest, then use \`healthlink_status\` and \`get_personal_context\`:
    \`\`\`bash
    vitalmcp setup --resume --yes --output json
@@ -154,7 +160,7 @@ Then request a separate reviewed plan:
 vitalmcp setup --transport tailscale --tailscale-name <host.tailnet.ts.net> --agent ${agent} --output json
 \`\`\`
 
-After explicit approval, resume with \`vitalmcp setup --resume --yes --output json\`. Do not silently switch an existing LAN installation to Tailscale. Tailscale is optional and user-managed; VitalMCP does not create an account, install the apps, or authorize tailnet devices.
+After explicit approval, resume with \`vitalmcp setup --resume --yes --output json\`. Do not silently switch an existing LAN installation to Tailscale. Tailscale is optional and user-managed; Vital Agent Sync does not create an account, install the apps, or authorize tailnet devices.
 
 ### LAN And Tailscale Troubleshooting
 
@@ -193,7 +199,7 @@ Relay setup may install a \`relay-pull\` service. A pull schedule only moves alr
 
 - Never print, request, summarize, or copy files under \`~/.healthlink/secrets\`.
 - Do not ask the user to paste private keys into an Agent chat.
-- Treat the complete onboarding QR, deep link, and text code as credentials. They contain \`upload_auth_secret\`, \`relay_access_token\`, and sometimes \`relay_api_token\`; show them only to the user for transfer to the intended VitalMCP source device, and never paste them into Agent chat, logs, memory, tool arguments, issue trackers, or support messages.
+- Treat the complete onboarding QR, deep link, and text code as credentials. They contain \`upload_auth_secret\`, \`relay_access_token\`, and sometimes \`relay_api_token\`; show them only to the user for transfer to the intended Vital Agent Sync source device, and never paste them into Agent chat, logs, memory, tool arguments, issue trackers, or support messages.
 - Hosted and self-hosted relays should contain encrypted envelopes plus minimal hashed tenant/revocation metadata; relay operators should not be able to decrypt health payloads.
 - Treat \`~/.healthlink/config.json\`, \`~/.healthlink/healthlink.sqlite\`, generated reports, and exported summaries as sensitive local state.
 - Do not dump raw health tables or long metric histories unless the user explicitly asks for that detail.
@@ -239,11 +245,11 @@ Do not save reports to files unless the user explicitly asks. Treat generated re
 - Use cautious language when data is incomplete.
 - Separate observed data from inference.
 - Match the user's language.
-- If the user asks for exact reasons behind a health signal that VitalMCP does not contain, say the data cannot prove that.
+- If the user asks for exact reasons behind a health signal that Vital Agent Sync does not contain, say the data cannot prove that.
 
 ## Verification Checklist
 
-- [ ] VitalMCP MCP tool output was used for health claims.
+- [ ] Vital Agent Sync MCP tool output was used for health claims.
 - [ ] Data freshness or missing data was surfaced.
 - [ ] Relay mode used \`vitalmcp pull\` before MCP analysis when fresh data was needed.
 - [ ] Private keys and raw local state were not exposed.
@@ -325,7 +331,7 @@ function uniqueBackupPath(skillPath: string): string {
     }
   }
 
-  throw new Error("Could not allocate a unique VitalMCP skill backup path.");
+  throw new Error("Could not allocate a unique Vital Agent Sync skill backup path.");
 }
 
 export function readInstalledHermesSkill(options: SkillInstallOptions = {}): string | undefined {
@@ -334,11 +340,11 @@ export function readInstalledHermesSkill(options: SkillInstallOptions = {}): str
 }
 
 function buildSkillPackageReadme(agent: NonNullable<HealthLinkSkillOptions["agent"]>): string {
-  return `# VitalMCP Personal Context Skill
+  return `# Vital Agent Sync Personal Context Skill
 
 Target agent: ${agentDisplayName(agent)}.
 
-This package contains a VitalMCP skill for LAN-first agent-guided setup, optional user-managed Tailscale access, freshness checks, and MCP-based personal health context. Experimental relay guidance remains available for explicit tests. The skill delegates all local runtime, transport, crypto, storage, and MCP behavior to \`vitalmcp\`.
+This package contains a Vital Agent Sync skill for LAN-first agent-guided setup, optional user-managed Tailscale access, freshness checks, and MCP-based personal health context. Experimental relay guidance remains available for explicit tests. The skill delegates all local runtime, transport, crypto, storage, and MCP behavior to \`vitalmcp\`.
 
 Package contents:
 
@@ -362,7 +368,7 @@ clawhub login
 clawhub whoami
 clawhub skill publish . \\
   --slug ${HEALTHLINK_SKILL_NAME} \\
-  --name "VitalMCP Personal Context" \\
+  --name "Vital Agent Sync Personal Context" \\
   --version ${HEALTHLINK_SKILL_VERSION} \\
   --changelog "LAN-first Local Preview" \\
   --dry-run

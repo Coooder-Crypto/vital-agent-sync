@@ -1,12 +1,12 @@
-# HealthLink E2EE Relay Threat Model
+# Vital Agent Sync E2EE Relay Threat Model
 
-This document defines the security boundary for the HealthLink relay route. It covers hosted relay and self-hosted relay modes that use the same encrypted envelope protocol.
+This document defines the security boundary for the Vital Agent Sync relay route. It covers hosted relay and self-hosted relay modes that use the same encrypted envelope protocol.
 
 ## Scope
 
 In scope:
 
-- HealthLink iOS or compatible mobile source app.
+- Vital Agent iOS app or compatible mobile source app.
 - `vitalmcp` runtime, local SQLite database, MCP server, and private key storage.
 - Hosted or self-hosted relay API that stores encrypted envelopes.
 - OpenClaw, Hermes, and generic MCP agents that read through MCP.

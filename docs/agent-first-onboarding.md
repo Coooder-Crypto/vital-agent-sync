@@ -1,6 +1,6 @@
 # Agent-First Onboarding And Runtime Bootstrap
 
-This document defines the target installation and onboarding experience for HealthLink. It replaces the assumption that the website and a shell command are the product entry point. The preferred entry point is an existing Agent conversation; the website and CLI remain portable fallbacks.
+This document defines the target installation and onboarding experience for Vital Agent Sync. It replaces the assumption that the website and a shell command are the product entry point. The preferred entry point is an existing Agent conversation; the website and CLI remain portable fallbacks.
 
 Related work:
 
@@ -11,10 +11,10 @@ Related work:
 
 ## Product Decision
 
-HealthLink is not an OpenClaw-only skill and it is not a shell installer with an iOS companion. It is four replaceable layers:
+Vital Agent Sync is not an OpenClaw-only skill and it is not a shell installer with an iOS companion. It is four replaceable layers:
 
 ```text
-HealthLink iOS source
+Vital Agent iOS app source
   -> encrypted transport
   -> vitalmcp context runtime
   -> Agent-neutral MCP
@@ -24,7 +24,7 @@ HealthLink iOS source
 The default product experience should be:
 
 ```text
-Ask an Agent to install HealthLink
+Ask an Agent to install Vital Agent Sync
   -> review the setup plan
   -> let the Agent invoke the shared bootstrap
   -> receive one onboarding action
@@ -37,7 +37,7 @@ The Agent can guide this flow, but it must not become the data plane. Removing a
 
 ## Reference Product Alignment
 
-The current [Apple Health Sync skill on ClawHub](https://clawhub.ai/lukasosterheider/skills/apple-health-sync) and [Health Sync product walkthrough](https://gethealthsync.app/) provide a useful interaction benchmark, but VitalMCP Local Preview does not depend on any marketplace listing:
+The current [Apple Health Sync skill on ClawHub](https://clawhub.ai/lukasosterheider/skills/apple-health-sync) and [Health Sync product walkthrough](https://gethealthsync.app/) provide a useful interaction benchmark, but Vital Agent Sync runtime Preview does not depend on any marketplace listing:
 
 1. The user starts inside an Agent conversation.
 2. The Agent installs a Skill and initializes a local runtime.
@@ -46,13 +46,13 @@ The current [Apple Health Sync skill on ClawHub](https://clawhub.ai/lukasosterhe
 5. The local runtime fetches, decrypts, validates, and persists snapshots.
 6. The Agent can generate summaries from the latest available sync.
 
-HealthLink should align with that low-friction sequence, but not copy an Agent-specific runtime or duplicate the query layer in Skill scripts. HealthLink already has a reusable TypeScript runtime, E2EE relay protocol, SQLite ingest path, lifecycle controls, and 12 Agent-neutral MCP tools.
+Vital Agent Sync should align with that low-friction sequence, but not copy an Agent-specific runtime or duplicate the query layer in Skill scripts. Vital Agent Sync already has a reusable TypeScript runtime, E2EE relay protocol, SQLite ingest path, lifecycle controls, and 12 Agent-neutral MCP tools.
 
 ## Entry Surfaces
 
 ### 1. Agent Conversation (Preferred)
 
-The user gives a supported Agent a HealthLink install URL or marketplace package. The adapter:
+The user gives a supported Agent a Vital Agent Sync install URL or marketplace package. The adapter:
 
 - explains the filesystem, service, network, and Agent-config changes before applying them
 - invokes the shared `vitalmcp` bootstrap
@@ -81,13 +81,13 @@ The shell script is a distribution helper, not a second setup implementation. It
 
 ### 3. Mobile Agent Trigger
 
-A mobile Agent may open a HealthLink universal/deep link after an Agent-side runtime has created onboarding state:
+A mobile Agent may open a Vital Agent Sync universal/deep link after an Agent-side runtime has created onboarding state:
 
 ```text
 Agent mobile app
   -> vitalmcp://onboard?... or an HTTPS universal link
-  -> HealthLink iOS confirms the target and requested scopes
-  -> HealthLink uploads ciphertext
+  -> Vital Agent iOS app confirms the target and requested scopes
+  -> Vital Agent Sync uploads ciphertext
   -> vitalmcp pulls, decrypts, and exposes MCP
 ```
 
@@ -103,7 +103,7 @@ flowchart LR
   adapter --> bootstrap
   bootstrap --> runtime["Local runtime, keys, SQLite, MCP"]
   bootstrap --> handoff["One onboarding action"]
-  handoff --> ios["VitalMCP iOS"]
+  handoff --> ios["Vital Agent iOS app"]
   ios -->|"default: trusted LAN"| runtime
   ios -->|"optional: authorized tailnet"| runtime
   ios -.->|"future/experimental encrypted envelope"| relay["Hosted or self-hosted Relay"]
@@ -111,7 +111,7 @@ flowchart LR
   runtime -->|"Agent-neutral MCP"| chat
 ```
 
-LAN is the Local Preview default and requires only a reachable trusted network between the iPhone and receiver. Tailscale is the optional private remote path for users who install its apps, sign in to an account, and authorize both devices on the same tailnet. Neither path asks for a relay URL, VPS, domain, VitalMCP account, or payment method. Hosted Relay remains future/experimental and is not recommended or required in Local Preview.
+LAN is the Local Preview default and requires only a reachable trusted network between the iPhone and receiver. Tailscale is the optional private remote path for users who install its apps, sign in to an account, and authorize both devices on the same tailnet. Neither path asks for a relay URL, VPS, domain, Vital Agent Sync account, or payment method. Hosted Relay remains future/experimental and is not recommended or required in Local Preview.
 
 ## Bootstrap Ownership
 

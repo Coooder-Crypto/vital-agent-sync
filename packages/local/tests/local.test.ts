@@ -1144,7 +1144,7 @@ test("relay server enforces per-user queue quota and exposes body-free metrics",
     const statusPageResponse = await fetch(`${relayUrl}/`);
     const statusPageText = await statusPageResponse.text();
     assert.equal(statusPageResponse.headers.get("content-type")?.includes("text/html"), true);
-    assert.match(statusPageText, /VitalMCP Relay Status/);
+    assert.match(statusPageText, /Vital Agent Sync Relay Status/);
     assert.match(statusPageText, /Queued envelopes/);
     assert.doesNotMatch(statusPageText, /ciphertext/);
     assert.doesNotMatch(statusPageText, new RegExp(firstEnvelope.envelope_id));
@@ -2116,13 +2116,14 @@ test("Agent auto-detection prefers installed or available specific adapters befo
   }
 });
 
-test("VitalMCP skill can be printed and installed for Hermes", () => {
+test("Vital Agent Sync skill can be printed and installed for Hermes", () => {
   const tempDir = mkdtempSync(join(tmpdir(), "healthlink-skill-test-"));
   try {
     const skillPath = join(tempDir, "skills", "health", "vitalmcp-personal-context", "SKILL.md");
     const markdown = buildHealthLinkSkillMarkdown();
     const hermesMarkdown = buildHealthLinkSkillMarkdown({ agent: "hermes" });
     const openclawMarkdown = buildHealthLinkSkillMarkdown({ agent: "openclaw" });
+    const workbuddyMarkdown = buildHealthLinkSkillMarkdown({ agent: "workbuddy" });
     assert.match(markdown, /name: vitalmcp-personal-context/);
     assert.match(markdown, /get_personal_context/);
     assert.match(markdown, /vitalmcp setup --transport lan --agent generic/);
@@ -2133,7 +2134,7 @@ test("VitalMCP skill can be printed and installed for Hermes", () => {
     assert.match(openclawMarkdown, /Target agent: OpenClaw/);
     assert.match(openclawMarkdown, /### Local Preview: LAN By Default/);
     assert.match(openclawMarkdown, /vitalmcp setup --transport lan --agent openclaw/);
-    assert.match(openclawMarkdown, /does not require a relay URL, VPS, domain, VitalMCP account, or payment method/);
+    assert.match(openclawMarkdown, /does not require a relay URL, VPS, domain, Vital Agent Sync account, or payment method/);
     assert.match(openclawMarkdown, /### Optional Private Remote Path: Tailscale/);
     assert.match(openclawMarkdown, /install and sign in to Tailscale on both the iPhone and receiver machine/);
     assert.match(openclawMarkdown, /authorized tailnet that includes both devices/);
@@ -2142,8 +2143,8 @@ test("VitalMCP skill can be printed and installed for Hermes", () => {
     assert.match(openclawMarkdown, /Hosted Relay is not available, recommended, or required in the Local Preview flow/);
     assert.match(openclawMarkdown, /vitalmcp setup --transport relay --relay-url https:\/\/HOSTED-RELAY --agent openclaw/);
     assert.match(openclawMarkdown, /Never invent a relay domain/);
-    assert.match(openclawMarkdown, /npx -y vitalmcp@0\.3\.0 --version/);
-    assert.match(openclawMarkdown, /prefix every local CLI invocation below with `npx -y vitalmcp@0\.3\.0`/);
+    assert.match(openclawMarkdown, /npx -y vitalmcp@0\.4\.0 --version/);
+    assert.match(openclawMarkdown, /prefix every local CLI invocation below with `npx -y vitalmcp@0\.4\.0`/);
     assert.match(openclawMarkdown, /Do not switch runners midway through setup/);
     assert.match(openclawMarkdown, /setup --resume --yes --output json/);
     assert.match(openclawMarkdown, /next_action\.url/);
@@ -2165,6 +2166,10 @@ test("VitalMCP skill can be printed and installed for Hermes", () => {
     assert.match(openclawMarkdown, /manual Sync Now plus catch-up when the iOS app is active or returns to the foreground/);
     assert.match(openclawMarkdown, /Never promise scheduled daily or weekly delivery/);
     assert.match(openclawMarkdown, /revoke_source_device/);
+    assert.match(workbuddyMarkdown, /# Vital Agent Sync for WorkBuddy/);
+    assert.match(workbuddyMarkdown, /Connect private Apple Health context to WorkBuddy/);
+    assert.match(workbuddyMarkdown, /Target agent: WorkBuddy/);
+    assert.match(workbuddyMarkdown, /--agent workbuddy/);
 
     const planIndex = openclawMarkdown.indexOf("setup --transport lan");
     const consentIndex = openclawMarkdown.indexOf("obtain explicit approval");
@@ -2182,7 +2187,7 @@ test("VitalMCP skill can be printed and installed for Hermes", () => {
 
     assert.equal(first.skillPath, skillPath);
     assert.ok(second.backupPath);
-    assert.match(installed ?? "", /VitalMCP Personal Context/);
+    assert.match(installed ?? "", /Vital Agent Sync Personal Context/);
     assert.match(installed ?? "", /Target agent: Hermes/);
     assert.match(installed ?? "", /--agent hermes/);
     assert.doesNotMatch(installed ?? "", /## OpenClaw Relay Setup Flow/);
@@ -2191,7 +2196,7 @@ test("VitalMCP skill can be printed and installed for Hermes", () => {
   }
 });
 
-test("VitalMCP skill can be exported as an OpenClaw package", () => {
+test("Vital Agent Sync skill can be exported as an OpenClaw package", () => {
   const tempDir = mkdtempSync(join(tmpdir(), "healthlink-openclaw-skill-test-"));
   try {
     const packageDir = join(tempDir, "vitalmcp-personal-context");
@@ -2221,12 +2226,12 @@ test("VitalMCP skill can be exported as an OpenClaw package", () => {
     assert.equal(result.packageDir, packageDir);
     assert.deepEqual(readdirSync(packageDir).sort(), ["README.md", "SKILL.md"]);
     assert.equal(frontmatter.name, "vitalmcp-personal-context");
-    assert.equal(frontmatter.version, "0.3.0");
+    assert.equal(frontmatter.version, "0.4.0");
     assert.equal(frontmatter.license, undefined);
     assert.deepEqual(frontmatter.metadata.openclaw.requires.bins, ["vitalmcp"]);
     assert.deepEqual(frontmatter.metadata.openclaw.install, [{
       kind: "node",
-      package: "vitalmcp@0.3.0",
+      package: "vitalmcp@0.4.0",
       bins: ["vitalmcp"]
     }]);
     assert.deepEqual(frontmatter.metadata.openclaw.os, ["macos", "linux", "windows"]);
@@ -2807,7 +2812,7 @@ test("relay pull service units run periodic pull without receiver ports", () => 
     assert.match(plist, /<string>com\.vitalmcp\.local\.relay-pull<\/string>/);
     assert.match(plist, /<string>pull<\/string>/);
     assert.match(plist, /relay-pull\.out\.log/);
-    assert.match(unit, /Description=VitalMCP Relay Puller/);
+    assert.match(unit, /Description=Vital Agent Sync Relay Puller/);
     assert.match(unit, /ExecStart=\/tmp\/vitalmcp pull --watch --interval-seconds 120 --db /);
     assert.match(systemdPaths.configPath, /vitalmcp-relay-pull\.service$/);
     assert.match(launchdPaths.stdoutPath, /relay-pull\.out\.log$/);
@@ -2837,7 +2842,7 @@ test("systemd service unit uses daemon command and restart policy", () => {
     assert.equal(paths.manager, "systemd");
     assert.match(paths.configPath, /vitalmcp\.service$/);
     assert.match(unit, /\[Unit\]/);
-    assert.match(unit, /Description=VitalMCP Local Receiver/);
+    assert.match(unit, /Description=Vital Agent Sync Local Receiver/);
     assert.match(unit, /ExecStart=\/tmp\/vitalmcp daemon --host 0\.0\.0\.0 --port 8787 --db /);
     assert.match(unit, /--transport tailscale --tailscale-name healthlink\.tailnet\.ts\.net/);
     assert.match(unit, /Restart=on-failure/);
@@ -2970,7 +2975,7 @@ test("local package manifest is ready for public npm packing", () => {
   };
 
   assert.equal(manifest.name, "vitalmcp");
-  assert.equal(manifest.version, "0.3.0");
+  assert.equal(manifest.version, "0.4.0");
   assert.equal(manifest.private, undefined);
   assert.equal(manifest.license, "MIT");
   assert.equal(manifest.bin?.["vitalmcp"], "./dist/cli.js");
@@ -3209,7 +3214,7 @@ test("portable installer uses a user prefix and manages its PATH block idempoten
 
     let lastStdout = "";
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      const result = spawnSync("sh", [installScript, "--version", "0.3.0"], { env, encoding: "utf8" });
+      const result = spawnSync("sh", [installScript, "--version", "0.4.0"], { env, encoding: "utf8" });
       assert.equal(result.status, 0, result.stderr);
       lastStdout = result.stdout;
     }
@@ -3217,7 +3222,7 @@ test("portable installer uses a user prefix and manages its PATH block idempoten
     const installedProfile = readFileSync(profile, "utf8");
     assert.equal((installedProfile.match(/# >>> vitalmcp >>>/g) ?? []).length, 1);
     assert.match(installedProfile, new RegExp(escapeRegExp(`export PATH="${prefix}/bin:$PATH"`)));
-    assert.match(readFileSync(npmLog, "utf8"), /install --global --prefix .*vitalmcp@0\.3\.0/);
+    assert.match(readFileSync(npmLog, "utf8"), /install --global --prefix .*vitalmcp@0\.4\.0/);
     assert.equal(readFileSync(websiteInstallScript, "utf8"), readFileSync(installScript, "utf8"));
 
     const uninstall = spawnSync("sh", [installScript, "--uninstall"], { env, encoding: "utf8" });
@@ -3675,10 +3680,10 @@ test("relay onboarding artifact keeps credentials in a private local file", asyn
     assert.equal(artifact.local_url.startsWith("file://"), true);
     assert.equal(artifact.contains_credentials, true);
     const html = readFileSync(artifact.local_path, "utf8");
-    assert.match(html, /Connect VitalMCP iOS/);
+    assert.match(html, /Connect Vital Agent/);
     assert.match(html, /Do not share or upload/);
-    assert.match(html, /VitalMCP onboarding QR code/);
-    assert.doesNotMatch(html, />Open VitalMCP</);
+    assert.match(html, /Vital Agent Sync onboarding QR code/);
+    assert.doesNotMatch(html, />Open Vital Agent Sync</);
     assert.doesNotMatch(html, /<textarea/);
     assert.doesNotMatch(JSON.stringify(artifact), new RegExp(escapeRegExp(config.relay_access_token)));
     if (process.platform !== "win32") {
@@ -3687,16 +3692,16 @@ test("relay onboarding artifact keeps credentials in a private local file", asyn
 
     const deepLinkArtifact = await writeRelayOnboardingArtifact({ config, stateDir: tempDir, format: "deeplink" });
     const deepLinkHtml = readFileSync(deepLinkArtifact.local_path, "utf8");
-    assert.match(deepLinkHtml, />Open VitalMCP</);
-    assert.doesNotMatch(deepLinkHtml, /VitalMCP onboarding QR code/);
+    assert.match(deepLinkHtml, />Open Vital Agent Sync</);
+    assert.doesNotMatch(deepLinkHtml, /Vital Agent Sync onboarding QR code/);
     assert.doesNotMatch(deepLinkHtml, /<textarea/);
 
     const textArtifact = await writeRelayOnboardingArtifact({ config, stateDir: tempDir, format: "text" });
     const textHtml = readFileSync(textArtifact.local_path, "utf8");
     assert.match(textHtml, /<textarea/);
     assert.match(textHtml, /healthlink-e2ee-v1:/);
-    assert.doesNotMatch(textHtml, />Open VitalMCP</);
-    assert.doesNotMatch(textHtml, /VitalMCP onboarding QR code/);
+    assert.doesNotMatch(textHtml, />Open Vital Agent Sync</);
+    assert.doesNotMatch(textHtml, /Vital Agent Sync onboarding QR code/);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }

@@ -51,7 +51,7 @@ try {
   installIsolatedHermesAdapter();
   await verifyGenericMcpClient();
   verifyHermesCli();
-  console.log("\nVitalMCP generic MCP and Hermes adapter audit passed.");
+  console.log("\nVital Agent Sync generic MCP and Hermes adapter audit passed.");
 } finally {
   await cleanup();
 }
@@ -79,20 +79,20 @@ function installIsolatedHermesAdapter() {
     "--db",
     databasePath
   ], { env: isolatedEnv });
-  assert(installOutput.includes("VitalMCP MCP installed for Hermes"), "Hermes MCP install did not complete.");
+  assert(installOutput.includes("Vital Agent Sync MCP installed for Hermes"), "Hermes MCP install did not complete.");
 
   const config = readFileSync(hermesConfigPath, "utf8");
   assert(config.includes("mcp_servers:"), "Hermes config does not contain mcp_servers.");
   assert(config.includes("healthlink:"), "Hermes config does not contain the healthlink server.");
-  assert(config.includes(cliPath), "Hermes config does not point at the compiled VitalMCP CLI.");
-  assert(config.includes(databasePath), "Hermes config does not point at the isolated VitalMCP database.");
+  assert(config.includes(cliPath), "Hermes config does not point at the compiled Vital Agent Sync CLI.");
+  assert(config.includes(databasePath), "Hermes config does not point at the isolated Vital Agent Sync database.");
 
   const skillOutput = capture(cliPath, [
     "install-hermes-skill",
     "--hermes-skill-path",
     hermesSkillPath
   ], { env: isolatedEnv });
-  assert(skillOutput.includes("VitalMCP skill installed for Hermes"), "Hermes skill install did not complete.");
+  assert(skillOutput.includes("Vital Agent Sync skill installed for Hermes"), "Hermes skill install did not complete.");
 
   const skill = readFileSync(hermesSkillPath, "utf8");
   assert(skill.includes("Target agent: Hermes."), "Installed Hermes skill is not targeted at Hermes.");
@@ -174,8 +174,8 @@ function verifyHermesCli() {
     timeout: 30_000
   });
   assert(test.includes("Connected"), "Hermes did not connect to the healthlink MCP server.");
-  assert(test.includes("Tools discovered: 12"), "Hermes did not discover all 12 VitalMCP tools.");
-  assert(!test.includes("Connection failed"), "Hermes reported a failed VitalMCP MCP connection.");
+  assert(test.includes("Tools discovered: 12"), "Hermes did not discover all 12 Vital Agent Sync tools.");
+  assert(!test.includes("Connection failed"), "Hermes reported a failed Vital Agent Sync MCP connection.");
   for (const required of ["healthlink_status", "get_personal_context", "get_weekly_summary"]) {
     assert(test.includes(required), `Hermes MCP discovery output is missing ${required}.`);
   }

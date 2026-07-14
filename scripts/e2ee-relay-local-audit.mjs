@@ -82,7 +82,7 @@ runHostedSetupFailClosedCheck();
 runCliArgumentValidationCheck();
 runSavedRelayModeCheck();
 await runCompiledRelayAudit();
-console.log("\nVitalMCP E2EE relay local audit passed.");
+console.log("\nVital Agent Sync E2EE relay local audit passed.");
 
 function run(check) {
   console.log(`\n==> ${check.label}`);
@@ -144,7 +144,7 @@ function runHostedSetupFailClosedCheck() {
     }
     const output = result.stdout.trim() ? JSON.parse(result.stdout) : {};
     if (result.status === 0 || output.error?.code !== "relay_url_invalid" ||
-        !output.error?.message?.includes("Hosted VitalMCP relay URL is not configured")) {
+        !output.error?.message?.includes("Hosted Vital Agent Sync relay URL is not configured")) {
       process.stderr.write(result.stdout);
       process.stderr.write(result.stderr);
       throw new Error("Hosted relay setup did not fail with the expected missing-URL error.");
