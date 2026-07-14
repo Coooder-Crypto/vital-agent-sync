@@ -45,7 +45,7 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 }
 
 try {
-  const tarballPath = packVital Agent Sync();
+  const tarballPath = packVitalAgentSync();
   verifyPinnedNpxFallback(tarballPath);
   await installTarball(tarballPath);
   const binaryPath = resolveInstalledBinary();
@@ -90,7 +90,7 @@ function verifyPinnedNpxFallback(tarballPath) {
   assert(status.command === "status", "Pinned npm exec fallback ran the wrong command.");
 }
 
-function packVital Agent Sync() {
+function packVitalAgentSync() {
   console.log("\n==> pack vitalmcp tarball");
   const output = capture("npm", [
     "pack",
