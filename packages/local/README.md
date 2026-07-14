@@ -130,6 +130,7 @@ npx -y vitalmcp mcp
 npx -y vitalmcp print-mcp-config
 npx -y vitalmcp print-agent-config --agent generic
 npx -y vitalmcp print-agent-config --agent openclaw
+npx -y vitalmcp setup --agent workbuddy --workbuddy-project ~/VitalMCP
 npx -y vitalmcp print-docker-compose --server-url http://192.168.31.53:8787
 # Future/experimental relay operator commands (not the Local Preview onboarding path)
 npx -y vitalmcp print-relay-docker-compose
@@ -347,13 +348,17 @@ npx -y vitalmcp install-hermes
 npx -y vitalmcp install-hermes-skill
 npx -y vitalmcp init --agent hermes
 npx -y vitalmcp init --agent openclaw
+npx -y vitalmcp init --agent workbuddy --workbuddy-project ~/VitalMCP
 npx -y vitalmcp init --hermes --install-skill
 npx -y vitalmcp doctor --agent hermes
 npx -y vitalmcp doctor --agent openclaw
+npx -y vitalmcp doctor --agent workbuddy --workbuddy-project ~/VitalMCP
 npx -y vitalmcp doctor --transport lan
 ```
 
-`print-mcp-config` and `print-agent-config --agent generic` print standard `mcpServers.healthlink` JSON. `print-agent-config --agent hermes` prints a Hermes-style `mcp_servers.healthlink` YAML snippet. `print-agent-config --agent openclaw` prints an OpenClaw-style `mcp.servers.healthlink` JSON snippet. `install-hermes` backs up `~/.hermes/config.yaml`, writes `mcp_servers.healthlink`, and uses the same local database and tool surface as `vitalmcp mcp`. `init --agent hermes` and `init --hermes` perform the same Hermes install step as part of the foreground pairing flow. `init --agent openclaw` backs up and writes `~/.openclaw/openclaw.json` when it is valid JSON; use `--openclaw-config <path>` for a custom file.
+`print-mcp-config`, `print-agent-config --agent generic`, and `print-agent-config --agent workbuddy` print standard `mcpServers.healthlink` JSON. WorkBuddy setup writes project-scoped configuration only: pass `--workbuddy-project <dir>` to merge `<dir>/workbuddy.mcp.json`, or `--workbuddy-config <path>` for an explicit file. Existing JSON fields and other MCP servers are preserved, invalid JSON is rejected, and an existing file receives a timestamped backup. Restart WorkBuddy after configuration changes. `print-agent-config --agent hermes` prints a Hermes-style `mcp_servers.healthlink` YAML snippet. `print-agent-config --agent openclaw` prints an OpenClaw-style `mcp.servers.healthlink` JSON snippet. `install-hermes` backs up `~/.hermes/config.yaml`, writes `mcp_servers.healthlink`, and uses the same local database and tool surface as `vitalmcp mcp`. `init --agent hermes` and `init --hermes` perform the same Hermes install step as part of the foreground pairing flow. `init --agent openclaw` backs up and writes `~/.openclaw/openclaw.json` when it is valid JSON; use `--openclaw-config <path>` for a custom file.
+
+WorkBuddy officially documents `workbuddy.mcp.json` in the project root with the standard `mcpServers` shape. VitalMCP deliberately does not write `~/.workbuddy/models.json`, which configures models rather than MCP servers. See the [WorkBuddy MCP setup guide](https://docs.cloudbase.net/en/ai/cloudbase-ai-toolkit/ide-setup/workbuddy). WorkBuddy Skill export and model-side privacy guidance are tracked separately in [issue #90](https://github.com/Coooder-Crypto/health-link/issues/90).
 
 `print-skill` prints portable VitalMCP Skill Markdown parameterized for `generic`, `hermes`, `openclaw`, or `workbuddy`; setup commands and mobile trigger sources follow the selected adapter. `install-hermes-skill` writes the Hermes-targeted form to `~/.hermes/skills/health/vitalmcp-personal-context/SKILL.md` with a timestamped backup when replacing an existing file. `setup` auto-detects Hermes and installs the Hermes MCP config and Skill by default when Hermes config is present. Use `setup --agent hermes` to force Hermes, or `init --hermes --install-skill` when you want the same Skill install behavior in the foreground flow. As an optional marketplace adapter, `export-skill --agent openclaw --output-dir ./vitalmcp-openclaw-skill` writes a ClawHub/OpenClaw-ready package with `SKILL.md` and `README.md`; generic MCP works without a Skill or marketplace listing.
 

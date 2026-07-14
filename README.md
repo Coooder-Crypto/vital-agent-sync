@@ -106,6 +106,7 @@ Agent-safe setup commands:
 vitalmcp setup --agent auto --transport lan --output json
 vitalmcp setup --resume --yes --output json
 vitalmcp setup --agent auto --transport tailscale --tailscale-name <host.tailnet.ts.net> --output json
+vitalmcp setup --agent workbuddy --workbuddy-project ~/VitalMCP --transport lan --output json
 vitalmcp status --output json
 ```
 
@@ -116,7 +117,7 @@ npm run build:local
 node packages/local/dist/cli.js setup
 ```
 
-`setup` installs and starts the background receiver through the current platform's service manager, prints the iPhone pairing QR, and auto-detects Hermes/OpenClaw when their config exists. If Hermes is detected, it backs up and writes `~/.hermes/config.yaml`, installs the VitalMCP Hermes Skill, and points Hermes at the same VitalMCP database. macOS uses `launchd`; Linux servers use a user-level `systemd` service. Pass `--agent hermes`, `--agent openclaw`, or `--agent generic` to force an adapter. After pairing and syncing, restart Hermes or run `/reload-mcp` when an Agent config was changed. If the QR expires, run `vitalmcp pair` or `npx -y vitalmcp pair`.
+`setup` installs and starts the background receiver through the current platform's service manager, prints the iPhone pairing QR, and auto-detects a project-level WorkBuddy config, Hermes, or OpenClaw. WorkBuddy setup merges `mcpServers.healthlink` into `<project>/workbuddy.mcp.json` with a timestamped backup; pass `--workbuddy-project <dir>` or `--workbuddy-config <path>` and restart WorkBuddy after setup. If Hermes is detected, setup backs up and writes `~/.hermes/config.yaml`, installs the VitalMCP Hermes Skill, and points Hermes at the same VitalMCP database. macOS uses `launchd`; Linux servers use a user-level `systemd` service. Pass `--agent workbuddy`, `--agent hermes`, `--agent openclaw`, or `--agent generic` to force an adapter. If the QR expires, run `vitalmcp pair` or `npx -y vitalmcp pair`.
 
 The planned one-command installer only bootstraps this package into a user-writable prefix. It must not create a second setup implementation. Agent-first, website, and manual CLI entry points all converge on `vitalmcp setup`, the same local state, and the same MCP tools.
 
@@ -166,6 +167,7 @@ npx -y vitalmcp init --hermes
 npx -y vitalmcp setup
 npx -y vitalmcp setup --agent hermes
 npx -y vitalmcp setup --agent openclaw
+npx -y vitalmcp setup --agent workbuddy --workbuddy-project ~/VitalMCP
 npx -y vitalmcp ensure
 npx -y vitalmcp service status
 npx -y vitalmcp logs

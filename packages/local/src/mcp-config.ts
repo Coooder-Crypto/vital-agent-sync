@@ -24,6 +24,11 @@ export type OpenClawInstallOptions = McpConfigOptions & {
   configPath?: string;
 };
 
+export type WorkBuddyInstallOptions = McpConfigOptions & {
+  projectPath?: string;
+  configPath?: string;
+};
+
 export type HermesInstallResult = {
   configPath: string;
   backupPath?: string;
@@ -31,6 +36,12 @@ export type HermesInstallResult = {
 };
 
 export type OpenClawInstallResult = {
+  configPath: string;
+  backupPath?: string;
+  server: McpCommandConfig;
+};
+
+export type WorkBuddyInstallResult = {
   configPath: string;
   backupPath?: string;
   server: McpCommandConfig;
@@ -44,6 +55,13 @@ export type HermesMcpInstallStatus = {
 };
 
 export type OpenClawMcpInstallStatus = {
+  configPath: string;
+  exists: boolean;
+  installed: boolean;
+  server?: unknown;
+};
+
+export type WorkBuddyMcpInstallStatus = {
   configPath: string;
   exists: boolean;
   installed: boolean;
@@ -75,6 +93,29 @@ export function buildStandardMcpConfig(options: McpConfigOptions = {}): {
 
 export function formatStandardMcpConfig(options: McpConfigOptions = {}): string {
   return `${JSON.stringify(buildStandardMcpConfig(options), null, 2)}\n`;
+}
+
+export function buildWorkBuddyMcpConfig(options: McpConfigOptions = {}): {
+  mcpServers: {
+    healthlink: McpCommandConfig;
+  };
+} {
+  const server = buildHealthLinkMcpServerConfig(options);
+  const guiSafeServer = server.command.endsWith(".js")
+    ? {
+        command: process.execPath,
+        args: [server.command, ...server.args]
+      }
+    : server;
+  return {
+    mcpServers: {
+      healthlink: guiSafeServer
+    }
+  };
+}
+
+export function formatWorkBuddyMcpConfig(options: McpConfigOptions = {}): string {
+  return `${JSON.stringify(buildWorkBuddyMcpConfig(options), null, 2)}\n`;
 }
 
 export function buildOpenClawMcpConfig(options: McpConfigOptions = {}): {
@@ -161,6 +202,33 @@ export function installOpenClawMcpConfig(options: OpenClawInstallOptions = {}): 
   };
 }
 
+export function installWorkBuddyMcpConfig(options: WorkBuddyInstallOptions = {}): WorkBuddyInstallResult {
+  const configPath = getWorkBuddyConfigPath(options);
+  mkdirSync(dirname(configPath), { recursive: true });
+
+  const existing = existsSync(configPath) ? readFileSync(configPath, "utf8") : "";
+  const root = existing.trim().length > 0 ? parseJsonRecord(existing, "WorkBuddy") : {};
+  const mcpServers = isRecord(root.mcpServers) ? root.mcpServers : {};
+  const server = buildWorkBuddyMcpConfig(options).mcpServers.healthlink;
+  const backupPath = existsSync(configPath) ? uniqueBackupPath(configPath) : undefined;
+  if (backupPath) {
+    copyFileSync(configPath, backupPath);
+  }
+
+  root.mcpServers = {
+    ...mcpServers,
+    healthlink: server
+  };
+
+  writeFileSync(configPath, `${JSON.stringify(root, null, 2)}\n`, "utf8");
+
+  return {
+    configPath,
+    backupPath,
+    server
+  };
+}
+
 export function getHermesMcpInstallStatus(options: HermesInstallOptions = {}): HermesMcpInstallStatus {
   const configPath = getHermesConfigPath(options);
   if (!existsSync(configPath)) {
@@ -204,12 +272,40 @@ export function getOpenClawMcpInstallStatus(options: OpenClawInstallOptions = {}
   };
 }
 
+export function getWorkBuddyMcpInstallStatus(options: WorkBuddyInstallOptions = {}): WorkBuddyMcpInstallStatus {
+  const configPath = getWorkBuddyConfigPath(options);
+  if (!existsSync(configPath)) {
+    return {
+      configPath,
+      exists: false,
+      installed: false
+    };
+  }
+
+  const config = parseJsonRecord(readFileSync(configPath, "utf8"), "WorkBuddy");
+  const mcpServers = isRecord(config.mcpServers) ? config.mcpServers : {};
+  const server = mcpServers.healthlink;
+  return {
+    configPath,
+    exists: true,
+    installed: isRecord(server),
+    server
+  };
+}
+
 function getHermesConfigPath(options: HermesInstallOptions = {}): string {
   return resolveHomePath(options.configPath ?? join(options.hermesHome ?? process.env.HERMES_HOME ?? "~/.hermes", "config.yaml"));
 }
 
 function getOpenClawConfigPath(options: OpenClawInstallOptions = {}): string {
   return resolveHomePath(options.configPath ?? join(options.openclawHome ?? process.env.OPENCLAW_HOME ?? "~/.openclaw", "openclaw.json"));
+}
+
+function getWorkBuddyConfigPath(options: WorkBuddyInstallOptions = {}): string {
+  if (options.configPath) {
+    return resolve(resolveHomePath(options.configPath));
+  }
+  return join(resolve(resolveHomePath(options.projectPath ?? process.cwd())), "workbuddy.mcp.json");
 }
 
 function parseYamlRecord(value: string): Record<string, unknown> {

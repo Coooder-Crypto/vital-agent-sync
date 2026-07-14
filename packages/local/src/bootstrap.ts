@@ -61,6 +61,8 @@ export type BootstrapConfig = {
   hermes_config_path?: string;
   hermes_skill_path?: string;
   openclaw_config_path?: string;
+  workbuddy_config_path?: string;
+  workbuddy_project_path?: string;
 };
 
 export type BootstrapPlanItem = {
@@ -140,7 +142,9 @@ const bootstrapConfigSchema = z.object({
   agent_name: z.string().min(1).optional(),
   hermes_config_path: z.string().min(1).optional(),
   hermes_skill_path: z.string().min(1).optional(),
-  openclaw_config_path: z.string().min(1).optional()
+  openclaw_config_path: z.string().min(1).optional(),
+  workbuddy_config_path: z.string().min(1).optional(),
+  workbuddy_project_path: z.string().min(1).optional()
 });
 
 const bootstrapStateSchema = z.object({
@@ -167,7 +171,11 @@ const sensitiveKeyPattern = /(?:private|secret|token|credential|authorization|ci
 const sensitiveValuePattern = /-----BEGIN [^-]*PRIVATE KEY-----|healthlink-e2ee-v1:|healthlink:\/\/onboard\?payload=|(?:vitalmcp|healthlink):\/\/pair\?|\b[A-Za-z0-9_-]{43}\b/i;
 
 export function buildBootstrapPlan(config: BootstrapConfig): BootstrapPlanItem[] {
-  const agentLabel = config.agent_id === "generic" ? "print generic MCP configuration" : `configure ${config.agent_id} MCP`;
+  const agentLabel = config.agent_id === "generic"
+    ? "print generic MCP configuration"
+    : config.agent_id === "workbuddy"
+      ? `configure WorkBuddy MCP in ${config.workbuddy_config_path ?? join(config.workbuddy_project_path ?? ".", "workbuddy.mcp.json")}`
+      : `configure ${config.agent_id} MCP`;
   const serviceLabel = config.service_mode === "relay_pull" ? "relay-pull" : "receiver";
   return [
     {

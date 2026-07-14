@@ -3,14 +3,18 @@ import {
   buildHealthLinkMcpServerConfig,
   formatOpenClawMcpConfig,
   formatStandardMcpConfig,
+  formatWorkBuddyMcpConfig,
   getHermesMcpInstallStatus,
   getOpenClawMcpInstallStatus,
+  getWorkBuddyMcpInstallStatus,
   installHermesMcpConfig,
   installOpenClawMcpConfig,
+  installWorkBuddyMcpConfig,
   type HermesInstallOptions,
   type McpCommandConfig,
   type McpConfigOptions,
-  type OpenClawInstallOptions
+  type OpenClawInstallOptions,
+  type WorkBuddyInstallOptions
 } from "./mcp-config.js";
 import { installHermesHealthLinkSkill, type SkillInstallOptions, type SkillInstallResult } from "./skill.js";
 
@@ -61,6 +65,8 @@ export type AgentAdapterOptions = {
   hermesSkillPath?: string;
   openclawConfigPath?: string;
   openclawHome?: string;
+  workbuddyConfigPath?: string;
+  workbuddyProjectPath?: string;
 };
 
 export function getAgentAdapter(id: AgentAdapterId): AgentAdapter {
@@ -72,7 +78,7 @@ export function getAgentAdapter(id: AgentAdapterId): AgentAdapter {
   case "openclaw":
     return openClawAgentAdapter;
   case "workbuddy":
-    return createResearchAgentAdapter(id);
+    return workBuddyAgentAdapter;
   }
 }
 
@@ -81,7 +87,15 @@ export function isAgentAdapterId(value: string): value is AgentAdapterId {
 }
 
 export function detectPreferredAgentAdapter(options?: AgentAdapterOptions): AgentAutoDetectResult {
-  const statuses = (["hermes", "openclaw"] as AgentAdapterId[]).map((id) => getAgentAdapter(id).detect(options));
+  const statuses = (["workbuddy", "hermes", "openclaw"] as AgentAdapterId[]).map((id) => getAgentAdapter(id).detect(options));
+  const workbuddy = statuses.find((status) => status.id === "workbuddy");
+  if (workbuddy?.available) {
+    return {
+      id: "workbuddy",
+      status: workbuddy,
+      statuses
+    };
+  }
   const installed = statuses.find((status) => status.installed);
   if (installed) {
     return {
@@ -117,6 +131,14 @@ function toOpenClawOptions(options: AgentAdapterOptions | undefined, config: Mcp
     databasePath: config.databasePath,
     configPath: options?.openclawConfigPath,
     openclawHome: options?.openclawHome
+  };
+}
+
+function toWorkBuddyOptions(options: AgentAdapterOptions | undefined, config: McpConfigOptions): WorkBuddyInstallOptions {
+  return {
+    databasePath: config.databasePath,
+    configPath: options?.workbuddyConfigPath,
+    projectPath: options?.workbuddyProjectPath
   };
 }
 
@@ -235,34 +257,51 @@ const openClawAgentAdapter: AgentAdapter = {
   }
 };
 
-function createResearchAgentAdapter(id: "workbuddy"): AgentAdapter {
-  const displayName = "WorkBuddy";
-  return {
-    id,
-    displayName,
-    detect() {
+const workBuddyAgentAdapter: AgentAdapter = {
+  id: "workbuddy",
+  displayName: "WorkBuddy",
+  detect(options) {
+    try {
+      const status = getWorkBuddyMcpInstallStatus({
+        configPath: options?.workbuddyConfigPath,
+        projectPath: options?.workbuddyProjectPath
+      });
       return {
-        id,
-        available: false,
+        id: "workbuddy",
+        available: status.exists,
+        installed: status.installed,
+        configPath: status.configPath,
+        detail: status.installed
+          ? `healthlink MCP is installed in ${status.configPath}`
+          : `${status.configPath} ${status.exists ? "does not include" : "does not exist for"} healthlink`
+      };
+    } catch (error) {
+      return {
+        id: "workbuddy",
+        available: true,
         installed: false,
-        detail: `${displayName} adapter research is not implemented yet. Use print-agent-config --agent generic for MCP-compatible setup.`
+        configPath: options?.workbuddyConfigPath,
+        detail: error instanceof Error ? error.message : String(error)
       };
-    },
-    installMcp(config) {
-      return {
-        id,
-        server: buildHealthLinkMcpServerConfig(config),
-        message: `${displayName} automatic install is not implemented yet. Use generic MCP config output for now.`
-      };
-    },
-    formatMcpConfig(config) {
-      return formatStandardMcpConfig(config);
-    },
-    reloadHint() {
-      return `${displayName} reload behavior is still under adapter research. Use that agent's MCP reload or restart flow.`;
     }
-  };
-}
+  },
+  installMcp(config, options) {
+    const result = installWorkBuddyMcpConfig(toWorkBuddyOptions(options, config));
+    return {
+      id: "workbuddy",
+      configPath: result.configPath,
+      backupPath: result.backupPath,
+      server: result.server,
+      message: `VitalMCP MCP installed for WorkBuddy in ${result.configPath}`
+    };
+  },
+  formatMcpConfig(config) {
+    return formatWorkBuddyMcpConfig(config);
+  },
+  reloadHint() {
+    return "Restart WorkBuddy to load the healthlink tools from workbuddy.mcp.json.";
+  }
+};
 
 function toHermesSkillOptions(options: AgentAdapterOptions | undefined): SkillInstallOptions {
   return {
