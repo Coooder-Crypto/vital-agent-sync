@@ -476,9 +476,9 @@ function normalizeTransportOption(value: string | undefined): string | undefined
   return value;
 }
 
-function normalizeWorkBuddyProjectPath(projectPath: string | undefined): string {
+function normalizeWorkBuddyProjectPath(projectPath: string | undefined): string | undefined {
   if (!projectPath) {
-    return process.cwd();
+    return undefined;
   }
   if (projectPath === "~" || projectPath.startsWith("~/")) {
     return projectPath;
@@ -502,7 +502,7 @@ async function main(): Promise<void> {
   }
 
   if (options.command === "version") {
-    console.log("vitalmcp 0.4.0");
+    console.log("vitalmcp 0.4.1");
     return;
   }
 
@@ -554,14 +554,19 @@ async function main(): Promise<void> {
   }
 
   if (options.command === "export-skill") {
+    const defaultOutputDir = options.agentId === "workbuddy"
+      ? "vital-agent-sync-workbuddy-skill"
+      : "vitalmcp-openclaw-skill";
     const result = exportHealthLinkSkillPackage({
       agent: options.agentId,
-      outputDir: options.outputDir ?? "vitalmcp-openclaw-skill"
+      outputDir: options.outputDir ?? defaultOutputDir
     });
     console.log("Vital Agent Sync skill package exported");
     console.log(`Package:  ${result.packageDir}`);
     console.log(`Skill:    ${result.skillPath}`);
-    console.log(`README:   ${result.readmePath}`);
+    if (result.readmePath) {
+      console.log(`README:   ${result.readmePath}`);
+    }
     return;
   }
 
@@ -712,13 +717,14 @@ async function main(): Promise<void> {
 }
 
 function buildCliHelp(): string {
-  return `Vital Agent Sync runtime 0.4.0
+  return `Vital Agent Sync runtime 0.4.1
 
 Usage:
   vitalmcp <command> [options]
 
 Core setup:
   setup --transport lan --agent <generic|hermes|openclaw|workbuddy> [--output json]  # Local Preview default
+  setup --transport lan --agent workbuddy                                           # user MCP config
   setup --transport lan --agent workbuddy --workbuddy-project <dir>                 # project MCP config
   setup --transport tailscale --tailscale-name <host.tailnet.ts.net> --agent <agent> # optional private HTTPS remote
   setup --transport self-hosted-relay --relay-url http://HOST:8790 --agent <agent>
@@ -748,7 +754,7 @@ Agent integration:
   print-skill --agent <generic|hermes|openclaw|workbuddy>
   install-hermes
   install-hermes-skill
-  export-skill --agent openclaw --output-dir <directory>  # optional ClawHub package
+  export-skill --agent <openclaw|workbuddy> --output-dir <directory>
 
 Service:
   service <install|start|stop|status|uninstall> [--mode receiver|relay-pull]
@@ -759,7 +765,7 @@ Global:
   --state-dir <path> Relay runtime state directory
   --server-url <url> Explicit iPhone-reachable URL (HTTPS required for Tailscale)
   --tailscale-name   MagicDNS name used by private Tailscale Serve HTTPS
-  --workbuddy-project <dir> Project directory containing workbuddy.mcp.json
+  --workbuddy-project <dir> Project directory for <dir>/.workbuddy/mcp.json
   --workbuddy-config <path> Explicit WorkBuddy MCP configuration path
   --output text|json Versioned Agent-safe command output
   --yes              Apply a reviewed setup plan

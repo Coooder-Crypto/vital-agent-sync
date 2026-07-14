@@ -299,7 +299,7 @@ const workBuddyAgentAdapter: AgentAdapter = {
     return formatWorkBuddyMcpConfig(config);
   },
   reloadHint() {
-    return "Restart WorkBuddy to load the healthlink tools from workbuddy.mcp.json.";
+    return "Open WorkBuddy MCP settings and confirm healthlink is green; restart WorkBuddy if the tools do not appear.";
   }
 };
 

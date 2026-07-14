@@ -305,7 +305,10 @@ function getWorkBuddyConfigPath(options: WorkBuddyInstallOptions = {}): string {
   if (options.configPath) {
     return resolve(resolveHomePath(options.configPath));
   }
-  return join(resolve(resolveHomePath(options.projectPath ?? process.cwd())), "workbuddy.mcp.json");
+  if (options.projectPath) {
+    return join(resolve(resolveHomePath(options.projectPath)), ".workbuddy", "mcp.json");
+  }
+  return join(homedir(), ".workbuddy", "mcp.json");
 }
 
 function parseYamlRecord(value: string): Record<string, unknown> {
