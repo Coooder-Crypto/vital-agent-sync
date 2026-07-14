@@ -1962,8 +1962,9 @@ test("Hermes MCP install writes healthlink server idempotently with backups", ()
 test("WorkBuddy MCP install merges project config idempotently with backups and fails closed", () => {
   const tempDir = mkdtempSync(join(tmpdir(), "healthlink-workbuddy-test-"));
   try {
-    const configPath = join(tempDir, "workbuddy.mcp.json");
+    const configPath = join(tempDir, ".workbuddy", "mcp.json");
     const databasePath = join(tempDir, "healthlink.sqlite");
+    mkdirSync(dirname(configPath), { recursive: true });
     writeFileSync(configPath, JSON.stringify({
       workspace: { name: "personal" },
       mcpServers: {
@@ -2063,9 +2064,9 @@ test("Agent adapters expose generic MCP config and Hermes install behavior", () 
     };
     assert.equal(workbuddyInstalled.id, "workbuddy");
     assert.equal(workbuddyStatus.installed, true);
-    assert.equal(workbuddyInstalled.configPath, join(workbuddyProjectPath, "workbuddy.mcp.json"));
+    assert.equal(workbuddyInstalled.configPath, join(workbuddyProjectPath, ".workbuddy", "mcp.json"));
     assert.deepEqual(workbuddyConfig.mcpServers.healthlink.args.slice(0, 2), ["mcp", "--db"]);
-    assert.match(workbuddy.reloadHint(), /Restart WorkBuddy/);
+    assert.match(workbuddy.reloadHint(), /restart WorkBuddy/i);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
@@ -2098,8 +2099,8 @@ test("Agent auto-detection prefers installed or available specific adapters befo
       workbuddyProjectPath
     }).id, "hermes");
 
-    mkdirSync(workbuddyProjectPath, { recursive: true });
-    writeFileSync(join(workbuddyProjectPath, "workbuddy.mcp.json"), JSON.stringify({ mcpServers: {} }, null, 2), "utf8");
+    mkdirSync(join(workbuddyProjectPath, ".workbuddy"), { recursive: true });
+    writeFileSync(join(workbuddyProjectPath, ".workbuddy", "mcp.json"), JSON.stringify({ mcpServers: {} }, null, 2), "utf8");
     assert.equal(detectPreferredAgentAdapter({
       hermesConfigPath,
       openclawConfigPath,
@@ -2143,8 +2144,8 @@ test("Vital Agent Sync skill can be printed and installed for Hermes", () => {
     assert.match(openclawMarkdown, /Hosted Relay is not available, recommended, or required in the Local Preview flow/);
     assert.match(openclawMarkdown, /vitalmcp setup --transport relay --relay-url https:\/\/HOSTED-RELAY --agent openclaw/);
     assert.match(openclawMarkdown, /Never invent a relay domain/);
-    assert.match(openclawMarkdown, /npx -y vitalmcp@0\.4\.0 --version/);
-    assert.match(openclawMarkdown, /prefix every local CLI invocation below with `npx -y vitalmcp@0\.4\.0`/);
+    assert.match(openclawMarkdown, /npx -y vitalmcp@0\.4\.1 --version/);
+    assert.match(openclawMarkdown, /prefix every local CLI invocation below with `npx -y vitalmcp@0\.4\.1`/);
     assert.match(openclawMarkdown, /Do not switch runners midway through setup/);
     assert.match(openclawMarkdown, /setup --resume --yes --output json/);
     assert.match(openclawMarkdown, /next_action\.url/);
@@ -2167,9 +2168,15 @@ test("Vital Agent Sync skill can be printed and installed for Hermes", () => {
     assert.match(openclawMarkdown, /Never promise scheduled daily or weekly delivery/);
     assert.match(openclawMarkdown, /revoke_source_device/);
     assert.match(workbuddyMarkdown, /# Vital Agent Sync for WorkBuddy/);
-    assert.match(workbuddyMarkdown, /Connect private Apple Health context to WorkBuddy/);
-    assert.match(workbuddyMarkdown, /Target agent: WorkBuddy/);
-    assert.match(workbuddyMarkdown, /--agent workbuddy/);
+    assert.match(workbuddyMarkdown, /name: vital-agent-sync/);
+    assert.match(workbuddyMarkdown, /npm install --global --prefix/);
+    assert.match(workbuddyMarkdown, /vitalmcp@0\.4\.1/);
+    assert.match(workbuddyMarkdown, /~\/\.workbuddy\/mcp\.json/);
+    assert.match(workbuddyMarkdown, /setup --transport lan --agent workbuddy --output json/);
+    assert.match(workbuddyMarkdown, /open <next_action\.url>/);
+    assert.match(workbuddyMarkdown, /可能会发送给你在 WorkBuddy 中选择的模型提供商/);
+    assert.match(workbuddyMarkdown, /不得读取、截图、上传或转述页面里的二维码/);
+    assert.doesNotMatch(workbuddyMarkdown, /^metadata:/m);
 
     const planIndex = openclawMarkdown.indexOf("setup --transport lan");
     const consentIndex = openclawMarkdown.indexOf("obtain explicit approval");
@@ -2226,12 +2233,12 @@ test("Vital Agent Sync skill can be exported as an OpenClaw package", () => {
     assert.equal(result.packageDir, packageDir);
     assert.deepEqual(readdirSync(packageDir).sort(), ["README.md", "SKILL.md"]);
     assert.equal(frontmatter.name, "vitalmcp-personal-context");
-    assert.equal(frontmatter.version, "0.4.0");
+    assert.equal(frontmatter.version, "0.4.1");
     assert.equal(frontmatter.license, undefined);
     assert.deepEqual(frontmatter.metadata.openclaw.requires.bins, ["vitalmcp"]);
     assert.deepEqual(frontmatter.metadata.openclaw.install, [{
       kind: "node",
-      package: "vitalmcp@0.4.0",
+      package: "vitalmcp@0.4.1",
       bins: ["vitalmcp"]
     }]);
     assert.deepEqual(frontmatter.metadata.openclaw.os, ["macos", "linux", "windows"]);
@@ -2244,6 +2251,39 @@ test("Vital Agent Sync skill can be exported as an OpenClaw package", () => {
     assert.match(readme, /MIT-0/);
     assert.doesNotMatch(skill, /BEGIN PRIVATE KEY/);
     assert.doesNotMatch(readme, /healthlink\.sqlite/);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("Vital Agent Sync skill can be exported as a WorkBuddy and SkillHub package", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-workbuddy-skill-test-"));
+  try {
+    const packageDir = join(tempDir, "vital-agent-sync");
+    mkdirSync(packageDir, { recursive: true });
+    writeFileSync(join(packageDir, "README.md"), "stale\n", "utf8");
+    const result = exportHealthLinkSkillPackage({
+      agent: "workbuddy",
+      outputDir: packageDir
+    });
+    const skill = readFileSync(result.skillPath, "utf8");
+    const frontmatterMatch = skill.match(/^---\n([\s\S]*?)\n---/);
+    assert.ok(frontmatterMatch);
+    const frontmatter = YAML.parse(frontmatterMatch[1] ?? "") as Record<string, unknown>;
+
+    assert.equal(result.packageDir, packageDir);
+    assert.equal(result.readmePath, undefined);
+    assert.deepEqual(readdirSync(packageDir), ["SKILL.md"]);
+    assert.deepEqual(Object.keys(frontmatter).sort(), ["description", "name"]);
+    assert.equal(frontmatter.name, "vital-agent-sync");
+    assert.match(String(frontmatter.description), /WorkBuddy/);
+    assert.match(skill, /vitalmcp@0\.4\.1/);
+    assert.match(skill, /~\/\.workbuddy\/mcp\.json/);
+    assert.match(skill, /next_action\.url/);
+    assert.doesNotMatch(skill, /BEGIN PRIVATE KEY|relay_access_token|upload_auth_secret/);
+
+    const committedSkill = readFileSync(resolve(packageRoot, "..", "..", "skills", "vital-agent-sync", "SKILL.md"), "utf8");
+    assert.equal(skill, committedSkill);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
@@ -2975,7 +3015,7 @@ test("local package manifest is ready for public npm packing", () => {
   };
 
   assert.equal(manifest.name, "vitalmcp");
-  assert.equal(manifest.version, "0.4.0");
+  assert.equal(manifest.version, "0.4.1");
   assert.equal(manifest.private, undefined);
   assert.equal(manifest.license, "MIT");
   assert.equal(manifest.bin?.["vitalmcp"], "./dist/cli.js");
@@ -3214,7 +3254,7 @@ test("portable installer uses a user prefix and manages its PATH block idempoten
 
     let lastStdout = "";
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      const result = spawnSync("sh", [installScript, "--version", "0.4.0"], { env, encoding: "utf8" });
+      const result = spawnSync("sh", [installScript, "--version", "0.4.1"], { env, encoding: "utf8" });
       assert.equal(result.status, 0, result.stderr);
       lastStdout = result.stdout;
     }
@@ -3222,7 +3262,7 @@ test("portable installer uses a user prefix and manages its PATH block idempoten
     const installedProfile = readFileSync(profile, "utf8");
     assert.equal((installedProfile.match(/# >>> vitalmcp >>>/g) ?? []).length, 1);
     assert.match(installedProfile, new RegExp(escapeRegExp(`export PATH="${prefix}/bin:$PATH"`)));
-    assert.match(readFileSync(npmLog, "utf8"), /install --global --prefix .*vitalmcp@0\.4\.0/);
+    assert.match(readFileSync(npmLog, "utf8"), /install --global --prefix .*vitalmcp@0\.4\.1/);
     assert.equal(readFileSync(websiteInstallScript, "utf8"), readFileSync(installScript, "utf8"));
 
     const uninstall = spawnSync("sh", [installScript, "--uninstall"], { env, encoding: "utf8" });
@@ -3429,7 +3469,7 @@ test("CLI setup persists the WorkBuddy project path before consent", () => {
     assert.equal(state?.config.agent_id, "workbuddy");
     assert.equal(state?.config.workbuddy_project_path, projectPath);
     assert.equal(state?.config.workbuddy_config_path, undefined);
-    assert.equal(existsSync(join(projectPath, "workbuddy.mcp.json")), false);
+    assert.equal(existsSync(join(projectPath, ".workbuddy", "mcp.json")), false);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }

@@ -252,19 +252,19 @@ The [Apple Health Sync ClawHub package](https://clawhub.ai/lukasosterheider/skil
 
 ## WorkBuddy Adapter
 
-Tencent WorkBuddy documents native, project-scoped MCP configuration through `workbuddy.mcp.json` in the project root. The file uses the standard `mcpServers` JSON shape, so the adapter shares the same MCP process and SQLite database as the generic path.
+Tencent WorkBuddy documents native user-level MCP configuration at `~/.workbuddy/mcp.json` and project-level configuration at `<project>/.workbuddy/mcp.json`. Both use the standard `mcpServers` JSON shape, so the adapter shares the same MCP process and SQLite database as the generic path.
 
 Implemented adapter behavior:
 
-- `detect()` checks an explicit `--workbuddy-config` path or `<workbuddy-project>/workbuddy.mcp.json`.
+- `detect()` checks an explicit `--workbuddy-config` path, `<workbuddy-project>/.workbuddy/mcp.json`, or the default user-level `~/.workbuddy/mcp.json`.
 - `formatMcpConfig()` returns standard `mcpServers.healthlink` JSON.
 - `installMcp()` rejects invalid JSON, creates a timestamped backup, preserves unrelated keys and MCP servers, and merges `mcpServers.healthlink` idempotently.
-- `reloadHint()` tells the user to restart WorkBuddy.
-- Auto-detection treats a project-level WorkBuddy config as stronger evidence than user-global Hermes or OpenClaw config.
+- `reloadHint()` tells the user to confirm the MCP is green and restart WorkBuddy only when tools do not appear.
+- Auto-detection treats an explicit, project-level, or documented user-level WorkBuddy config as stronger evidence than Hermes or OpenClaw config.
 
-The adapter does not write `~/.workbuddy/models.json`; that documented file configures model providers, not MCP servers. It also does not invent a user-global MCP location. See the [official WorkBuddy configuration guide](https://docs.cloudbase.net/en/ai/cloudbase-ai-toolkit/ide-setup/workbuddy).
+The adapter does not write model-provider configuration. See the [official WorkBuddy MCP guide](https://www.codebuddy.cn/docs/workbuddy/From-Beginner-to-Expert-Guide/Function-Description/MCP-Guide).
 
-Skill packaging remains separate in [issue #90](https://github.com/Coooder-Crypto/health-link/issues/90). Until WorkBuddy exposes a stable automatic Skill install contract, Vital Agent Sync may print WorkBuddy-targeted Markdown but must not mutate undocumented Skill storage.
+The WorkBuddy Skill package is implemented under [issue #90](https://github.com/Coooder-Crypto/health-link/issues/90) and committed at `skills/vital-agent-sync` for direct GitHub import into SkillHub. Skill installation remains WorkBuddy-owned; the Skill invokes the pinned npm runtime, requests explicit consent for persistent changes, configures the documented user-level MCP file, and opens the credential-bearing QR only in the user's local browser.
 
 ## Non-Hermes Skill Import
 

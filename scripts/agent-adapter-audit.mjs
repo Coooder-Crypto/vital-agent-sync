@@ -64,7 +64,7 @@ function verifyAgentNeutralCliHelp() {
     "print-agent-config --agent <agent>",
     "print-skill --agent <generic|hermes|openclaw|workbuddy>",
     "install-hermes-skill",
-    "optional ClawHub package"
+    "export-skill --agent <openclaw|workbuddy>"
   ]) {
     assert(help.includes(expected), `CLI help is missing the Agent-neutral entry: ${expected}`);
   }

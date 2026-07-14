@@ -174,7 +174,9 @@ export function buildBootstrapPlan(config: BootstrapConfig): BootstrapPlanItem[]
   const agentLabel = config.agent_id === "generic"
     ? "print generic MCP configuration"
     : config.agent_id === "workbuddy"
-      ? `configure WorkBuddy MCP in ${config.workbuddy_config_path ?? join(config.workbuddy_project_path ?? ".", "workbuddy.mcp.json")}`
+      ? `configure WorkBuddy MCP in ${config.workbuddy_config_path ?? (config.workbuddy_project_path
+        ? join(config.workbuddy_project_path, ".workbuddy", "mcp.json")
+        : "~/.workbuddy/mcp.json")}`
       : `configure ${config.agent_id} MCP`;
   const serviceLabel = config.service_mode === "relay_pull" ? "relay-pull" : "receiver";
   return [

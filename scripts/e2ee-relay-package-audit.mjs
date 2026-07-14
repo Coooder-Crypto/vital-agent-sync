@@ -15,6 +15,7 @@ const stateDir = join(tempDir, "state");
 const databasePath = join(tempDir, "healthlink.sqlite");
 const relayDatabasePath = join(tempDir, "relay.sqlite");
 const skillDir = join(tempDir, "openclaw-skill");
+const workBuddySkillDir = join(tempDir, "workbuddy-skill");
 const relayApiToken = randomBytes(32).toString("base64url");
 const metricsToken = randomBytes(32).toString("base64url");
 const npmEnv = {
@@ -69,7 +70,7 @@ function verifyPinnedNpxFallback(tarballPath) {
     "vitalmcp",
     "--version"
   ], { cwd: tempDir, env: npmEnv, timeoutMs: 5 * 60_000 }).trim();
-  assert(version === "vitalmcp 0.4.0", "Pinned npm exec fallback reports the wrong version.");
+  assert(version === "vitalmcp 0.4.1", "Pinned npm exec fallback reports the wrong version.");
   console.log(version);
   const status = JSON.parse(capture("npm", [
     "exec",
@@ -103,7 +104,7 @@ function packVitalAgentSync() {
   const packed = JSON.parse(output);
   const artifact = packed[0];
   assert(artifact?.name === "vitalmcp", "npm pack returned the wrong package name.");
-  assert(artifact.version === "0.4.0", "npm pack returned the wrong package version.");
+  assert(artifact.version === "0.4.1", "npm pack returned the wrong package version.");
   assert(Array.isArray(artifact.files), "npm pack did not report package files.");
   const packagePaths = artifact.files.map((entry) => entry.path);
   for (const required of [
@@ -159,12 +160,12 @@ function resolveInstalledBinary() {
 function verifyInstalledCli(binaryPath) {
   console.log("\n==> isolated installed CLI");
   const version = capture(binaryPath, ["--version"], { cwd: tempDir, env: npmEnv }).trim();
-  assert(version === "vitalmcp 0.4.0", "Installed CLI reports the wrong version.");
+  assert(version === "vitalmcp 0.4.1", "Installed CLI reports the wrong version.");
   const help = capture(binaryPath, ["--help"], { cwd: tempDir, env: npmEnv });
   for (const expected of [
     "setup --transport relay",
     "relay audit --relay-url <url> --active --yes",
-    "export-skill --agent openclaw"
+    "export-skill --agent <openclaw|workbuddy>"
   ]) {
     assert(help.includes(expected), `Installed CLI help is missing: ${expected}.`);
   }
@@ -301,8 +302,8 @@ function verifyInstalledSkillExport(binaryPath) {
   const readme = readFileSync(join(skillDir, "README.md"), "utf8");
   for (const expected of [
     "name: vitalmcp-personal-context",
-    "version: 0.4.0",
-    "vitalmcp@0.4.0",
+    "version: 0.4.1",
+    "vitalmcp@0.4.1",
     "vitalmcp pull"
   ]) {
     assert(skill.includes(expected), `Installed CLI skill export is missing: ${expected}.`);
@@ -312,7 +313,34 @@ function verifyInstalledSkillExport(binaryPath) {
   for (const forbidden of [relayApiToken, metricsToken, "BEGIN PRIVATE KEY"]) {
     assert(!exported.includes(forbidden), "Installed CLI skill export contains sensitive runtime material.");
   }
-  console.log(JSON.stringify({ files: ["README.md", "SKILL.md"], version: "0.4.0" }));
+  console.log(JSON.stringify({ files: ["README.md", "SKILL.md"], version: "0.4.1" }));
+
+  console.log("\n==> isolated installed WorkBuddy SkillHub export");
+  capture(binaryPath, [
+    "export-skill",
+    "--agent",
+    "workbuddy",
+    "--output-dir",
+    workBuddySkillDir
+  ], { cwd: tempDir, env: npmEnv });
+  assert(
+    JSON.stringify(readdirSync(workBuddySkillDir)) === JSON.stringify(["SKILL.md"]),
+    "Installed CLI exported unexpected WorkBuddy package files."
+  );
+  const workBuddySkill = readFileSync(join(workBuddySkillDir, "SKILL.md"), "utf8");
+  for (const expected of [
+    "name: vital-agent-sync",
+    "vitalmcp@0.4.1",
+    "~/.workbuddy/mcp.json",
+    "setup --transport lan --agent workbuddy --output json",
+    "next_action.url"
+  ]) {
+    assert(workBuddySkill.includes(expected), `Installed CLI WorkBuddy export is missing: ${expected}.`);
+  }
+  for (const forbidden of [relayApiToken, metricsToken, "BEGIN PRIVATE KEY", "relay_access_token", "upload_auth_secret"]) {
+    assert(!workBuddySkill.includes(forbidden), "Installed CLI WorkBuddy export contains sensitive runtime material.");
+  }
+  console.log(JSON.stringify({ files: ["SKILL.md"], version: "0.4.1", agent: "workbuddy" }));
 }
 
 function verifyRelayLogs() {
