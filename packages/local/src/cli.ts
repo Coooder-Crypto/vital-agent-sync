@@ -5,6 +5,7 @@ import {
 } from "./mcp-config.js";
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
+import { resolve } from "node:path";
 import { detectPreferredAgentAdapter, getAgentAdapter, isAgentAdapterId, type AgentAdapterId } from "./agents.js";
 import {
   BOOTSTRAP_SCHEMA_VERSION,
@@ -123,6 +124,8 @@ type CliOptions = {
   hermesConfigPath?: string;
   hermesSkillPath?: string;
   openclawConfigPath?: string;
+  workbuddyConfigPath?: string;
+  workbuddyProjectPath?: string;
   yes: boolean;
   resume: boolean;
   outputFormat: "text" | "json";
@@ -350,6 +353,12 @@ function parseArgs(argv: string[]): CliOptions {
     } else if (arg === "--openclaw-config") {
       options.openclawConfigPath = requiredOptionValue(argv, index, arg);
       index += 1;
+    } else if (arg === "--workbuddy-config") {
+      options.workbuddyConfigPath = requiredOptionValue(argv, index, arg);
+      index += 1;
+    } else if (arg === "--workbuddy-project") {
+      options.workbuddyProjectPath = requiredOptionValue(argv, index, arg);
+      index += 1;
     } else if (arg === "--hermes-skill-path") {
       options.hermesSkillPath = requiredOptionValue(argv, index, arg);
       index += 1;
@@ -387,6 +396,9 @@ function parseArgs(argv: string[]): CliOptions {
 
   if (!Number.isInteger(options.port) || options.port <= 0) {
     throw new Error("Expected --port to be a positive integer.");
+  }
+  if (options.workbuddyConfigPath && options.workbuddyProjectPath) {
+    throw new Error("Use either --workbuddy-config or --workbuddy-project, not both.");
   }
   if (!Number.isInteger(options.logLines) || options.logLines <= 0) {
     throw new Error("Expected --lines to be a positive integer.");
@@ -462,6 +474,23 @@ function normalizeTransportOption(value: string | undefined): string | undefined
     return "self_hosted_relay";
   }
   return value;
+}
+
+function normalizeWorkBuddyProjectPath(projectPath: string | undefined): string {
+  if (!projectPath) {
+    return process.cwd();
+  }
+  if (projectPath === "~" || projectPath.startsWith("~/")) {
+    return projectPath;
+  }
+  return resolve(projectPath);
+}
+
+function normalizeWorkBuddyConfigPath(configPath: string | undefined): string | undefined {
+  if (!configPath || configPath === "~" || configPath.startsWith("~/")) {
+    return configPath;
+  }
+  return resolve(configPath);
 }
 
 async function main(): Promise<void> {
@@ -633,7 +662,9 @@ async function main(): Promise<void> {
       databasePath: options.databasePath
     }, {
       hermesConfigPath: options.hermesConfigPath,
-      openclawConfigPath: options.openclawConfigPath
+      openclawConfigPath: options.openclawConfigPath,
+      workbuddyConfigPath: options.workbuddyConfigPath,
+      workbuddyProjectPath: options.workbuddyProjectPath
     })
     : undefined;
   const skillInstall = options.command === "init" && options.installSkill
@@ -688,6 +719,7 @@ Usage:
 
 Core setup:
   setup --transport lan --agent <generic|hermes|openclaw|workbuddy> [--output json]  # Local Preview default
+  setup --transport lan --agent workbuddy --workbuddy-project <dir>                 # project MCP config
   setup --transport tailscale --tailscale-name <host.tailnet.ts.net> --agent <agent> # optional private HTTPS remote
   setup --transport self-hosted-relay --relay-url http://HOST:8790 --agent <agent>
   setup --transport relay --relay-url https://HOSTED-RELAY --agent <agent> [--output json] # future/experimental
@@ -727,6 +759,8 @@ Global:
   --state-dir <path> Relay runtime state directory
   --server-url <url> Explicit iPhone-reachable URL (HTTPS required for Tailscale)
   --tailscale-name   MagicDNS name used by private Tailscale Serve HTTPS
+  --workbuddy-project <dir> Project directory containing workbuddy.mcp.json
+  --workbuddy-config <path> Explicit WorkBuddy MCP configuration path
   --output text|json Versioned Agent-safe command output
   --yes              Apply a reviewed setup plan
   --version, -v      Print version
@@ -831,11 +865,19 @@ async function prepareNewBootstrapOptions(options: CliOptions): Promise<CliOptio
   const serviceMode = resolved.transportId === "relay" || resolved.transportId === "self_hosted_relay"
     ? "relay_pull"
     : "receiver";
+  const workbuddyProjectPath = agentId === "workbuddy" && !resolved.workbuddyConfigPath
+    ? normalizeWorkBuddyProjectPath(resolved.workbuddyProjectPath)
+    : resolved.workbuddyProjectPath;
+  const workbuddyConfigPath = agentId === "workbuddy"
+    ? normalizeWorkBuddyConfigPath(resolved.workbuddyConfigPath)
+    : resolved.workbuddyConfigPath;
   return {
     ...resolved,
     agentId,
     agentAuto: false,
-    serviceMode
+    serviceMode,
+    workbuddyConfigPath,
+    workbuddyProjectPath
   };
 }
 
@@ -882,7 +924,9 @@ function restoreBootstrapOptions(options: CliOptions): CliOptions {
     agentName: config.agent_name,
     hermesConfigPath: config.hermes_config_path,
     hermesSkillPath: config.hermes_skill_path,
-    openclawConfigPath: config.openclaw_config_path
+    openclawConfigPath: config.openclaw_config_path,
+    workbuddyConfigPath: config.workbuddy_config_path,
+    workbuddyProjectPath: config.workbuddy_project_path
   };
 }
 
@@ -912,7 +956,9 @@ function toBootstrapConfig(options: CliOptions, installSkill: boolean): Bootstra
     agent_name: options.agentName,
     hermes_config_path: options.hermesConfigPath,
     hermes_skill_path: options.hermesSkillPath,
-    openclaw_config_path: options.openclawConfigPath
+    openclaw_config_path: options.openclawConfigPath,
+    workbuddy_config_path: options.workbuddyConfigPath,
+    workbuddy_project_path: options.workbuddyProjectPath
   };
 }
 
@@ -985,12 +1031,16 @@ async function executeBootstrapSetup(state: BootstrapState, options: CliOptions)
     agent_configured: () => {
       const detected = agent.detect({
         hermesConfigPath: effectiveOptions.hermesConfigPath,
-        openclawConfigPath: effectiveOptions.openclawConfigPath
+        openclawConfigPath: effectiveOptions.openclawConfigPath,
+        workbuddyConfigPath: effectiveOptions.workbuddyConfigPath,
+        workbuddyProjectPath: effectiveOptions.workbuddyProjectPath
       });
       if (effectiveOptions.agentId !== "generic" && !detected.installed) {
         agent.installMcp({ databasePath: effectiveOptions.databasePath }, {
           hermesConfigPath: effectiveOptions.hermesConfigPath,
-          openclawConfigPath: effectiveOptions.openclawConfigPath
+          openclawConfigPath: effectiveOptions.openclawConfigPath,
+          workbuddyConfigPath: effectiveOptions.workbuddyConfigPath,
+          workbuddyProjectPath: effectiveOptions.workbuddyProjectPath
         });
       }
       if (state.config.install_skill) {
@@ -1182,7 +1232,9 @@ function resolveSetupAgentId(options: CliOptions): AgentAdapterId {
   }
   return detectPreferredAgentAdapter({
     hermesConfigPath: options.hermesConfigPath,
-    openclawConfigPath: options.openclawConfigPath
+    openclawConfigPath: options.openclawConfigPath,
+    workbuddyConfigPath: options.workbuddyConfigPath,
+    workbuddyProjectPath: options.workbuddyProjectPath
   }).id;
 }
 
@@ -1192,11 +1244,13 @@ function printAgentAutoDetectSummary(options: CliOptions, agentId: AgentAdapterI
   }
   const detected = detectPreferredAgentAdapter({
     hermesConfigPath: options.hermesConfigPath,
-    openclawConfigPath: options.openclawConfigPath
+    openclawConfigPath: options.openclawConfigPath,
+    workbuddyConfigPath: options.workbuddyConfigPath,
+    workbuddyProjectPath: options.workbuddyProjectPath
   });
   if (agentId === "generic") {
-    console.log("Agent auto-detect: no Hermes/OpenClaw config found; using generic MCP output.");
-    console.log("Agent auto-detect: pass --agent hermes or --agent openclaw to force a specific adapter.");
+    console.log("Agent auto-detect: no WorkBuddy/Hermes/OpenClaw config found; using generic MCP output.");
+    console.log("Agent auto-detect: pass --agent workbuddy, --agent hermes, or --agent openclaw to force a specific adapter.");
     return;
   }
   console.log(`Agent auto-detect: ${getAgentAdapter(agentId).displayName} (${detected.status?.detail ?? "detected"})`);
@@ -1373,7 +1427,9 @@ function runRelaySetup(options: CliOptions): void {
       databasePath: options.databasePath
     }, {
       hermesConfigPath: options.hermesConfigPath,
-      openclawConfigPath: options.openclawConfigPath
+      openclawConfigPath: options.openclawConfigPath,
+      workbuddyConfigPath: options.workbuddyConfigPath,
+      workbuddyProjectPath: options.workbuddyProjectPath
     });
     console.log(`Agent config: ${agentInstall.message}`);
     if (agentInstall.backupPath) {
@@ -1730,7 +1786,9 @@ async function printDoctor(options: CliOptions): Promise<void> {
   const agent = getAgentAdapter(options.agentId);
   const agentStatus = agent.detect({
     hermesConfigPath: options.hermesConfigPath,
-    openclawConfigPath: options.openclawConfigPath
+    openclawConfigPath: options.openclawConfigPath,
+    workbuddyConfigPath: options.workbuddyConfigPath,
+    workbuddyProjectPath: options.workbuddyProjectPath
   });
   results.push({
     status: agentStatus.installed ? "OK" : "WARN",

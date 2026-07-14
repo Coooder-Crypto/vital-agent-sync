@@ -48,7 +48,13 @@ import {
   getWeeklySummary,
   getWorkoutLoad
 } from "../src/health-query.js";
-import { buildHealthLinkMcpServerConfig, getHermesMcpInstallStatus, installHermesMcpConfig } from "../src/mcp-config.js";
+import {
+  buildHealthLinkMcpServerConfig,
+  getHermesMcpInstallStatus,
+  getWorkBuddyMcpInstallStatus,
+  installHermesMcpConfig,
+  installWorkBuddyMcpConfig
+} from "../src/mcp-config.js";
 import { requestPairingSession } from "../src/pairing-client.js";
 import { writeRelayOnboardingArtifact } from "../src/onboarding-artifact.js";
 import { PairingStore } from "../src/pairing.js";
@@ -1953,6 +1959,50 @@ test("Hermes MCP install writes healthlink server idempotently with backups", ()
   }
 });
 
+test("WorkBuddy MCP install merges project config idempotently with backups and fails closed", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-workbuddy-test-"));
+  try {
+    const configPath = join(tempDir, "workbuddy.mcp.json");
+    const databasePath = join(tempDir, "healthlink.sqlite");
+    writeFileSync(configPath, JSON.stringify({
+      workspace: { name: "personal" },
+      mcpServers: {
+        existing: { command: "existing-mcp", args: ["serve"] }
+      }
+    }, null, 2), "utf8");
+
+    const first = installWorkBuddyMcpConfig({ projectPath: tempDir, databasePath });
+    const second = installWorkBuddyMcpConfig({ configPath, databasePath });
+    const status = getWorkBuddyMcpInstallStatus({ projectPath: tempDir });
+    const installed = JSON.parse(readFileSync(configPath, "utf8")) as {
+      workspace: { name: string };
+      mcpServers: Record<string, { command: string; args: string[] }>;
+    };
+
+    assert.equal(status.installed, true);
+    assert.equal(first.configPath, configPath);
+    assert.ok(first.backupPath);
+    assert.ok(second.backupPath);
+    assert.notEqual(first.backupPath, second.backupPath);
+    assert.equal(installed.workspace.name, "personal");
+    assert.deepEqual(installed.mcpServers.existing.args, ["serve"]);
+    assert.deepEqual(installed.mcpServers.healthlink.args.slice(0, 2), ["mcp", "--db"]);
+    assert.equal(installed.mcpServers.healthlink.args[2], databasePath);
+
+    const invalidPath = join(tempDir, "invalid-workbuddy.mcp.json");
+    const invalid = "{ invalid json";
+    writeFileSync(invalidPath, invalid, "utf8");
+    assert.throws(
+      () => installWorkBuddyMcpConfig({ configPath: invalidPath, databasePath }),
+      /WorkBuddy config must be valid JSON/
+    );
+    assert.equal(readFileSync(invalidPath, "utf8"), invalid);
+    assert.equal(readdirSync(tempDir).some((name) => name.startsWith("invalid-workbuddy.mcp.json.healthlink-backup-")), false);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("Agent adapters expose generic MCP config and Hermes install behavior", () => {
   const tempDir = mkdtempSync(join(tmpdir(), "healthlink-agent-test-"));
   try {
@@ -1997,6 +2047,25 @@ test("Agent adapters expose generic MCP config and Hermes install behavior", () 
     assert.equal(openclawInstalled.id, "openclaw");
     assert.equal(openclawStatus.installed, true);
     assert.deepEqual(openclawConfig.mcp.servers.healthlink.args.slice(0, 2), ["mcp", "--db"]);
+
+    const workbuddy = getAgentAdapter("workbuddy");
+    const workbuddyProjectPath = join(tempDir, "workbuddy-project");
+    const workbuddyInstalled = workbuddy.installMcp({
+      databasePath: join(tempDir, "healthlink.sqlite")
+    }, {
+      workbuddyProjectPath
+    });
+    const workbuddyStatus = workbuddy.detect({ workbuddyProjectPath });
+    const workbuddyConfig = JSON.parse(workbuddy.formatMcpConfig({
+      databasePath: join(tempDir, "healthlink.sqlite")
+    })) as {
+      mcpServers: { healthlink: { args: string[] } };
+    };
+    assert.equal(workbuddyInstalled.id, "workbuddy");
+    assert.equal(workbuddyStatus.installed, true);
+    assert.equal(workbuddyInstalled.configPath, join(workbuddyProjectPath, "workbuddy.mcp.json"));
+    assert.deepEqual(workbuddyConfig.mcpServers.healthlink.args.slice(0, 2), ["mcp", "--db"]);
+    assert.match(workbuddy.reloadHint(), /Restart WorkBuddy/);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
@@ -2007,23 +2076,41 @@ test("Agent auto-detection prefers installed or available specific adapters befo
   try {
     const hermesConfigPath = join(tempDir, "config.yaml");
     const openclawConfigPath = join(tempDir, "openclaw.json");
+    const workbuddyProjectPath = join(tempDir, "workbuddy-project");
 
     assert.equal(detectPreferredAgentAdapter({
       hermesConfigPath,
-      openclawConfigPath
+      openclawConfigPath,
+      workbuddyProjectPath
     }).id, "generic");
 
     writeFileSync(openclawConfigPath, JSON.stringify({ model: { provider: "test" } }, null, 2), "utf8");
     assert.equal(detectPreferredAgentAdapter({
       hermesConfigPath,
-      openclawConfigPath
+      openclawConfigPath,
+      workbuddyProjectPath
     }).id, "openclaw");
 
     writeFileSync(hermesConfigPath, "model:\n  provider: test\n", "utf8");
     assert.equal(detectPreferredAgentAdapter({
       hermesConfigPath,
-      openclawConfigPath
+      openclawConfigPath,
+      workbuddyProjectPath
     }).id, "hermes");
+
+    mkdirSync(workbuddyProjectPath, { recursive: true });
+    writeFileSync(join(workbuddyProjectPath, "workbuddy.mcp.json"), JSON.stringify({ mcpServers: {} }, null, 2), "utf8");
+    assert.equal(detectPreferredAgentAdapter({
+      hermesConfigPath,
+      openclawConfigPath,
+      workbuddyProjectPath
+    }).id, "workbuddy");
+
+    assert.equal(detectPreferredAgentAdapter({
+      hermesConfigPath,
+      openclawConfigPath,
+      workbuddyProjectPath
+    }).id, "workbuddy");
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
@@ -3303,6 +3390,41 @@ test("CLI setup emits one redacted JSON document for plan and resumable failure"
       assert.doesNotMatch(result.stdout, /relay_access_token|upload_auth_secret|relay_api_token|BEGIN PRIVATE KEY|healthlink-e2ee-v1:/);
       assert.doesNotThrow(() => JSON.parse(result.stdout), `${commandArgs[0]} must emit one JSON document`);
     }
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("CLI setup persists the WorkBuddy project path before consent", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-cli-workbuddy-"));
+  try {
+    const cliPath = join(packageRoot, "src", "cli.ts");
+    const stateDir = join(tempDir, "state");
+    const projectPath = join(tempDir, "workbuddy-project");
+    const result = spawnSync(process.execPath, [
+      "--import", "tsx", cliPath,
+      "setup",
+      "--agent", "workbuddy",
+      "--workbuddy-project", projectPath,
+      "--transport", "lan",
+      "--manager", "manual",
+      "--state-dir", stateDir,
+      "--db", join(tempDir, "healthlink.sqlite"),
+      "--output", "json"
+    ], {
+      env: { ...process.env, HOME: tempDir },
+      encoding: "utf8"
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    const output = JSON.parse(result.stdout) as { status: string; next_action: { type: string } };
+    assert.equal(output.status, "awaiting_consent");
+    assert.equal(output.next_action.type, "confirm");
+    const state = readBootstrapState({ stateDir });
+    assert.equal(state?.config.agent_id, "workbuddy");
+    assert.equal(state?.config.workbuddy_project_path, projectPath);
+    assert.equal(state?.config.workbuddy_config_path, undefined);
+    assert.equal(existsSync(join(projectPath, "workbuddy.mcp.json")), false);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
