@@ -45,7 +45,7 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 }
 
 try {
-  const tarballPath = packVitalMCP();
+  const tarballPath = packVitalAgentSync();
   verifyPinnedNpxFallback(tarballPath);
   await installTarball(tarballPath);
   const binaryPath = resolveInstalledBinary();
@@ -53,7 +53,7 @@ try {
   await verifyInstalledRelayFlow(binaryPath);
   verifyInstalledSkillExport(binaryPath);
   verifyRelayLogs();
-  console.log("\nVitalMCP relay package audit passed.");
+  console.log("\nVital Agent Sync relay package audit passed.");
 } finally {
   await cleanup();
 }
@@ -69,7 +69,7 @@ function verifyPinnedNpxFallback(tarballPath) {
     "vitalmcp",
     "--version"
   ], { cwd: tempDir, env: npmEnv, timeoutMs: 5 * 60_000 }).trim();
-  assert(version === "vitalmcp 0.3.0", "Pinned npm exec fallback reports the wrong version.");
+  assert(version === "vitalmcp 0.4.0", "Pinned npm exec fallback reports the wrong version.");
   console.log(version);
   const status = JSON.parse(capture("npm", [
     "exec",
@@ -90,7 +90,7 @@ function verifyPinnedNpxFallback(tarballPath) {
   assert(status.command === "status", "Pinned npm exec fallback ran the wrong command.");
 }
 
-function packVitalMCP() {
+function packVitalAgentSync() {
   console.log("\n==> pack vitalmcp tarball");
   const output = capture("npm", [
     "pack",
@@ -103,7 +103,7 @@ function packVitalMCP() {
   const packed = JSON.parse(output);
   const artifact = packed[0];
   assert(artifact?.name === "vitalmcp", "npm pack returned the wrong package name.");
-  assert(artifact.version === "0.3.0", "npm pack returned the wrong package version.");
+  assert(artifact.version === "0.4.0", "npm pack returned the wrong package version.");
   assert(Array.isArray(artifact.files), "npm pack did not report package files.");
   const packagePaths = artifact.files.map((entry) => entry.path);
   for (const required of [
@@ -159,7 +159,7 @@ function resolveInstalledBinary() {
 function verifyInstalledCli(binaryPath) {
   console.log("\n==> isolated installed CLI");
   const version = capture(binaryPath, ["--version"], { cwd: tempDir, env: npmEnv }).trim();
-  assert(version === "vitalmcp 0.3.0", "Installed CLI reports the wrong version.");
+  assert(version === "vitalmcp 0.4.0", "Installed CLI reports the wrong version.");
   const help = capture(binaryPath, ["--help"], { cwd: tempDir, env: npmEnv });
   for (const expected of [
     "setup --transport relay",
@@ -301,8 +301,8 @@ function verifyInstalledSkillExport(binaryPath) {
   const readme = readFileSync(join(skillDir, "README.md"), "utf8");
   for (const expected of [
     "name: vitalmcp-personal-context",
-    "version: 0.3.0",
-    "vitalmcp@0.3.0",
+    "version: 0.4.0",
+    "vitalmcp@0.4.0",
     "vitalmcp pull"
   ]) {
     assert(skill.includes(expected), `Installed CLI skill export is missing: ${expected}.`);
@@ -312,7 +312,7 @@ function verifyInstalledSkillExport(binaryPath) {
   for (const forbidden of [relayApiToken, metricsToken, "BEGIN PRIVATE KEY"]) {
     assert(!exported.includes(forbidden), "Installed CLI skill export contains sensitive runtime material.");
   }
-  console.log(JSON.stringify({ files: ["README.md", "SKILL.md"], version: "0.3.0" }));
+  console.log(JSON.stringify({ files: ["README.md", "SKILL.md"], version: "0.4.0" }));
 }
 
 function verifyRelayLogs() {

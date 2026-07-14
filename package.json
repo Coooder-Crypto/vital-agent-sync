@@ -1,17 +1,17 @@
 {
-  "name": "healthlink",
+  "name": "vital-agent-sync",
   "version": "0.1.0",
   "private": true,
-  "description": "Private HealthKit bridge between VitalMCP iOS and a user's local Agent runtime.",
+  "description": "Private HealthKit bridge between the Vital Agent iOS app and a user's local Agent runtime.",
   "workspaces": [
     "packages/*",
     "apps/*"
   ],
   "scripts": {
     "build": "npm run build --workspaces",
-    "dev:www": "npm run dev --workspace @healthlink/www",
-    "build:www": "npm run build --workspace @healthlink/www",
-    "typecheck:www": "npm run typecheck --workspace @healthlink/www",
+    "dev:www": "npm run dev --workspace vital-agent-sync-www",
+    "build:www": "npm run build --workspace vital-agent-sync-www",
+    "typecheck:www": "npm run typecheck --workspace vital-agent-sync-www",
     "test:ios": "node scripts/ios-unit-tests.mjs",
     "dev:local": "npm run dev --workspace vitalmcp",
     "build:local": "npm run build --workspace vitalmcp",
@@ -21,7 +21,7 @@
     "audit:relay-package": "node scripts/e2ee-relay-package-audit.mjs",
     "audit:agent-adapters": "node scripts/agent-adapter-audit.mjs",
     "audit:dependencies": "npm audit --omit=dev --workspace vitalmcp",
-    "audit:www-dependencies": "npm audit --omit=dev --workspace @healthlink/www",
+    "audit:www-dependencies": "npm audit --omit=dev --workspace vital-agent-sync-www",
     "audit:secrets": "node scripts/release-secret-scan.mjs",
     "audit:relay-hosted": "node scripts/e2ee-relay-hosted-audit.mjs",
     "preflight:relay-production": "node scripts/e2ee-relay-production-preflight.mjs",

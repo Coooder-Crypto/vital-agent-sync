@@ -1,13 +1,13 @@
 # Secure direct LAN transport
 
-VitalMCP direct mode uses the `vitalmcp-direct-v1` application-layer envelope for pairing, sync, and device revocation. An `http://` LAN or Tailscale URL identifies how to reach the receiver; it does not mean that credentials or health summaries are sent as plaintext HTTP bodies.
+Vital Agent Sync direct mode uses the `vitalmcp-direct-v1` application-layer envelope for pairing, sync, and device revocation. An `http://` LAN or Tailscale URL identifies how to reach the receiver; it does not mean that credentials or health summaries are sent as plaintext HTTP bodies.
 
 ## Trust boundaries
 
 | Mode | Network path | Trusted decrypting endpoint | Payload protection |
 | --- | --- | --- | --- |
-| Trusted LAN | User-controlled local network | The local VitalMCP receiver | Receiver-pinned application-layer encryption |
-| Tailscale | WireGuard tailnet | The local VitalMCP receiver | Tailscale tunnel plus the same receiver-pinned application-layer encryption |
+| Trusted LAN | User-controlled local network | The local Vital Agent Sync receiver | Receiver-pinned application-layer encryption |
+| Tailscale | WireGuard tailnet | The local Vital Agent Sync receiver | Tailscale tunnel plus the same receiver-pinned application-layer encryption |
 | Hosted or self-hosted relay | Relay service | The user's local relay-pull runtime | Existing E2EE relay envelope; the relay stores opaque ciphertext |
 
 Direct LAN mode is not described as network-layer E2EE. The receiver terminates the direct encrypted envelope, validates the paired device, writes the existing local SQLite schema, and serves the existing MCP data path. The relay protocol and relay trust boundary are unchanged.

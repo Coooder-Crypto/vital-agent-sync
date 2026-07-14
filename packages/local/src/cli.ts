@@ -502,7 +502,7 @@ async function main(): Promise<void> {
   }
 
   if (options.command === "version") {
-    console.log("vitalmcp 0.3.0");
+    console.log("vitalmcp 0.4.0");
     return;
   }
 
@@ -558,7 +558,7 @@ async function main(): Promise<void> {
       agent: options.agentId,
       outputDir: options.outputDir ?? "vitalmcp-openclaw-skill"
     });
-    console.log("VitalMCP skill package exported");
+    console.log("Vital Agent Sync skill package exported");
     console.log(`Package:  ${result.packageDir}`);
     console.log(`Skill:    ${result.skillPath}`);
     console.log(`README:   ${result.readmePath}`);
@@ -606,13 +606,13 @@ async function main(): Promise<void> {
     if (!result) {
       throw new Error("Hermes adapter does not support skill installation.");
     }
-    console.log("VitalMCP skill installed for Hermes");
+    console.log("Vital Agent Sync skill installed for Hermes");
     console.log(`Skill: ${result.skillPath}`);
     if (result.backupPath) {
       console.log(`Backup: ${result.backupPath}`);
     }
     console.log("");
-    console.log("Restart Hermes or reload skills to make the VitalMCP skill visible.");
+    console.log("Restart Hermes or reload skills to make the Vital Agent Sync skill visible.");
     return;
   }
 
@@ -699,7 +699,7 @@ async function main(): Promise<void> {
       }
       console.log(`  ${agent.reloadHint()}`);
       if (skillInstall) {
-        console.log(`  installed VitalMCP skill in ${skillInstall.skillPath}`);
+        console.log(`  installed Vital Agent Sync skill in ${skillInstall.skillPath}`);
       }
     } else {
       console.log("  vitalmcp init --agent hermes");
@@ -712,7 +712,7 @@ async function main(): Promise<void> {
 }
 
 function buildCliHelp(): string {
-  return `VitalMCP Local 0.3.0
+  return `Vital Agent Sync runtime 0.4.0
 
 Usage:
   vitalmcp <command> [options]
@@ -755,7 +755,7 @@ Service:
   logs [--mode receiver|relay-pull] [--lines N]
 
 Global:
-  --db <path>        VitalMCP SQLite path
+  --db <path>        Vital Agent Sync SQLite path
   --state-dir <path> Relay runtime state directory
   --server-url <url> Explicit iPhone-reachable URL (HTTPS required for Tailscale)
   --tailscale-name   MagicDNS name used by private Tailscale Serve HTTPS
@@ -773,25 +773,25 @@ async function runServiceCommand(options: CliOptions): Promise<void> {
   const serviceOptions = toServiceOptions(options);
   if (action === "install") {
     const status = installHealthLinkService(serviceOptions);
-    console.log("VitalMCP service installed");
+    console.log("Vital Agent Sync service installed");
     await printServiceStatusDetails(status, options);
     return;
   }
   if (action === "start") {
     const status = startHealthLinkService(serviceOptions);
-    console.log("VitalMCP service start requested");
+    console.log("Vital Agent Sync service start requested");
     await printServiceStatusDetails(status, options);
     return;
   }
   if (action === "stop") {
     const status = stopHealthLinkService(serviceOptions);
-    console.log("VitalMCP service stop requested");
+    console.log("Vital Agent Sync service stop requested");
     await printServiceStatusDetails(status, options);
     return;
   }
   if (action === "uninstall") {
     const status = uninstallHealthLinkService(serviceOptions);
-    console.log("VitalMCP service uninstalled");
+    console.log("Vital Agent Sync service uninstalled");
     await printServiceStatusDetails(status, options);
     return;
   }
@@ -892,7 +892,7 @@ function createAndPersistBootstrapState(options: CliOptions): BootstrapState {
     return existing;
   }
   if (existing && existing.status !== "complete") {
-    throw new Error("An unfinished VitalMCP setup already exists with different options. Resume it with setup --resume, or finish it before starting a different setup plan.");
+    throw new Error("An unfinished Vital Agent Sync setup already exists with different options. Resume it with setup --resume, or finish it before starting a different setup plan.");
   }
   const state = createBootstrapState(config);
   return writeBootstrapState(state, { stateDir: options.stateDir });
@@ -933,7 +933,7 @@ function restoreBootstrapOptions(options: CliOptions): CliOptions {
 function requireBootstrapState(options: Pick<CliOptions, "stateDir">): BootstrapState {
   const state = readBootstrapState({ stateDir: options.stateDir });
   if (!state) {
-    throw new Error("No resumable VitalMCP setup was found. Run vitalmcp setup with the desired Agent and transport first.");
+    throw new Error("No resumable Vital Agent Sync setup was found. Run vitalmcp setup with the desired Agent and transport first.");
   }
   return state;
 }
@@ -977,7 +977,7 @@ function printBootstrapPlan(state: BootstrapState, options: CliOptions): void {
     printJson(buildBootstrapOutput(state, options));
     return;
   }
-  console.log(`VitalMCP setup plan for ${getAgentAdapter(state.config.agent_id).displayName}`);
+  console.log(`Vital Agent Sync setup plan for ${getAgentAdapter(state.config.agent_id).displayName}`);
   for (const [index, item] of state.plan.entries()) {
     console.log(`${index + 1}. ${item.description}${item.persistent_change ? " (persistent change)" : ""}`);
   }
@@ -1129,7 +1129,7 @@ function buildBootstrapOutput(state: BootstrapState, options: CliOptions): Boots
       },
       error: state.last_error_code ? {
         code: state.last_error_code,
-        message: state.last_error_message ?? "VitalMCP setup failed."
+        message: state.last_error_message ?? "Vital Agent Sync setup failed."
       } : undefined
     });
   } finally {
@@ -1143,13 +1143,13 @@ function printBootstrapResult(state: BootstrapState, options: CliOptions): void 
     return;
   }
   const agent = getAgentAdapter(state.config.agent_id);
-  console.log(`VitalMCP setup status: ${state.status}`);
+  console.log(`Vital Agent Sync setup status: ${state.status}`);
   if (state.onboarding_url && state.status !== "complete") {
     console.log(`Open this local onboarding page: ${state.onboarding_url}`);
     console.log("This page contains credentials. Do not upload or paste it into an Agent chat.");
   }
   if (state.status === "awaiting_first_sync") {
-    console.log("Next: connect VitalMCP iOS, run the first sync, then run vitalmcp setup --resume --yes.");
+    console.log("Next: connect the Vital Agent app, run the first sync, then run vitalmcp setup --resume --yes.");
   } else if (state.status === "complete") {
     console.log("First sync observed. Verify freshness with healthlink_status, then ask: How am I doing today?");
     console.log(agent.reloadHint());
@@ -1164,7 +1164,7 @@ async function runEnsure(options: CliOptions): Promise<void> {
   const ensureOptions = await resolveAutoServicePort(options);
   const serviceOptions = toServiceOptions(ensureOptions);
   let lastStatus: HealthLinkServiceStatus | undefined;
-  console.log("Ensuring VitalMCP receiver service");
+  console.log("Ensuring Vital Agent Sync receiver service");
   await runServiceEnsureWorkflow({
     getStatus: () => {
       lastStatus = getHealthLinkServiceStatus(serviceOptions);
@@ -1187,7 +1187,7 @@ async function runEnsure(options: CliOptions): Promise<void> {
     waitForReady: () => waitForLocalReceiver(ensureOptions),
     printStatus: async () => {
       const status = getHealthLinkServiceStatus(serviceOptions);
-      console.log("VitalMCP receiver is ready.");
+      console.log("Vital Agent Sync receiver is ready.");
       await printServiceStatusDetails(status, ensureOptions);
     }
   });
@@ -1214,7 +1214,7 @@ async function resolveAutoServicePort(options: CliOptions): Promise<CliOptions> 
 
   const listener = describePortListeners(options.port);
   if (options.outputFormat === "text") {
-    console.log(`Port ${options.port} is already in use; using ${selected.port} for VitalMCP.`);
+    console.log(`Port ${options.port} is already in use; using ${selected.port} for Vital Agent Sync.`);
     if (listener) {
       console.log(`Current listener: ${listener}`);
     }
@@ -1273,7 +1273,7 @@ async function printPairingSession(options: CliOptions): Promise<void> {
   }
   console.log("");
   console.log("Next:");
-  console.log("  1. Scan with VitalMCP iOS Settings -> Pairing -> Scan QR.");
+  console.log("  1. In Vital Agent, open Settings -> Pairing -> Scan QR.");
   console.log("  2. Confirm pairing in the app, grant Health access, then Sync.");
   console.log("  3. If this code expires, run vitalmcp pair to print a fresh QR.");
   console.log("");
@@ -1303,7 +1303,7 @@ async function waitForLocalReceiver(options: CliOptions): Promise<void> {
     lastError = probe.detail;
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error(`VitalMCP service did not become ready at ${localReceiverStatusEndpoint(options)} within 5 seconds. ${lastError}`);
+  throw new Error(`Vital Agent Sync service did not become ready at ${localReceiverStatusEndpoint(options)} within 5 seconds. ${lastError}`);
 }
 
 function toServiceOptions(options: CliOptions): LaunchdServiceOptions {
@@ -1327,7 +1327,7 @@ async function printServiceStatusDetails(status: HealthLinkServiceStatus, option
   try {
     const health = getHealthStatus(database);
     const receiver = await probeLocalReceiver(options);
-    console.log("VitalMCP service");
+    console.log("Vital Agent Sync service");
     console.log(`Manager:   ${status.manager}`);
     console.log(`Label:     ${status.label}`);
     console.log(`Installed: ${status.installed ? "yes" : "no"}`);
@@ -1368,7 +1368,7 @@ function printServiceLogs(options: CliOptions): void {
     lines: options.logLines
   });
 
-  console.log(`VitalMCP service logs (${options.logLines} lines)`);
+  console.log(`Vital Agent Sync service logs (${options.logLines} lines)`);
   printLogSection("stdout", stdout);
   printLogSection("stderr", stderr);
 }
@@ -1388,7 +1388,7 @@ function printSetupNextSteps(agent: ReturnType<typeof getAgentAdapter>, manager:
   console.log("Setup complete");
   console.log("");
   console.log("Next:");
-  console.log("  1. Scan the QR with VitalMCP iOS.");
+  console.log("  1. Scan the QR with Vital Agent.");
   console.log("  2. Confirm pairing, grant Health access, then run Sync in the app.");
   console.log(`  3. ${agent.reloadHint()}`);
   console.log("");
@@ -1418,7 +1418,7 @@ function runRelaySetup(options: CliOptions): void {
   });
   const onboarding = formatRelayOnboarding(config, { mode });
 
-  console.log(`Setting up VitalMCP relay for ${agent.displayName}`);
+  console.log(`Setting up Vital Agent Sync relay for ${agent.displayName}`);
   printAgentAutoDetectSummary(options, agentId);
   if (agentId === "generic") {
     console.log("Agent config: generic MCP config will be printed on request.");
@@ -1456,10 +1456,10 @@ function runRelaySetup(options: CliOptions): void {
   console.log("Next:");
   if (mode === "self_hosted_relay") {
     console.log("  1. Run vitalmcp relay serve to start the self-hosted relay.");
-    console.log("  2. Scan the onboarding QR from VitalMCP iOS or a compatible agent/mobile app.");
+    console.log("  2. Scan the onboarding QR from Vital Agent or a compatible mobile app.");
     console.log("  3. The background relay-pull service will decrypt synced envelopes into the local MCP database.");
   } else {
-    console.log("  1. Scan the onboarding QR from VitalMCP iOS or a compatible agent/mobile app.");
+    console.log("  1. Scan the onboarding QR from Vital Agent or a compatible mobile app.");
     console.log("  2. The background relay-pull service will decrypt hosted relay envelopes into the local MCP database.");
   }
   console.log(`  4. ${agent.reloadHint()}`);
@@ -1499,7 +1499,7 @@ async function printRelayOnboarding(options: CliOptions): Promise<void> {
     } satisfies BootstrapOutput);
     return;
   }
-  console.log("VitalMCP relay onboarding is ready.");
+  console.log("Vital Agent Sync relay onboarding is ready.");
   console.log(`Open this local credential-bearing page: ${artifact.local_url}`);
   console.log("Do not upload, paste, or attach this page in an Agent chat.");
 }
@@ -1512,7 +1512,7 @@ async function runRelayPull(options: CliOptions): Promise<void> {
       relayUrl: options.relayUrl,
       relayApiToken: options.relayApiToken
     });
-    console.log("VitalMCP relay pull complete");
+    console.log("Vital Agent Sync relay pull complete");
     console.log(`Fetched:         ${result.fetched}`);
     console.log(`Ingested:        ${result.ingested}`);
     console.log(`Acked:           ${result.acked}`);
@@ -1553,12 +1553,12 @@ async function runRelayCommand(options: CliOptions): Promise<void> {
               targetRelayApiToken: options.relayApiToken ?? process.env.HEALTHLINK_RELAY_API_TOKEN,
               targetMode: options.transportId === "self_hosted_relay" ? "self_hosted_relay" : "hosted_relay"
             });
-    console.log(`VitalMCP relay ${result.action} complete`);
+    console.log(`Vital Agent Sync relay ${result.action} complete`);
     console.log(`Relay:      ${result.relay_url}`);
     console.log(`User:       ${result.user_id}`);
     console.log(`Device:     ${result.source_device_id}`);
     console.log(`Purged:     ${result.purged}`);
-    console.log("Onboarding: required on VitalMCP iOS");
+    console.log("Onboarding: required in the Vital Agent app");
     if (action !== "unlink") {
       console.log("Next: run vitalmcp print-onboarding and reconnect the iOS app.");
     } else {
@@ -1706,7 +1706,7 @@ function printStatus(options: CliOptions): void {
       } satisfies BootstrapOutput);
       return;
     }
-    console.log("VitalMCP Local status");
+    console.log("Vital Agent Sync runtime status");
     console.log(`Database:   ${database.path}`);
     console.log(`Sources:    ${status.device_count}`);
     console.log(`Syncs:      ${status.sync_count}`);
@@ -1882,11 +1882,11 @@ async function printDoctor(options: CliOptions): Promise<void> {
       },
       error: hasFailure ? {
         code: "doctor_failed",
-        message: "One or more VitalMCP diagnostic checks failed."
+        message: "One or more Vital Agent Sync diagnostic checks failed."
       } : undefined
     } satisfies BootstrapOutput);
   } else {
-    console.log("VitalMCP doctor");
+    console.log("Vital Agent Sync doctor");
     for (const result of results) {
       console.log(`[${result.status}] ${result.label}: ${result.detail}`);
     }
@@ -1931,7 +1931,7 @@ async function probeLocalReceiver(options: CliOptions): Promise<ReceiverProbeRes
     if (!isReceiverHealthStatus(body)) {
       return {
         reachable: false,
-        detail: `${endpoint} responded, but it does not look like a VitalMCP receiver`
+        detail: `${endpoint} responded, but it does not look like a Vital Agent Sync receiver`
       };
     }
     return {
@@ -1992,7 +1992,7 @@ function formatCliError(error: unknown): string {
     const portNumber = Number(port);
     const listener = describePortListeners(Number.isInteger(portNumber) ? portNumber : 8787);
     return [
-      `VitalMCP Local failed: ${message}`,
+      `Vital Agent Sync runtime failed: ${message}`,
       "",
       `Port ${port} is already in use.`,
       listener ? `Current listener: ${listener}` : "Current listener: could not be identified automatically.",
@@ -2003,12 +2003,12 @@ function formatCliError(error: unknown): string {
   }
   if (message.includes("did not become ready")) {
     return [
-      `VitalMCP Local failed: ${message}`,
+      `Vital Agent Sync runtime failed: ${message}`,
       "",
       "Check service status with: vitalmcp service status",
       "Check daemon logs with: vitalmcp logs",
       "If port 8787 is occupied, stop the old receiver or rerun with --port <free-port>."
     ].join("\n");
   }
-  return `VitalMCP Local failed: ${message}`;
+  return `Vital Agent Sync runtime failed: ${message}`;
 }

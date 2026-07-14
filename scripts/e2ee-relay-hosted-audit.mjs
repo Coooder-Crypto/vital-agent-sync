@@ -37,7 +37,7 @@ run("vitalmcp build", "npm", [
 const passive = runAudit("passive", []);
 const active = runAudit("active", ["--active", "--yes"]);
 
-console.log("\nVitalMCP hosted relay audit passed.");
+console.log("\nVital Agent Sync hosted relay audit passed.");
 console.log(JSON.stringify({
   relay_url: relayUrl,
   passive: passive.ok,

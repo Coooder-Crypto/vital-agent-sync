@@ -181,10 +181,10 @@ export function buildBootstrapPlan(config: BootstrapConfig): BootstrapPlanItem[]
     {
       id: "initialize_runtime",
       description: config.service_mode === "relay_pull"
-        ? "Initialize or reuse the private VitalMCP relay runtime and local database"
+        ? "Initialize or reuse the private Vital Agent Sync relay runtime and local database"
         : config.transport_id === "tailscale"
-          ? "Initialize or reuse the private VitalMCP local database and configure tailnet-only Tailscale Serve HTTPS"
-          : "Initialize or reuse the private VitalMCP local database",
+          ? "Initialize or reuse the private Vital Agent Sync local database and configure tailnet-only Tailscale Serve HTTPS"
+          : "Initialize or reuse the private Vital Agent Sync local database",
       persistent_change: true
     },
     {
@@ -199,7 +199,7 @@ export function buildBootstrapPlan(config: BootstrapConfig): BootstrapPlanItem[]
     },
     {
       id: "create_onboarding",
-      description: "Create one local credential-bearing onboarding action for VitalMCP iOS",
+      description: "Create one local credential-bearing onboarding action for the Vital Agent app",
       persistent_change: true
     },
     {
@@ -342,7 +342,7 @@ export async function withBootstrapLock<T>(
     descriptor = openSync(lockPath, "wx", 0o600);
   } catch (error) {
     if (isNodeError(error) && error.code === "EEXIST") {
-      throw new Error("Another VitalMCP setup is already running. Wait for it to finish, then run setup --resume.");
+      throw new Error("Another Vital Agent Sync setup is already running. Wait for it to finish, then run setup --resume.");
     }
     throw error;
   }
@@ -361,7 +361,7 @@ export function sanitizeAgentOutput<T>(value: T): T {
 
 export function safeErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
-  return sensitiveValuePattern.test(message) ? "VitalMCP setup failed while handling sensitive local state. Run vitalmcp doctor for a redacted diagnosis." : message;
+  return sensitiveValuePattern.test(message) ? "Vital Agent Sync setup failed while handling sensitive local state. Run vitalmcp doctor for a redacted diagnosis." : message;
 }
 
 export function classifyBootstrapError(error: unknown): string {

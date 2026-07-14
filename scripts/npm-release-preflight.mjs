@@ -30,7 +30,7 @@ try {
   if (!localOnly) {
     verifyRegistry(manifest);
   }
-  console.log("\nVitalMCP npm release preflight passed.");
+  console.log("\nVital Agent Sync npm release preflight passed.");
   console.log(JSON.stringify({
     package: manifest.name,
     local_version: manifest.version,
@@ -43,8 +43,8 @@ try {
 }
 
 function assertReleaseManifest(value) {
-  if (value.name !== "vitalmcp" || value.version !== "0.3.0") {
-    throw new Error("Expected the release manifest to be vitalmcp@0.3.0.");
+  if (value.name !== "vitalmcp" || value.version !== "0.4.0") {
+    throw new Error("Expected the release manifest to be vitalmcp@0.4.0.");
   }
   if (value.private === true || value.publishConfig?.access !== "public") {
     throw new Error("vitalmcp must be a public publishable package.");

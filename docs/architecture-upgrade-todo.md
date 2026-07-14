@@ -1,4 +1,4 @@
-# HealthLink Architecture Upgrade TODO
+# Vital Agent Sync Architecture Upgrade TODO
 
 This document tracks the architecture upgrade from the current local iOS + Hermes MVP to a multi-source, multi-agent, multi-transport personal data gateway.
 
@@ -6,7 +6,7 @@ Implementation guidance for the remaining adapter work lives in [architecture-ad
 
 ## Target
 
-HealthLink should support:
+Vital Agent Sync should support:
 
 - multiple data-source apps:
   - iOS app with Apple Health
@@ -47,7 +47,7 @@ Transport Providers
   -> advertised URL
   -> reachability
 
-HealthLink Gateway
+Vital Agent Sync Gateway
   pairing
   source-device tokens
   agent-client registration
@@ -196,7 +196,7 @@ Source adapters should only know how to collect data and sync normalized payload
 
 ## Agent Adapter TODO
 
-Agent adapters should install or print configuration. They should not own HealthLink data semantics.
+Agent adapters should install or print configuration. They should not own Vital Agent Sync data semantics.
 
 Define an adapter interface:
 
@@ -235,7 +235,7 @@ MCP is the product protocol. Skills are optional instructions that improve natur
 
 Tasks:
 
-- [x] Add a bundled HealthLink skill Markdown template.
+- [x] Add a bundled Vital Agent Sync skill Markdown template.
 - [x] Add `vitalmcp print-skill --format markdown`.
 - [x] Add `vitalmcp install-hermes-skill`.
 - [x] Add `vitalmcp init --hermes --install-skill`.
@@ -357,6 +357,6 @@ Phase 4:
 
 - Do not expose raw health samples by default.
 - Do not make the iOS app run an Agent.
-- Do not require HealthLink Cloud for local use.
+- Do not require Vital Agent Sync Cloud for local use.
 - Do not promise exact iOS background sync intervals.
 - Do not make skills mandatory for generic MCP support.

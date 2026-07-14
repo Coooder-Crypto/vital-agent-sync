@@ -1,6 +1,6 @@
 # Agent Connection UX
 
-This document defines the target "foolproof" path for connecting HealthLink iOS to Hermes Agent or any other agent runtime.
+This document defines the target "foolproof" path for connecting Vital Agent iOS app to Hermes Agent or any other agent runtime.
 
 For the canonical installation/bootstrap state machine, security boundary, and delivery slices, see [agent-first-onboarding.md](agent-first-onboarding.md).
 For the longer-term adapter architecture and implementation checklist covering Android, Xiaomi, OpenClaw, WorkBuddy, Tailscale, tunnels, and public HTTPS, see [architecture-upgrade-todo.md](architecture-upgrade-todo.md).
@@ -9,9 +9,9 @@ For adapter implementation guidance, see [architecture-adapter-design.md](archit
 ## Target User Experience
 
 ```text
-1. User asks an Agent to install HealthLink, or uses the portable CLI fallback.
+1. User asks an Agent to install Vital Agent Sync, or uses the portable CLI fallback.
 2. The Agent shows a redacted setup plan and invokes the shared vitalmcp bootstrap.
-3. HealthLink initializes local state, MCP, and the selected transport.
+3. Vital Agent Sync initializes local state, MCP, and the selected transport.
 4. The user receives one QR/deep-link action and opens it with the iOS app.
 5. The user selects which data types to expose and authorizes Apple Health once.
 6. The iOS app sends compact summaries directly over LAN by default, or over the user's authorized tailnet when Tailscale is selected.
@@ -23,10 +23,10 @@ The user should not manually copy tokens, edit SQLite, or understand HealthKit. 
 
 ## Product Boundary
 
-HealthLink has three roles:
+Vital Agent Sync has three roles:
 
 ```text
-HealthLink iOS
+Vital Agent iOS app
   Apple permissions
   HealthKit collection
   scope selection
@@ -41,14 +41,14 @@ vitalmcp
 Agent runtime
   calls MCP tools
   generates analysis, reports, advice, or automations
-  may load optional HealthLink skills
+  may load optional Vital Agent Sync skills
 ```
 
 The agent never talks to HealthKit directly. Skills and Agent adapters do not become alternate data stores. Experimental Hosted Relay code handles opaque encrypted envelopes and must not become a health data warehouse.
 
 ## Persistent Link Model
 
-HealthLink does not rely on a live socket between iOS and the Agent. Pairing creates persistent local state:
+Vital Agent Sync does not rely on a live socket between iOS and the Agent. Pairing creates persistent local state:
 
 ```text
 iOS app
@@ -63,7 +63,7 @@ vitalmcp
 
 Hermes or another agent
   MCP config pointing to vitalmcp mcp
-  optional HealthLink skill instructions
+  optional Vital Agent Sync skill instructions
 ```
 
 Normal use after setup is:
@@ -81,13 +81,13 @@ Reconnect or re-pair only when:
 - the database path changes
 - the device token is revoked
 - the user disconnects in the iOS app
-- local HealthLink data is deleted
+- local Vital Agent Sync data is deleted
 - Hermes config is removed or rewritten
 
 Product language:
 
 ```text
-Pair once. Sync manually anytime; VitalMCP also catches up when the app is active. Ask your Agent after a fresh sync.
+Pair once. Sync manually anytime; Vital Agent Sync also catches up when the app is active. Ask your Agent after a fresh sync.
 ```
 
 ## Sync Lifecycle
@@ -115,12 +115,12 @@ Background sync should be best-effort, not a strict schedule:
 Required UX copy:
 
 ```text
-Use Sync Now anytime. VitalMCP also catches up while the app is active or returns to the foreground. Background refresh is best-effort and has no guaranteed schedule.
+Use Sync Now anytime. Vital Agent Sync also catches up while the app is active or returns to the foreground. Background refresh is best-effort and has no guaranteed schedule.
 ```
 
 ## Connection Modes
 
-VitalMCP exposes one product flow with LAN first, Tailscale as the optional private remote path, and advanced/experimental transports outside the Local Preview happy path.
+Vital Agent Sync exposes one product flow with LAN first, Tailscale as the optional private remote path, and advanced/experimental transports outside the Local Preview happy path.
 
 ### Mode A: LAN
 
@@ -130,7 +130,7 @@ This is the Local Preview default for new users.
 iPhone -> encrypted direct envelope over LAN -> vitalmcp decrypts -> SQLite -> MCP -> Agent
 ```
 
-LAN uses receiver-pinned application-layer encryption for pairing credentials, device tokens, and Health summaries. It is not network-layer E2EE: the user-owned local VitalMCP receiver is the trusted decrypting endpoint. See [direct-lan-security.md](direct-lan-security.md).
+LAN uses receiver-pinned application-layer encryption for pairing credentials, device tokens, and Health summaries. It is not network-layer E2EE: the user-owned local Vital Agent Sync receiver is the trusted decrypting endpoint. See [direct-lan-security.md](direct-lan-security.md).
 
 Pros:
 
@@ -144,7 +144,7 @@ Limits:
 - The iPhone cannot use `127.0.0.1`; the QR must use the receiver's reachable LAN address.
 - The network should be trusted; public Wi-Fi with client isolation may block the connection.
 
-LAN setup needs no relay URL, VPS, domain, VitalMCP account, payment method, or Agent marketplace listing.
+LAN setup needs no relay URL, VPS, domain, Vital Agent Sync account, payment method, or Agent marketplace listing.
 
 ### Mode B: Tailscale
 
@@ -160,14 +160,14 @@ Prerequisites:
 vitalmcp setup --transport tailscale --tailscale-name my-mac.tailnet.ts.net
 ```
 
-VitalMCP verifies a tailnet-only Tailscale Serve HTTPS route to the loopback receiver and advertises its trusted `.ts.net` URL. It fails safely rather than advertising plain HTTP or a raw `100.x` address. It does not install Tailscale, create an account, or authorize devices. See [Tailscale HTTPS Onboarding For iOS](tailscale-ios-onboarding.md).
+Vital Agent Sync verifies a tailnet-only Tailscale Serve HTTPS route to the loopback receiver and advertises its trusted `.ts.net` URL. It fails safely rather than advertising plain HTTP or a raw `100.x` address. It does not install Tailscale, create an account, or authorize devices. See [Tailscale HTTPS Onboarding For iOS](tailscale-ios-onboarding.md).
 
 ### Mode C: Public HTTPS
 
 For agents deployed on a VPS or a user-controlled server.
 
 ```text
-iPhone -> https://agent.example.com/healthlink -> HealthLink receiver -> storage -> MCP -> Agent
+iPhone -> https://agent.example.com/healthlink -> Vital Agent Sync receiver -> storage -> MCP -> Agent
 ```
 
 Requirements:
@@ -216,7 +216,7 @@ npx -y vitalmcp setup
 - Initialize SQLite.
 - Auto-detect a supported Agent config such as Hermes or OpenClaw.
 - Back up and write the selected Agent MCP config.
-- Install or update the HealthLink Hermes skill when Hermes is selected.
+- Install or update the Vital Agent Sync Hermes skill when Hermes is selected.
 - Install and start the background HTTP receiver.
 - Create a short-lived pairing session.
 - Open or print the pairing page.
@@ -263,7 +263,7 @@ First-time user onboarding should still use `setup`, because setup writes the Ag
 Expected output:
 
 ```text
-HealthLink Local running
+Vital Agent Sync runtime running
 
 Pair with iPhone:
   http://127.0.0.1:8787/pair
@@ -364,13 +364,13 @@ npx -y vitalmcp status
 npx -y vitalmcp doctor
 ```
 
-The helpers should not invent new protocols. They should write or print the same MCP command with the correct database path. `setup` uses the same install logic as the selected Agent adapter, installs the HealthLink Hermes skill by default when Hermes is selected, installs/starts the receiver service, and folds pairing into one Agent-driven flow. `init --hermes` remains the foreground compatibility path.
+The helpers should not invent new protocols. They should write or print the same MCP command with the correct database path. `setup` uses the same install logic as the selected Agent adapter, installs the Vital Agent Sync Hermes skill by default when Hermes is selected, installs/starts the receiver service, and folds pairing into one Agent-driven flow. `init --hermes` remains the foreground compatibility path.
 
 ## Skill Layer
 
 MCP is the product protocol. Skills are optional agent-specific instructions that improve natural-language tool use.
 
-HealthLink should provide small, portable skill documents for agents that support them. OpenClaw and Hermes can provide first-class onboarding adapters, while generic MCP remains the mandatory fallback.
+Vital Agent Sync should provide small, portable skill documents for agents that support them. OpenClaw and Hermes can provide first-class onboarding adapters, while generic MCP remains the mandatory fallback.
 
 Skill responsibilities:
 

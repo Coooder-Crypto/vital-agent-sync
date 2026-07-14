@@ -1,4 +1,4 @@
-# HealthLink E2EE Relay Implementation Plan
+# Vital Agent Sync E2EE Relay Implementation Plan
 
 This plan turns the E2EE relay technical route into executable milestones. It assumes the current direct receiver, SQLite, and MCP path continue to work while the relay path is added incrementally.
 
@@ -14,11 +14,11 @@ Release audit gate: [e2ee-relay-release-audit.md](e2ee-relay-release-audit.md).
 
 ## Product Outcome
 
-HealthLink should support two first-class setup paths:
+Vital Agent Sync should support two first-class setup paths:
 
 ```text
 Default consumer path
-  HealthLink iOS
+  Vital Agent iOS app
     -> hosted E2EE relay
     -> vitalmcp pull/decrypt/ingest
     -> SQLite
@@ -28,7 +28,7 @@ Default consumer path
 
 ```text
 Self-owned path
-  HealthLink iOS
+  Vital Agent iOS app
     -> self-hosted relay or direct gateway
     -> vitalmcp
     -> SQLite
@@ -42,7 +42,7 @@ Every Agent should use the same MCP data interface. Hermes is the current execut
 
 ### User Experience
 
-- A user can connect any MCP-compatible Agent to HealthLink.
+- A user can connect any MCP-compatible Agent to Vital Agent Sync.
 - Agent-specific adapters can guide the user through local setup and iOS onboarding without owning health data or cryptography.
 - The user does not need to expose a local port for hosted relay mode.
 - The iOS app can sync health summaries over outbound HTTPS.
@@ -253,7 +253,7 @@ Acceptance:
 
 Status: fixture pull/decrypt/ingest path, automatic bounded-page draining, mobile-compatible HMAC envelopes, atomic failed/success cursor metadata, `pull --once`, foreground `pull --watch --interval-seconds`, and managed launchd/systemd `relay-pull` service mode are implemented.
 
-Goal: make `vitalmcp` pull encrypted envelopes, decrypt them, and write existing HealthLink SQLite tables.
+Goal: make `vitalmcp` pull encrypted envelopes, decrypt them, and write existing Vital Agent Sync SQLite tables.
 
 Work:
 
@@ -408,7 +408,7 @@ Work:
 - [x] Add optional deep link prompt from agent:
 
 ```text
-Open HealthLink on your iPhone to sync now:
+Open Vital Agent Sync on your iPhone to sync now:
 healthlink://sync?source=<agent>&request_id=...
 ```
 

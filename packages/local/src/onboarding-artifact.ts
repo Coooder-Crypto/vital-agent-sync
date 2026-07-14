@@ -65,7 +65,7 @@ function buildOnboardingHtml(options: {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>VitalMCP iOS onboarding</title>
+  <title>Vital Agent onboarding</title>
   <style>
     :root { color-scheme: light dark; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
     body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #0b1220; color: #f8fafc; }
@@ -79,11 +79,11 @@ function buildOnboardingHtml(options: {
 </head>
 <body>
   <main>
-    <h1>Connect VitalMCP iOS</h1>
+    <h1>Connect Vital Agent</h1>
     <p class="warning">This local page contains pairing credentials. Do not share or upload it.</p>
-    ${showQr ? `<img src="${options.qrDataUrl}" alt="VitalMCP onboarding QR code">` : ""}
-    ${showDeepLink ? `<div><a href="${link}">Open VitalMCP</a></div>` : ""}
-    ${showText ? `<textarea readonly aria-label="VitalMCP onboarding text code">${escapeHtml(options.textCode)}</textarea>` : ""}
+    ${showQr ? `<img src="${options.qrDataUrl}" alt="Vital Agent Sync onboarding QR code">` : ""}
+    ${showDeepLink ? `<div><a href="${link}">Open Vital Agent Sync</a></div>` : ""}
+    ${showText ? `<textarea readonly aria-label="Vital Agent Sync onboarding text code">${escapeHtml(options.textCode)}</textarea>` : ""}
     <p class="meta">Relay: ${escapeHtml(options.relayUrl)}</p>
     <p class="meta">Fingerprint: ${escapeHtml(options.fingerprint)}</p>
   </main>

@@ -20,10 +20,10 @@ final class GatewaySettingsTests: XCTestCase {
         keychain = nil
     }
 
-    func testVitalMCPBundleMetadataAndCompatibilitySchemes() throws {
+    func testVitalAgentSyncBundleMetadataAndCompatibilitySchemes() throws {
         XCTAssertEqual(Bundle.main.bundleIdentifier, "com.vitalmcp.ios")
-        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String, "VitalMCP")
-        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String, "VitalMCP")
+        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String, "Vital Agent")
+        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String, "Vital Agent")
 
         let permittedTasks = try XCTUnwrap(
             Bundle.main.object(forInfoDictionaryKey: "BGTaskSchedulerPermittedIdentifiers") as? [String]

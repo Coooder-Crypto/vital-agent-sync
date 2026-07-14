@@ -1,6 +1,6 @@
 # Direct Gateway Vs E2EE Relay
 
-HealthLink supports two transport families over the same normalized data and MCP query layer.
+Vital Agent Sync supports two transport families over the same normalized data and MCP query layer.
 
 ## Summary
 
@@ -8,7 +8,7 @@ HealthLink supports two transport families over the same normalized data and MCP
 | --- | --- | --- |
 | Direct gateway | Users who can keep the agent machine reachable from iOS over LAN, Tailscale, or user-managed HTTPS. | Simpler data path, but network reachability is the user's problem. |
 | Hosted E2EE relay | Users who want outbound-only iOS sync with minimal setup. | Relay operator sees metadata and must operate infrastructure responsibly. |
-| Self-hosted E2EE relay | Users who want outbound-only sync but own the relay infrastructure. | More operational work, but no HealthLink-hosted relay dependency. |
+| Self-hosted E2EE relay | Users who want outbound-only sync but own the relay infrastructure. | More operational work, but no Vital Agent Sync-hosted relay dependency. |
 
 ## Direct Gateway
 
@@ -97,7 +97,7 @@ iOS
 Use self-hosted relay when:
 
 - The user wants outbound-only iOS sync.
-- The user does not want HealthLink-operated relay infrastructure.
+- The user does not want Vital Agent Sync-operated relay infrastructure.
 - The user can operate Docker, persistence, TLS, logs, backups, and monitoring.
 
 Properties:

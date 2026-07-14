@@ -1,4 +1,4 @@
-# HealthLink Adapter Architecture Design
+# Vital Agent Sync Adapter Architecture Design
 
 This document turns the architecture upgrade TODO into implementation guidance for future source apps, agent runtimes, and transport modes. It is intentionally adapter-focused: the stable product surface remains scoped pairing, normalized storage, and MCP query tools. The shared installer and orchestration contract is defined in [agent-first-onboarding.md](agent-first-onboarding.md).
 
@@ -9,7 +9,7 @@ Implemented in the local MVP branch:
 - iOS source pairing and sync into local SQLite.
 - Source-device compatibility wrappers over the legacy `devices` table.
 - Generic MCP config output.
-- Hermes MCP config install and optional HealthLink skill install.
+- Hermes MCP config install and optional Vital Agent Sync skill install.
 - Agent adapter and transport provider interfaces.
 - LAN default transport and private Tailscale Serve HTTPS advertisement.
 - E2EE Hosted/Self-hosted Relay runtime, onboarding, pull, and lifecycle controls.
@@ -34,7 +34,7 @@ Still intentionally future work:
 flowchart LR
   source["Source Apps\n(iOS, Android, Xiaomi, connectors)"]
   transport["Transport Providers\n(LAN, Tailscale, tunnel, HTTPS)"]
-  gateway["HealthLink Gateway\n(pairing, auth, ingest, storage, audit)"]
+  gateway["Vital Agent Sync Gateway\n(pairing, auth, ingest, storage, audit)"]
   query["Query Layer\n(provider-neutral summaries)"]
   mcp["MCP Tools\n(context, status, feedback)"]
   agents["Agent Adapters\n(generic, Hermes, OpenClaw, WorkBuddy)"]
@@ -248,7 +248,7 @@ Open questions to close before expanding implementation:
 - Keep ClawHub publication optional and independently removable.
 - Ensure the Skill invokes the Agent-neutral bootstrap instead of adding Python/runtime data paths.
 
-The [Apple Health Sync ClawHub package](https://clawhub.ai/lukasosterheider/skills/apple-health-sync) is an interaction benchmark: initialize from Agent chat, prefer one QR handoff, complete a first iOS sync, pull/decrypt locally, and offer summaries or schedules. HealthLink should match that sequence while retaining its shared TypeScript runtime and MCP-only health-data access.
+The [Apple Health Sync ClawHub package](https://clawhub.ai/lukasosterheider/skills/apple-health-sync) is an interaction benchmark: initialize from Agent chat, prefer one QR handoff, complete a first iOS sync, pull/decrypt locally, and offer summaries or schedules. Vital Agent Sync should match that sequence while retaining its shared TypeScript runtime and MCP-only health-data access.
 
 ## WorkBuddy Adapter
 
@@ -264,11 +264,11 @@ Implemented adapter behavior:
 
 The adapter does not write `~/.workbuddy/models.json`; that documented file configures model providers, not MCP servers. It also does not invent a user-global MCP location. See the [official WorkBuddy configuration guide](https://docs.cloudbase.net/en/ai/cloudbase-ai-toolkit/ide-setup/workbuddy).
 
-Skill packaging remains separate in [issue #90](https://github.com/Coooder-Crypto/health-link/issues/90). Until WorkBuddy exposes a stable automatic Skill install contract, VitalMCP may print WorkBuddy-targeted Markdown but must not mutate undocumented Skill storage.
+Skill packaging remains separate in [issue #90](https://github.com/Coooder-Crypto/health-link/issues/90). Until WorkBuddy exposes a stable automatic Skill install contract, Vital Agent Sync may print WorkBuddy-targeted Markdown but must not mutate undocumented Skill storage.
 
 ## Non-Hermes Skill Import
 
-HealthLink skills must be portable text, not Hermes-only behavior.
+Vital Agent Sync skills must be portable text, not Hermes-only behavior.
 
 Recommended generic import path:
 
@@ -322,7 +322,7 @@ Future native provider:
 - verifies `cloudflared` exists
 - starts or references a named tunnel
 - returns an HTTPS advertised URL
-- warns that the tunnel is transport only, not HealthLink Cloud
+- warns that the tunnel is transport only, not Vital Agent Sync Cloud
 - records no health data outside the user's receiver by default
 
 Until then, users can pass:
@@ -359,7 +359,7 @@ Requirements:
 - firewall limited to the intended receiver port
 - backups and revocation behavior documented by the deployment owner
 
-HealthLink should provide config output and diagnostics first. It should not become a hosted health-data cloud by default.
+Vital Agent Sync should provide config output and diagnostics first. It should not become a hosted health-data cloud by default.
 
 ## iOS Background Sync Design
 
@@ -369,7 +369,7 @@ Foreground auto-sync is implemented. Background sync should be honest best-effor
 
 Use for lightweight refresh opportunities:
 
-- register a HealthLink refresh task identifier
+- register a Vital Agent Sync refresh task identifier
 - schedule after successful sync and app foregrounding
 - check pairing, permissions, battery/network conditions, and throttle interval
 - call the same sync coordinator used by foreground auto-sync
@@ -402,7 +402,7 @@ Enable background delivery for metric types the user authorized:
 
 - request after HealthKit authorization succeeds
 - use `.immediate` only where appropriate and allowed
-- still apply HealthLink throttling before network sync
+- still apply Vital Agent Sync throttling before network sync
 - surface last attempt and last successful sync in UI
 
 Product copy must say "when iOS allows" or "best effort." It must not promise exact intervals.

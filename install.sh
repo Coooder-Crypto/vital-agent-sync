@@ -2,7 +2,7 @@
 set -eu
 
 PACKAGE_NAME="vitalmcp"
-DEFAULT_VERSION="0.3.0"
+DEFAULT_VERSION="0.4.0"
 VERSION="${VITALMCP_VERSION:-$DEFAULT_VERSION}"
 PREFIX="${VITALMCP_INSTALL_PREFIX:-$HOME/.vitalmcp/npm-global}"
 BIN_DIR="$PREFIX/bin"
@@ -107,7 +107,7 @@ install_profile_block() {
   [ -f "$profile" ] || : > "$profile"
   remove_profile_block "$profile"
   if grep -Fqx "$BEGIN_MARKER" "$profile" || grep -Fqx "$END_MARKER" "$profile"; then
-    printf 'Incomplete VitalMCP PATH block in %s; repair the marked lines and rerun.\n' "$profile" >&2
+    printf 'Incomplete Vital Agent Sync PATH block in %s; repair the marked lines and rerun.\n' "$profile" >&2
     return 1
   fi
   {
@@ -122,7 +122,7 @@ install_profile_block() {
 
 platform="$(detect_platform)"
 if [ "$platform" = "unsupported" ]; then
-  printf '%s\n' "VitalMCP installer currently supports macOS, Linux, and WSL." >&2
+  printf '%s\n' "Vital Agent Sync installer currently supports macOS, Linux, and WSL." >&2
   exit 1
 fi
 
@@ -135,7 +135,7 @@ if [ "$ACTION" = "uninstall" ]; then
   if [ "$MANAGE_PROFILE" -eq 1 ]; then
     remove_profile_block "$profile"
   fi
-  printf '%s\n' "Removed the VitalMCP CLI and installer-owned PATH entry."
+  printf '%s\n' "Removed the Vital Agent Sync CLI and installer-owned PATH entry."
   printf '%s\n' "Local data under $HOME/.healthlink was preserved."
   exit 0
 fi
@@ -165,7 +165,7 @@ if [ "$MANAGE_PROFILE" -eq 1 ]; then
   install_profile_block "$profile"
 fi
 
-printf '\n%s\n' "VitalMCP CLI installed."
+printf '\n%s\n' "Vital Agent Sync CLI installed."
 printf 'Platform: %s\n' "$platform"
 printf 'Version:  %s\n' "$VERSION"
 printf 'Binary:   %s/vitalmcp\n' "$BIN_DIR"

@@ -132,15 +132,15 @@ export function verifyEnvelope(
   options: EnvelopeValidationOptions = {}
 ): void {
   if (envelope.protocol !== HEALTHLINK_E2EE_PROTOCOL) {
-    throw new Error(`Unsupported VitalMCP envelope protocol: ${envelope.protocol}`);
+    throw new Error(`Unsupported Vital Agent Sync envelope protocol: ${envelope.protocol}`);
   }
   if (envelope.user_id !== config.user_id) {
-    throw new Error("VitalMCP envelope user_id does not match local relay runtime.");
+    throw new Error("Vital Agent Sync envelope user_id does not match local relay runtime.");
   }
   if (envelope.crypto.alg !== "x25519-hkdf-sha256-chacha20poly1305-hmac-sha256" &&
       envelope.crypto.alg !== "x25519-chacha20poly1305-hmac-sha256" &&
       envelope.crypto.alg !== "x25519-chacha20poly1305-ed25519") {
-    throw new Error(`Unsupported VitalMCP envelope algorithm: ${envelope.crypto.alg}`);
+    throw new Error(`Unsupported Vital Agent Sync envelope algorithm: ${envelope.crypto.alg}`);
   }
   validateEnvelopeMetadata(config, envelope, options);
   const signature = Buffer.from(envelope.crypto.signature, "base64url");
@@ -156,7 +156,7 @@ export function verifyEnvelope(
     ? timingSafeEqualBase64Url(signEnvelopeWithUploadSecret(config, unsignedEnvelope), envelope.crypto.signature)
     : verifyLegacyLocalSignature(config, unsignedEnvelope, signature);
   if (!ok) {
-    throw new Error("VitalMCP envelope signature verification failed.");
+    throw new Error("Vital Agent Sync envelope signature verification failed.");
   }
 }
 
@@ -166,32 +166,32 @@ function validateEnvelopeMetadata(
   options: EnvelopeValidationOptions
 ): void {
   if (options.expectedDeviceId && envelope.device_id !== options.expectedDeviceId) {
-    throw new Error("VitalMCP envelope device_id does not match the configured relay source.");
+    throw new Error("Vital Agent Sync envelope device_id does not match the configured relay source.");
   }
   if (envelope.sequence <= (options.minSequenceExclusive ?? 0)) {
-    throw new Error("VitalMCP envelope sequence is not newer than the local relay cursor.");
+    throw new Error("Vital Agent Sync envelope sequence is not newer than the local relay cursor.");
   }
   if (options.seenEnvelopeIds && iterableIncludes(options.seenEnvelopeIds, envelope.envelope_id)) {
-    throw new Error("VitalMCP envelope was already processed.");
+    throw new Error("Vital Agent Sync envelope was already processed.");
   }
   const createdAt = Date.parse(envelope.created_at);
   if (!Number.isFinite(createdAt)) {
-    throw new Error("VitalMCP envelope created_at is invalid.");
+    throw new Error("Vital Agent Sync envelope created_at is invalid.");
   }
   const now = options.now ? new Date(options.now).getTime() : Date.now();
   if (!Number.isFinite(now)) {
-    throw new Error("VitalMCP envelope validation time is invalid.");
+    throw new Error("Vital Agent Sync envelope validation time is invalid.");
   }
   const maxAgeMs = options.maxAgeMs ?? DEFAULT_MAX_ENVELOPE_AGE_MS;
   const maxFutureSkewMs = options.maxFutureSkewMs ?? DEFAULT_MAX_FUTURE_SKEW_MS;
   if (createdAt < now - maxAgeMs) {
-    throw new Error("VitalMCP envelope is older than the allowed relay freshness window.");
+    throw new Error("Vital Agent Sync envelope is older than the allowed relay freshness window.");
   }
   if (createdAt > now + maxFutureSkewMs) {
-    throw new Error("VitalMCP envelope was created too far in the future.");
+    throw new Error("Vital Agent Sync envelope was created too far in the future.");
   }
   if (envelope.device_id !== config.source_device_id) {
-    throw new Error("VitalMCP envelope device_id does not match local relay runtime.");
+    throw new Error("Vital Agent Sync envelope device_id does not match local relay runtime.");
   }
 }
 
@@ -271,7 +271,7 @@ function getSenderPublicKey(envelope: HealthLinkEncryptedEnvelope) {
   if (envelope.crypto.sender_public_key) {
     return createPublicKey(envelope.crypto.sender_public_key);
   }
-  throw new Error("VitalMCP envelope is missing sender public key.");
+  throw new Error("Vital Agent Sync envelope is missing sender public key.");
 }
 
 function isBoundedIdentifier(value: unknown): value is string {
@@ -311,7 +311,7 @@ function x25519PublicKeyPemToRawBase64Url(publicKeyPem: string): string {
 
 function rawX25519PublicKeyToSpkiDer(raw: Buffer): Buffer {
   if (raw.length !== 32) {
-    throw new Error("VitalMCP X25519 sender public key must be 32 bytes.");
+    throw new Error("Vital Agent Sync X25519 sender public key must be 32 bytes.");
   }
   return Buffer.concat([
     Buffer.from("302a300506032b656e032100", "hex"),

@@ -94,7 +94,7 @@ enum SyncFailureCategory: String, Codable {
         case .tokenRevoked:
             return String(localized: "Pair this iPhone with the Agent again to receive a fresh device token.")
         case .healthPermissionMissing:
-            return String(localized: "Open iOS Settings and allow VitalMCP to read the selected Health data.")
+            return String(localized: "Open iOS Settings and allow Vital Agent Sync to read the selected Health data.")
         case .networkUnavailable:
             return String(localized: "Check Wi-Fi or cellular connectivity, then retry sync.")
         case .requestTimedOut:
@@ -770,7 +770,7 @@ enum GatewayError: LocalizedError {
         case .healthKitUnavailable:
             return "HealthKit is not available on this device."
         case .healthPermissionRequired:
-            return "Health permission is missing or denied. Open iOS Settings and allow VitalMCP to read selected Health data."
+            return "Health permission is missing or denied. Open iOS Settings and allow Vital Agent Sync to read selected Health data."
         case .missingServerURL:
             return "Server URL is not configured."
         case .missingAPIToken:

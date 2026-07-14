@@ -1,15 +1,15 @@
-# HealthLink Technical Plan
+# Vital Agent Sync Technical Plan
 
 ## 1. Product Shape
 
-HealthLink is a private data bridge between a user's iPhone and the user's own local Agent runtime.
+Vital Agent Sync is a private data bridge between a user's iPhone and the user's own local Agent runtime.
 
 It is not a cloud health platform, not a medical product, and not an AI coach by itself. The iOS app owns Apple permissions and data collection. The local Agent server owns storage, pairing, Agent-facing tools, and analysis.
 
 The first production-worthy shape should be:
 
 ```text
-HealthLink iOS
+Vital Agent iOS app
   -> local network sync
   -> @healthlink/local
   -> SQLite
@@ -39,7 +39,7 @@ Then:
 1. @healthlink/local starts a local HTTP server.
 2. It opens or prints a pairing URL.
 3. The pairing page shows a QR code.
-4. HealthLink iOS scans the QR code.
+4. Vital Agent iOS app scans the QR code.
 5. User confirms the server and requested scopes.
 6. iOS stores the paired server and device token.
 7. iOS manually syncs daily summaries.
@@ -57,7 +57,7 @@ The current repository contains the iOS app and the first Agent-side Node packag
 Recommended early structure:
 
 ```text
-HealthLink iOS repo
+Vital Agent iOS app repo
   App/
   docs/
   packages/
@@ -116,7 +116,7 @@ npx -y @healthlink/local init
 Default startup output:
 
 ```text
-HealthLink Local running
+Vital Agent Sync runtime running
 
 Pairing page: http://127.0.0.1:8787/pair
 LAN address:  http://192.168.1.23:8787
@@ -537,8 +537,8 @@ location.history.write
 
 App copy should be explicit:
 
-- HealthLink sends selected summaries to the user's configured Agent server.
-- HealthLink does not send data to a HealthLink cloud service in local mode.
+- Vital Agent Sync sends selected summaries to the user's configured Agent server.
+- Vital Agent Sync does not send data to a Vital Agent Sync cloud service in local mode.
 - Calendar titles are redacted by default.
 - Raw HealthKit samples are not uploaded by default.
 - User can disconnect a paired server.
@@ -625,7 +625,7 @@ Status: complete for manual sync.
 
 Exit criteria:
 
-- Local Agent can query HealthLink through MCP.
+- Local Agent can query Vital Agent Sync through MCP.
 - Tool responses include freshness metadata.
 
 Status: partially complete. MCP stdio exists and tools can query SQLite; freshness metadata needs to be normalized across all tools.
@@ -641,7 +641,7 @@ Status: partially complete. MCP stdio exists and tools can query SQLite; freshne
 
 Exit criteria:
 
-- User can ask an agent to install HealthLink or run one command.
+- User can ask an agent to install Vital Agent Sync or run one command.
 - User scans QR instead of copying a pairing URL.
 - Agent config can be written or printed without hand-authoring JSON.
 
@@ -672,7 +672,7 @@ v0.8  Device key signatures for sync payloads
 v0.9  Optional raw sample scopes for advanced users
 ```
 
-Avoid building a HealthLink-hosted cloud until the local product loop is proven.
+Avoid building a Vital Agent Sync-hosted cloud until the local product loop is proven.
 
 ## 14. Current Project Alignment
 

@@ -1,6 +1,6 @@
 # Server Contract
 
-This document describes the canonical HealthLink sync contract used by both direct receiver mode and E2EE relay mode.
+This document describes the canonical Vital Agent Sync sync contract used by both direct receiver mode and E2EE relay mode.
 
 ## Shared Data Model
 

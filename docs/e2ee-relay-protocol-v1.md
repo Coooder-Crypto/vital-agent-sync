@@ -1,4 +1,4 @@
-# HealthLink E2EE Relay Protocol v1
+# Vital Agent Sync E2EE Relay Protocol v1
 
 This document is the implementation contract for `healthlink-e2ee-v1`. It covers the mobile source, relay mailbox, and `vitalmcp` runtime. Hosted and self-hosted relays use the same protocol.
 
@@ -48,7 +48,7 @@ healthlink-e2ee-v1:<base64url(JSON)>
 vitalmcp://onboard?payload=healthlink-e2ee-v1:<base64url(JSON)>
 ```
 
-The QR contains the deep link. HealthLink iOS accepts all three forms.
+The QR contains the deep link. Vital Agent iOS app accepts all three forms.
 
 The complete onboarding value is sensitive. `upload_auth_secret`, `relay_access_token`, and optional `relay_api_token` are credentials. It may be shown directly to the intended source device, but must not be copied into Agent chat, logs, memory, analytics, issue trackers, or support messages.
 

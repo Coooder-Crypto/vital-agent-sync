@@ -1,4 +1,4 @@
-# HealthLink E2EE Relay Release Audit
+# Vital Agent Sync E2EE Relay Release Audit
 
 This document maps the implementation plan to concrete verification evidence. It separates local engineering evidence from checks that must be performed against a real hosted environment, ClawHub listing, or iOS device.
 
@@ -22,9 +22,9 @@ Latest repository evidence, 2026-07-11:
 - `audit:relay-local` passes, including 56 Node tests, compiled fixture flow, compiled CLI guards, passive and active compiled relay audits, full iOS source typecheck against the installed iPhoneOS SDK, and CryptoKit-to-Node envelope interoperability.
 - `npm run pack:check --workspace healthlink-local` passes for `healthlink-local@0.2.0` with 101 package files.
 - `audit:relay-package` passes against the local `healthlink-local@0.2.0` tarball, proving a clean temporary global install can run the relay crypto/pull path and export the two-file OpenClaw Skill package without relying on workspace modules. The latest cold-cache run completed its dependency install in about 225 seconds while emitting 15-second heartbeats, then passed fixture upload/pull, SQLite verification, active relay audit, skill export, and cleanup.
-- `audit:agent-adapters` passes with Hermes Agent v0.17.0: a generic MCP client discovers 12 tools and calls `healthlink_status`, then Hermes loads an isolated HealthLink config, connects, and discovers the same 12 tools. A separate test against the user's configured Hermes instance also connects in 186 ms and discovers all 12 tools.
+- `audit:agent-adapters` passes with Hermes Agent v0.17.0: a generic MCP client discovers 12 tools and calls `healthlink_status`, then Hermes loads an isolated Vital Agent Sync config, connects, and discovers the same 12 tools. A separate test against the user's configured Hermes instance also connects in 186 ms and discovers all 12 tools.
 - `audit:dependencies` reports zero known production dependency vulnerabilities across all severities for the current lockfile (336 audited dependency nodes on 2026-07-11).
-- `audit:secrets` passes its built-in positive/negative rule self-test and scans the non-website release scope for private keys, common provider tokens, literal HealthLink credentials, real environment files, SQLite/Keychain export artifacts, and runtime secret paths without printing matched values. The current scan covers 100 text files, skips 18 binary files, and reports zero findings.
+- `audit:secrets` passes its built-in positive/negative rule self-test and scans the non-website release scope for private keys, common provider tokens, literal Vital Agent Sync credentials, real environment files, SQLite/Keychain export artifacts, and runtime secret paths without printing matched values. The current scan covers 100 text files, skips 18 binary files, and reports zero findings.
 - `audit:relay-container` passes: development and production Relay Compose files validate, the relay image builds successfully, Caddy 2.11.4 reports `Valid configuration`, and all uniquely named temporary containers/networks/volumes are removed. `App/Info.plist` plus non-website `git diff --check` also pass.
 - The built runtime image reports Node 22.23.1 and UID 1000, loads the native `better-sqlite3` binding, contains no Python/make/g++ toolchain or empty API/metrics-token ENV defaults, and runs successfully with a read-only root filesystem, `cap_drop: ALL`, and `no-new-privileges`.
 - A hardened temporary container passes the full active relay audit. Its logs contain startup metadata only; the final relay database contains zero envelopes, zero active audit identities, and two revoked disposable identities.
@@ -35,12 +35,12 @@ Latest repository evidence, 2026-07-11:
 - The hosted audit wrapper fails closed without `--yes`, rejects HTTP relay URLs, requires all three hosted environment values, keeps tokens out of child-process arguments, and is ready to run both audits once a real deployment exists.
 - `release:npm-preflight` passed from committed release source for publisher `coooder`, the 101-file `healthlink-local@0.2.0` artifact, a zero-finding secret scan, and the required version advance from registry `0.1.3`. `healthlink-local@0.2.0` was then published on 2026-07-11. The public registry reports `0.2.0` with an integrity hash, and an isolated `/tmp` install using a private npm cache/global prefix reports `healthlink-local 0.2.0` and successfully emits a `healthlink-e2ee-v1` encrypted fixture without private key material. No OpenClaw CLI is installed. A temporary ClawHub 0.23.0 `skill publish --dry-run --json` validation succeeded for `healthlink-personal-context@0.2.0` with exactly `SKILL.md` and `README.md`; the temporary CLI/cache was removed. ClawHub marketplace publication remains an explicit optional external action.
 
-VitalMCP direct-cutover evidence, 2026-07-12:
+Vital Agent Sync direct-cutover evidence, 2026-07-12:
 
-- `vitalmcp@0.3.0` local tests pass 66/66, the full local relay audit passes, and the iOS simulator suite passes with Bundle ID `com.vitalmcp.ios`.
-- The final 107-file `vitalmcp-0.3.0.tgz` installs into an isolated global prefix and passes version, relay fixture/pull, active tenant audit, and OpenClaw Skill export checks using only the installed binary.
+- `vitalmcp@0.4.0` local tests pass 66/66, the full local relay audit passes, and the iOS simulator suite passes with Bundle ID `com.vitalmcp.ios`.
+- The final 107-file `vitalmcp-0.4.0.tgz` installs into an isolated global prefix and passes version, relay fixture/pull, active tenant audit, and OpenClaw Skill export checks using only the installed binary.
 - The authenticated release preflight identifies publisher `coooder`, reports `first_publish: true` for `vitalmcp`, and reports zero secret findings. The preflight does not publish.
-- The Web production build completes after switching the public install command and metadata to VitalMCP.
+- The Web production build completes after switching the public install command and metadata to Vital Agent Sync.
 
 That command runs the local evidence suite:
 
@@ -163,7 +163,7 @@ These checks require a machine with the matching iOS SDK/runtime and a test devi
 
 ## Optional OpenClaw Publishing Gate
 
-The generated Skill requires the relay-capable `vitalmcp@0.3.0` runtime. Before publishing it, run:
+The generated Skill requires the relay-capable `vitalmcp@0.4.0` runtime. Before publishing it, run:
 
 ```bash
 npm run pack:check --workspace vitalmcp
@@ -187,11 +187,11 @@ Before publishing:
 - Review generated `SKILL.md` and `README.md`; ClawHub reads publication and runtime metadata from `SKILL.md` frontmatter.
 - Confirm `metadata.openclaw.requires.bins` and the Node install specification both identify `vitalmcp`.
 - Confirm install instructions use the intended package source and hosted relay URL.
-- Confirm `vitalmcp --version` reports `0.3.0` after installation from npm.
+- Confirm `vitalmcp --version` reports `0.4.0` after installation from npm.
 - Confirm the skill tells the agent to use MCP tools for health claims.
 - Confirm the skill does not ask the user to paste `~/.healthlink/secrets` or raw SQLite contents.
 - Confirm the skill never transcribes onboarding QR/deep-link/text credentials into Agent messages, logs, memory, or tool arguments.
-- Re-run `clawhub skill publish /tmp/vitalmcp-openclaw-skill --slug vitalmcp-personal-context --name "VitalMCP Personal Context" --version 0.3.0 --changelog "VitalMCP E2EE relay release" --dry-run` with the release toolchain.
+- Re-run `clawhub skill publish /tmp/vitalmcp-openclaw-skill --slug vitalmcp-personal-context --name "Vital Agent Sync Personal Context" --version 0.4.0 --changelog "Vital Agent Sync E2EE relay release" --dry-run` with the release toolchain.
 - Publish to ClawHub, then smoke test `openclaw skills install <owner-or-final-slug>` from the published listing.
 
 ## Release Decision

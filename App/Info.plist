@@ -9,7 +9,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>VitalMCP</string>
+	<string>Vital Agent</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -17,7 +17,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>VitalMCP</string>
+	<string>Vital Agent</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -44,11 +44,11 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>VitalMCP scans pairing QR codes shown by your local Agent server.</string>
+	<string>Vital Agent Sync scans pairing QR codes shown by your local Agent server.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>VitalMCP reads selected Apple Health data to sync daily summaries to your authorized agent server.</string>
+	<string>Vital Agent Sync reads selected Apple Health data to sync daily summaries to your authorized agent server.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>VitalMCP connects to your local Agent server on your network after you approve pairing.</string>
+	<string>Vital Agent Sync connects to your local Agent server on your network after you approve pairing.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>

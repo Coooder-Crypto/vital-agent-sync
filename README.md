@@ -1,8 +1,8 @@
-# VitalMCP iOS
+# Vital Agent Sync
 
-VitalMCP is a private iOS data gateway for agent systems. The MVP reads user-authorized Apple Health summaries, uploads compact daily context to the user's Agent-side receiver, stores it locally, and exposes it to agents through MCP tools.
+Vital Agent Sync is a private iOS data gateway for agent systems. The MVP reads user-authorized Apple Health summaries, uploads compact daily context to the user's Agent-side receiver, stores it locally, and exposes it to agents through MCP tools.
 
-The pre-release product is branded VitalMCP, including the `vitalmcp` npm package and CLI. Protocol and persisted identifiers such as `healthlink-e2ee-v1`, `healthlink://`, `~/.healthlink`, and the internal Xcode target/module remain unchanged during the migration. See [docs/brand-identity.md](docs/brand-identity.md).
+The pre-release product is branded Vital Agent Sync, including the `vitalmcp` npm package and CLI. Protocol and persisted identifiers such as `healthlink-e2ee-v1`, `healthlink://`, `~/.healthlink`, and the internal Xcode target/module remain unchanged during the migration. See [docs/brand-identity.md](docs/brand-identity.md).
 
 It is intentionally not an agent. It is a user-controlled data connector.
 
@@ -56,13 +56,13 @@ npm run dev:local
 
 The local package lives in `packages/local` and is named `vitalmcp`. The package is prepared for public npm publishing and exposes the `vitalmcp` CLI.
 
-The target product entry is Agent-first: the user asks an existing Agent to install VitalMCP, the Agent adapter invokes the shared `vitalmcp` bootstrap, and the user receives one QR/deep-link action for the iOS app. The Skill is an orchestration layer only; MCP remains the data contract. See [Agent-First Onboarding And Runtime Bootstrap](docs/agent-first-onboarding.md).
+The target product entry is Agent-first: the user asks an existing Agent to install Vital Agent Sync, the Agent adapter invokes the shared `vitalmcp` bootstrap, and the user receives one QR/deep-link action for the iOS app. The Skill is an orchestration layer only; MCP remains the data contract. See [Agent-First Onboarding And Runtime Bootstrap](docs/agent-first-onboarding.md).
 
 ## Local Preview Network Path
 
-LAN is the default onboarding path. `vitalmcp setup` starts a receiver on the user's machine and creates a QR for an iPhone on the same reachable trusted network. This path needs no relay URL, VPS, domain, VitalMCP account, or payment method.
+LAN is the default onboarding path. `vitalmcp setup` starts a receiver on the user's machine and creates a QR for an iPhone on the same reachable trusted network. This path needs no relay URL, VPS, domain, Vital Agent Sync account, or payment method.
 
-Tailscale is the optional private remote path. It requires the user to install and sign in to Tailscale on both the iPhone and receiver machine, and to authorize both devices on the same tailnet. VitalMCP uses the user-managed tailnet; it does not create an account or approve devices.
+Tailscale is the optional private remote path. It requires the user to install and sign in to Tailscale on both the iPhone and receiver machine, and to authorize both devices on the same tailnet. Vital Agent Sync uses the user-managed tailnet; it does not create an account or approve devices.
 
 Hosted Relay remains future/experimental during Local Preview. Its implementation and protocol documentation remain in the repository, but it is not the default, recommended, or required onboarding route.
 
@@ -91,7 +91,7 @@ Current portable CLI fallback:
 npx -y vitalmcp setup
 ```
 
-Supported Agents can use the Skill-first flow instead: the generated VitalMCP Skill requests a redacted setup plan, asks for consent, resumes the shared `vitalmcp` bootstrap, presents one private local onboarding page, and verifies the first sync through MCP. The Skill never owns keys, relay crypto, SQLite, or a separate health query path. See [docs/agent-first-onboarding.md](docs/agent-first-onboarding.md).
+Supported Agents can use the Skill-first flow instead: the generated Vital Agent Sync Skill requests a redacted setup plan, asks for consent, resumes the shared `vitalmcp` bootstrap, presents one private local onboarding page, and verifies the first sync through MCP. The Skill never owns keys, relay crypto, SQLite, or a separate health query path. See [docs/agent-first-onboarding.md](docs/agent-first-onboarding.md).
 
 Portable no-sudo installer fallback:
 
@@ -106,7 +106,7 @@ Agent-safe setup commands:
 vitalmcp setup --agent auto --transport lan --output json
 vitalmcp setup --resume --yes --output json
 vitalmcp setup --agent auto --transport tailscale --tailscale-name <host.tailnet.ts.net> --output json
-vitalmcp setup --agent workbuddy --workbuddy-project ~/VitalMCP --transport lan --output json
+vitalmcp setup --agent workbuddy --workbuddy-project ~/VitalAgentSync --transport lan --output json
 vitalmcp status --output json
 ```
 
@@ -117,7 +117,7 @@ npm run build:local
 node packages/local/dist/cli.js setup
 ```
 
-`setup` installs and starts the background receiver through the current platform's service manager, prints the iPhone pairing QR, and auto-detects a project-level WorkBuddy config, Hermes, or OpenClaw. WorkBuddy setup merges `mcpServers.healthlink` into `<project>/workbuddy.mcp.json` with a timestamped backup; pass `--workbuddy-project <dir>` or `--workbuddy-config <path>` and restart WorkBuddy after setup. If Hermes is detected, setup backs up and writes `~/.hermes/config.yaml`, installs the VitalMCP Hermes Skill, and points Hermes at the same VitalMCP database. macOS uses `launchd`; Linux servers use a user-level `systemd` service. Pass `--agent workbuddy`, `--agent hermes`, `--agent openclaw`, or `--agent generic` to force an adapter. If the QR expires, run `vitalmcp pair` or `npx -y vitalmcp pair`.
+`setup` installs and starts the background receiver through the current platform's service manager, prints the iPhone pairing QR, and auto-detects a project-level WorkBuddy config, Hermes, or OpenClaw. WorkBuddy setup merges `mcpServers.healthlink` into `<project>/workbuddy.mcp.json` with a timestamped backup; pass `--workbuddy-project <dir>` or `--workbuddy-config <path>` and restart WorkBuddy after setup. If Hermes is detected, setup backs up and writes `~/.hermes/config.yaml`, installs the Vital Agent Sync Hermes Skill, and points Hermes at the same Vital Agent Sync database. macOS uses `launchd`; Linux servers use a user-level `systemd` service. Pass `--agent workbuddy`, `--agent hermes`, `--agent openclaw`, or `--agent generic` to force an adapter. After pairing and syncing, restart or reload the selected Agent when its config changed. If the QR expires, run `vitalmcp pair` or `npx -y vitalmcp pair`.
 
 The planned one-command installer only bootstraps this package into a user-writable prefix. It must not create a second setup implementation. Agent-first, website, and manual CLI entry points all converge on `vitalmcp setup`, the same local state, and the same MCP tools.
 
@@ -167,7 +167,7 @@ npx -y vitalmcp init --hermes
 npx -y vitalmcp setup
 npx -y vitalmcp setup --agent hermes
 npx -y vitalmcp setup --agent openclaw
-npx -y vitalmcp setup --agent workbuddy --workbuddy-project ~/VitalMCP
+npx -y vitalmcp setup --agent workbuddy --workbuddy-project ~/VitalAgentSync
 npx -y vitalmcp ensure
 npx -y vitalmcp service status
 npx -y vitalmcp logs
@@ -219,14 +219,14 @@ Normal use after setup:
 
 ```text
 iOS syncs latest summaries -> ~/.healthlink/healthlink.sqlite
-Hermes calls VitalMCP MCP -> reads the latest summaries
+Hermes calls Vital Agent Sync MCP -> reads the latest summaries
 ```
 
 No repeated QR scan, `install-hermes`, or `/reload-mcp` is needed unless the pairing, database path, MCP configuration, or skill files change.
 
 ## Agent Skills
 
-MCP is the stable integration contract. Skills are optional agent-side usage guidance that help an AI decide when to call VitalMCP and how to format analysis.
+MCP is the stable integration contract. Skills are optional agent-side usage guidance that help an AI decide when to call Vital Agent Sync and how to format analysis.
 
 Skills may also guide installation, onboarding, and first-sync verification by invoking `vitalmcp`. They must not promise scheduled iOS delivery, implement relay cryptography, store a separate copy of health data, expose onboarding credentials, or bypass MCP. OpenClaw marketplace publication is optional; Hermes and generic MCP remain supported without any marketplace listing.
 
@@ -237,7 +237,7 @@ For Hermes, the preferred skill behavior is:
 - mention data freshness before analysis
 - avoid medical diagnosis or prescriptions
 
-Product installs should keep the generic MCP path available for non-Hermes agents, while Hermes-first setup can install or update a VitalMCP Skill as an experience enhancement.
+Product installs should keep the generic MCP path available for non-Hermes agents, while Hermes-first setup can install or update a Vital Agent Sync Skill as an experience enhancement.
 
 ## Sync Contract
 
@@ -290,7 +290,7 @@ Canonical plaintext payload after local receiver decryption:
 - Add foreground auto sync after pairing, app launch, and app foregrounding with throttling.
 - Add `HKAnchoredObjectQuery` for incremental sample sync.
 - Add `HKObserverQuery`, `BGAppRefreshTask`, and background delivery as best-effort triggers.
-- Add an optional bundled VitalMCP Skill installer for Hermes.
+- Add an optional bundled Vital Agent Sync Skill installer for Hermes.
 - Add automated iOS UI coverage after real-device workflow stabilizes.
 - Add tunnel and public HTTPS transports.
 - Add Reminders summaries.

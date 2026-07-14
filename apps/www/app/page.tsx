@@ -112,7 +112,7 @@ const modes = [
     eyebrow: "Local Preview default",
     icon: Database,
     title: "Start on the network you trust.",
-    body: "Send summaries directly from iPhone to the VitalMCP receiver on your Mac or home server.",
+    body: "Send summaries directly from iPhone to the Vital Agent Sync receiver on your Mac or home server.",
     bullets: ["No hosted service", "No account or payment", "Same local MCP tools"],
     path: ["iPhone", "Trusted LAN", "Your machine"],
   },
@@ -205,9 +205,9 @@ function PageHeader({ active, onNavigate }: { active: number; onNavigate: (index
     <>
       <header className={`global-header ${isDark ? "header-dark" : "header-light"}`}>
         <div className="header-inner page-width">
-          <button type="button" className="header-brand" onClick={() => navigate(0)} aria-label="Go to VitalMCP overview">
+          <button type="button" className="header-brand" onClick={() => navigate(0)} aria-label="Go to Vital Agent Sync overview">
             <BrandMark className="header-mark" priority />
-            <span className="header-brand-copy"><strong>VitalMCP</strong><small>Private health context</small></span>
+            <span className="header-brand-copy"><strong>Vital Agent Sync</strong><small>Private health context</small></span>
           </button>
 
           <nav className="header-nav" aria-label="Primary navigation">
@@ -224,7 +224,7 @@ function PageHeader({ active, onNavigate }: { active: number; onNavigate: (index
           </nav>
 
           <div className="header-actions">
-            <a className="header-github" href={githubUrl} target="_blank" rel="noreferrer" aria-label="VitalMCP on GitHub" title="GitHub">
+            <a className="header-github" href={githubUrl} target="_blank" rel="noreferrer" aria-label="Vital Agent Sync on GitHub" title="GitHub">
               <Github size={18} />
             </a>
             <button type="button" className="header-install" onClick={() => navigate(sections.length - 1)}>
@@ -296,7 +296,7 @@ function HeroPage({ copied, onCopy, onNavigate }: { copied: boolean; onCopy: () 
       <div className="hero-code" aria-hidden="true">HL/01</div>
       <motion.div className="page-width hero-page-inner" initial={false} animate="show" variants={{ show: { transition: { staggerChildren: reducedMotion ? 0 : 0.07 } } }}>
         <div className="hero-main">
-          <motion.p className="page-kicker" variants={item}><span /> VitalMCP for MCP agents</motion.p>
+          <motion.p className="page-kicker" variants={item}><span /> Vital Agent Sync for MCP agents</motion.p>
           <motion.h1 variants={item}>Apple Health context.<strong>Private by design.</strong></motion.h1>
           <motion.p className="hero-lede" variants={item}>Fresh Apple Health summaries become scoped context for your agent. Start directly over trusted LAN; add your own Tailscale network for private remote access.</motion.p>
           <motion.div className="hero-actions" variants={item}>
@@ -306,7 +306,7 @@ function HeroPage({ copied, onCopy, onNavigate }: { copied: boolean; onCopy: () 
           <motion.div variants={item}><CommandBar copied={copied} onCopy={onCopy} /></motion.div>
         </div>
 
-        <motion.div className="hero-route" variants={item} aria-label="Local route from Apple Health to the VitalMCP runtime">
+        <motion.div className="hero-route" variants={item} aria-label="Local route from Apple Health to the Vital Agent Sync runtime">
           <RouteNode icon={Smartphone} label="Apple Health" detail="summarized on iPhone" />
           <RouteLine delay={false} />
           <RouteNode icon={Server} label="LAN / Tailscale" detail="your private network" />
@@ -338,7 +338,7 @@ function FirstRunPage() {
         </div>
 
         <div className="flow-workbench">
-          <div className="flow-tabs" role="tablist" aria-label="VitalMCP setup steps">
+          <div className="flow-tabs" role="tablist" aria-label="Vital Agent Sync setup steps">
             {flowSteps.map((item, index) => (
               <button key={item.number} type="button" role="tab" aria-selected={active === index} onClick={() => setActive(index)}>
                 {active === index && <motion.i layoutId="flow-tab" />}
@@ -413,7 +413,7 @@ function AgentAnswerPage() {
     <SnapPage id="agent-answer" className="agent-page">
       <div className="page-width agent-page-inner">
         <div className="agent-copy">
-          <PageTitle kicker="Useful on day one" title="Ask naturally. Keep the evidence visible." body="VitalMCP checks freshness, returns only the context your Agent requests, and marks the line between observed data and inference." />
+          <PageTitle kicker="Useful on day one" title="Ask naturally. Keep the evidence visible." body="Vital Agent Sync checks freshness, returns only the context your Agent requests, and marks the line between observed data and inference." />
           <div className="segmented-tabs" role="tablist" aria-label="Health question examples">
             {questions.map((item, index) => <button key={item.label} type="button" role="tab" aria-selected={active === index} onClick={() => setActive(index)}>{item.label}</button>)}
           </div>
@@ -448,7 +448,7 @@ function PrivacyPage() {
       <div className="privacy-word" aria-hidden="true">LOCAL FIRST</div>
       <div className="page-width privacy-page-inner">
         <div className="privacy-copy">
-          <PageTitle kicker="The Local Preview boundary" title="Your receiver. Your network. Your data." body="LAN sends directly to your machine. Optional Tailscale uses your authorized tailnet. No VitalMCP-hosted service sits in the default route." light />
+          <PageTitle kicker="The Local Preview boundary" title="Your receiver. Your network. Your data." body="LAN sends directly to your machine. Optional Tailscale uses your authorized tailnet. No Vital Agent Sync-hosted service sits in the default route." light />
           <div className="privacy-proof"><Database size={18} /><span><strong>Health context location</strong>Your machine, always</span></div>
         </div>
         <div className="privacy-ledger">
@@ -513,7 +513,7 @@ function ProductPage() {
           </div>
           <div className="phone-frame">
             <i className="phone-island" />
-            <div className="phone-head"><BrandMark className="phone-brand-mark" /><strong>VitalMCP</strong><small>Secure</small></div>
+            <div className="phone-head"><BrandMark className="phone-brand-mark" /><strong>Vital Agent Sync</strong><small>Secure</small></div>
             <div className="phone-sync"><span><Check size={28} /></span><h3>Sync complete</h3><p>Today&apos;s summary is stored in your local runtime and ready for your agent.</p></div>
             <div className="phone-meta"><span><small>ROUTE</small><strong>Trusted LAN</strong></span><span><small>UPDATED</small><strong>Just now</strong></span></div>
           </div>
@@ -528,7 +528,7 @@ function BuildersPage({ onNavigate }: { onNavigate: (index: number) => void }) {
     <SnapPage id="builders" className="builders-page">
       <div className="page-width builders-page-inner">
         <div className="builders-copy">
-          <PageTitle kicker="Portable by design" title="Agent-neutral. MCP underneath." body="Hermes, OpenClaw, and other MCP clients use the same local runtime. VitalMCP keeps crypto, storage, and health semantics outside any single Agent." />
+          <PageTitle kicker="Portable by design" title="Agent-neutral. MCP underneath." body="Hermes, OpenClaw, and other MCP clients use the same local runtime. Vital Agent Sync keeps crypto, storage, and health semantics outside any single Agent." />
           <div className="builder-links"><a href={githubUrl} target="_blank" rel="noreferrer">Explore the repository <ExternalLink size={15} /></a><button type="button" onClick={() => onNavigate(4)}>Compare deployment modes <ArrowRight size={15} /></button></div>
           <div className="builder-facts"><span><ShieldCheck size={15} /> Scoped by default</span><span><Zap size={15} /> Freshness attached</span></div>
         </div>
@@ -549,11 +549,11 @@ function FinalPage({ copied, onCopy, onNavigate }: { copied: boolean; onCopy: ()
       <div className="page-width final-page-inner">
         <p className="page-kicker light"><span /> Give your agent better context</p>
         <h2>Start locally with one command.</h2>
-        <p>LAN is the zero-account default. VitalMCP detects supported Agents or prints standard MCP config for any compatible client; add your own Tailscale network only when you need private remote access.</p>
+        <p>LAN is the zero-account default. Vital Agent Sync detects supported Agents or prints standard MCP config for any compatible client; add your own Tailscale network only when you need private remote access.</p>
         <CommandBar copied={copied} onCopy={onCopy} inverse />
         <button type="button" className="back-to-top" onClick={() => onNavigate(0)}>Back to overview <ArrowRight size={15} /></button>
       </div>
-      <footer className="page-width final-footer"><span><BrandMark className="footer-brand-mark" /> VitalMCP</span><p>Private Apple Health context for MCP-compatible agents.</p><div><a href={githubUrl}>GitHub</a><button type="button" onClick={() => onNavigate(3)}>Privacy</button><button type="button" onClick={() => onNavigate(4)}>Self-host</button></div></footer>
+      <footer className="page-width final-footer"><span><BrandMark className="footer-brand-mark" /> Vital Agent Sync</span><p>Private Apple Health context for MCP-compatible agents.</p><div><a href={githubUrl}>GitHub</a><button type="button" onClick={() => onNavigate(3)}>Privacy</button><button type="button" onClick={() => onNavigate(4)}>Self-host</button></div></footer>
     </SnapPage>
   );
 }
@@ -567,7 +567,7 @@ function PageTitle({ kicker, title, body, light = false }: { kicker: string; tit
 }
 
 function CommandBar({ copied, onCopy, inverse = false }: { copied: boolean; onCopy: () => void; inverse?: boolean }) {
-  return <div className={`command-bar ${inverse ? "inverse" : ""}`}><span>$</span><code>{installCommand}</code><button type="button" onClick={onCopy} aria-label="Copy VitalMCP setup command">{copied ? <Check size={17} /> : <Copy size={17} />}<strong>{copied ? "Copied" : "Copy"}</strong></button></div>;
+  return <div className={`command-bar ${inverse ? "inverse" : ""}`}><span>$</span><code>{installCommand}</code><button type="button" onClick={onCopy} aria-label="Copy Vital Agent Sync setup command">{copied ? <Check size={17} /> : <Copy size={17} />}<strong>{copied ? "Copied" : "Copy"}</strong></button></div>;
 }
 
 function BrandMark({ className, priority = false }: { className: string; priority?: boolean }) {

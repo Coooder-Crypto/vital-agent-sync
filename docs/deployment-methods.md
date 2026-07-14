@@ -1,6 +1,6 @@
-# HealthLink Common Deployment Methods
+# Vital Agent Sync Common Deployment Methods
 
-This document describes the common ways to run HealthLink. It is organized by deployment method, not by Agent runtime. Hermes, OpenClaw, WorkBuddy, Claude, Codex, and other MCP-compatible Agents are consumers of the same HealthLink MCP surface.
+This document describes the common ways to run Vital Agent Sync. It is organized by deployment method, not by Agent runtime. Hermes, OpenClaw, WorkBuddy, Claude, Codex, and other MCP-compatible Agents are consumers of the same Vital Agent Sync MCP surface.
 
 The common deployment methods to support first are:
 
@@ -11,9 +11,9 @@ The common deployment methods to support first are:
 
 ## Local Preview Decision
 
-New users start on LAN with `vitalmcp setup`. The iPhone and receiver must share a reachable trusted network, but the user does not need a relay URL, VPS, domain, VitalMCP account, payment method, or Agent marketplace listing.
+New users start on LAN with `vitalmcp setup`. The iPhone and receiver must share a reachable trusted network, but the user does not need a relay URL, VPS, domain, Vital Agent Sync account, payment method, or Agent marketplace listing.
 
-Tailscale is the optional private remote path for use away from the receiver's LAN. The user must install and sign in to Tailscale on the iPhone and receiver machine, and authorize both devices on the same tailnet. VitalMCP uses that tailnet but does not install the apps, create an account, or approve devices.
+Tailscale is the optional private remote path for use away from the receiver's LAN. The user must install and sign in to Tailscale on the iPhone and receiver machine, and authorize both devices on the same tailnet. Vital Agent Sync uses that tailnet but does not install the apps, create an account, or approve devices.
 
 Hosted Relay is future/experimental during Local Preview. Relay implementation and protocol documentation remain available for engineering work, but hosted relay is not a default or recommended deployment method here.
 
@@ -33,7 +33,7 @@ Best for first-time setup, local testing, and users whose Agent runs on the same
 ```text
 iPhone
   -> same Wi-Fi / LAN
-  -> macOS HealthLink receiver
+  -> macOS Vital Agent Sync receiver
   -> ~/.healthlink/healthlink.sqlite
   -> local MCP stdio
   -> MCP-compatible Agent
@@ -98,7 +98,7 @@ Recommended receiver command:
 vitalmcp setup --agent generic --manager systemd
 ```
 
-For SSH-based LAN installs, HealthLink tries to advertise the server address automatically. It first checks the SSH session's local address, then the default route source address, then non-virtual LAN interfaces. A command such as `ssh jarvis@192.168.31.53` should usually produce a pairing URL using `http://192.168.31.53:8787` without an explicit `--server-url`.
+For SSH-based LAN installs, Vital Agent Sync tries to advertise the server address automatically. It first checks the SSH session's local address, then the default route source address, then non-virtual LAN interfaces. A command such as `ssh jarvis@192.168.31.53` should usually produce a pairing URL using `http://192.168.31.53:8787` without an explicit `--server-url`.
 
 Pass `--server-url` only when the auto-detected address is not reachable from the iPhone, or when the receiver is behind Tailscale, Docker, WSL, a reverse proxy, or public HTTPS:
 
@@ -195,7 +195,7 @@ Best for NAS/N100 users, Windows Docker Desktop users, WSL users, and servers wh
 iPhone
   -> host LAN / Tailscale / HTTPS URL
   -> Docker host port 8787
-  -> HealthLink receiver container
+  -> Vital Agent Sync receiver container
   -> /data/healthlink.sqlite mounted volume
   -> MCP-compatible Agent on the host or another container with the same volume
 ```
@@ -264,7 +264,7 @@ vitalmcp daemon \
   --server-url https://healthlink.example.com
 ```
 
-The reverse proxy must terminate HTTPS and forward to the receiver. HealthLink does not currently install TLS certificates, configure Nginx/Caddy, or manage DNS.
+The reverse proxy must terminate HTTPS and forward to the receiver. Vital Agent Sync does not currently install TLS certificates, configure Nginx/Caddy, or manage DNS.
 
 Pairing:
 
@@ -285,7 +285,7 @@ Privacy boundary: health summaries leave the phone and home network, but are sti
 
 ## Out Of Scope For The First Deployment Pass
 
-- HealthLink-hosted cloud relay.
+- Vital Agent Sync-hosted cloud relay.
 - Automatic Cloudflare Tunnel, ngrok, or FRP process management.
 - SSH-based remote installation.
 - Official Docker image publishing.

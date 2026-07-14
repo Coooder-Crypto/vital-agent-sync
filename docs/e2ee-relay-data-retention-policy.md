@@ -1,6 +1,6 @@
-# HealthLink Relay Data Retention Policy
+# Vital Agent Sync Relay Data Retention Policy
 
-This policy applies to hosted HealthLink relay beta deployments. Self-hosted operators can use it as a default template.
+This policy applies to hosted Vital Agent Sync relay beta deployments. Self-hosted operators can use it as a default template.
 
 Release verification for this policy is tracked in [e2ee-relay-release-audit.md](e2ee-relay-release-audit.md).
 
@@ -70,7 +70,7 @@ The relay removes rows older than the configured retention window. The app-level
 
 Use this language in beta docs:
 
-> HealthLink hosted relay keeps encrypted envelopes for up to 30 days by default so your local runtime can pull them. The relay can see operational metadata such as upload time, envelope size, and queue identifiers, but it is not designed to read your health summaries.
+> Vital Agent Sync hosted relay keeps encrypted envelopes for up to 30 days by default so your local runtime can pull them. The relay can see operational metadata such as upload time, envelope size, and queue identifiers, but it is not designed to read your health summaries.
 
 ## Review Before Public Beta
 
