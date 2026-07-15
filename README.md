@@ -2,7 +2,7 @@
 
 Vital Agent Sync is a private iOS data gateway for agent systems. The MVP reads user-authorized Apple Health summaries, uploads compact daily context to the user's Agent-side receiver, stores it locally, and exposes it to agents through MCP tools.
 
-The pre-release product is branded Vital Agent Sync, including the `vitalmcp` npm package and CLI. Protocol and persisted identifiers such as `healthlink-e2ee-v1`, `healthlink://`, `~/.healthlink`, and the internal Xcode target/module remain unchanged during the migration. See [docs/brand-identity.md](docs/brand-identity.md).
+The pre-release product is branded Vital Agent Sync, including the `VitalAgentSync` Xcode project/module and the `vitalmcp` npm package and CLI. Protocol and persisted identifiers such as `healthlink-e2ee-v1`, `healthlink://`, and `~/.healthlink` remain unchanged until the dedicated runtime identifier migration. See [docs/brand-identity.md](docs/brand-identity.md).
 
 It is intentionally not an agent. It is a user-controlled data connector.
 
@@ -42,7 +42,7 @@ This repo uses XcodeGen so the generated `.xcodeproj` does not need to be hand-m
 
 ```bash
 xcodegen generate
-open HealthLink.xcodeproj
+open VitalAgentSync.xcodeproj
 ```
 
 ## Agent-Side Local Package
@@ -207,7 +207,7 @@ lsof -nP -iTCP:8787 -sTCP:LISTEN
 
 HealthKit requires a real iPhone for meaningful testing. In Xcode:
 
-1. Select the `HealthLink` target.
+1. Select the `VitalAgentSync` target.
 2. Set your Apple Developer Team.
 3. Keep the HealthKit capability enabled.
 4. Run on a physical iPhone.

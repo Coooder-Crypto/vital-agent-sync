@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct HealthLinkApp: App {
+struct VitalAgentSyncApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
 
@@ -82,7 +82,7 @@ struct HealthLinkApp: App {
 
     @MainActor
     private func openSafeCallback(_ rawCallbackURL: String?, requestID: String?, status: String) {
-        guard let callbackURL = HealthLinkCallbackPolicy.safeCallbackURL(
+        guard let callbackURL = VitalAgentCallbackPolicy.safeCallbackURL(
             rawCallbackURL: rawCallbackURL,
             requestID: requestID,
             status: status

@@ -5,7 +5,7 @@ on:
     paths:
       - .github/workflows/relay-ci.yml
       - App/**
-      - HealthLink.xcodeproj/**
+      - VitalAgentSync.xcodeproj/**
       - Tests/**
       - deploy/relay/**
       - packages/local/**
@@ -24,7 +24,7 @@ on:
     paths:
       - .github/workflows/relay-ci.yml
       - App/**
-      - HealthLink.xcodeproj/**
+      - VitalAgentSync.xcodeproj/**
       - Tests/**
       - deploy/relay/**
       - packages/local/**

@@ -26,16 +26,16 @@ if (!simulator) {
   process.exit(1);
 }
 
-const configuredDerivedData = process.env.HEALTHLINK_IOS_TEST_DERIVED_DATA?.trim();
-const derivedDataPath = configuredDerivedData || mkdtempSync(join(tmpdir(), "healthlink-ios-tests-"));
-const shouldKeepArtifacts = process.env.HEALTHLINK_KEEP_IOS_TEST_ARTIFACTS === "1";
+const configuredDerivedData = process.env.VITAL_AGENT_IOS_TEST_DERIVED_DATA?.trim();
+const derivedDataPath = configuredDerivedData || mkdtempSync(join(tmpdir(), "vital-agent-ios-tests-"));
+const shouldKeepArtifacts = process.env.VITAL_AGENT_KEEP_IOS_TEST_ARTIFACTS === "1";
 
-process.stdout.write(`Running HealthLinkTests on ${simulator.name} (${simulator.udid}).\n`);
+process.stdout.write(`Running VitalAgentSyncTests on ${simulator.name} (${simulator.udid}).\n`);
 
 const testResult = spawnSync("xcodebuild", [
   "test",
-  "-project", "HealthLink.xcodeproj",
-  "-scheme", "HealthLink",
+  "-project", "VitalAgentSync.xcodeproj",
+  "-scheme", "VitalAgentSync",
   "-destination", `platform=iOS Simulator,id=${simulator.udid}`,
   "-derivedDataPath", derivedDataPath,
   "CODE_SIGNING_ALLOWED=NO"

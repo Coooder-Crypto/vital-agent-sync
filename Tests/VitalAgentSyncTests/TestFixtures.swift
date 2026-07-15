@@ -1,5 +1,5 @@
 import Foundation
-@testable import HealthLink
+@testable import VitalAgentSync
 
 enum TestFixtures {
     static func dailySummary(date: String = "2026-07-11", steps: Int = 8_123) -> DailyHealthSummary {

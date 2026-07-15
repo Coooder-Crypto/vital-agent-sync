@@ -1,0 +1,510 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 54;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		12B3D294EDE9A7154566A8F4 /* PairingScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 226B76306EA47B0B0CCE8FB9 /* PairingScannerView.swift */; };
+		19F66C34BF23329231E5CD74 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57C1FB36C03C41412CD47BA5 /* KeychainStore.swift */; };
+		1D122698F1639754F3BC5702 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8397B066DD0C035A16337D21 /* Assets.xcassets */; };
+		23E5D2B751D100E252B6437B /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 6C3791556A1CC07C1C82CA3A /* Localizable.strings */; };
+		381966B2EFDEAF035AD337B4 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD76DC3CB1CCC6F2C600FAF4 /* Models.swift */; };
+		3A73BC9799340177E3C8658F /* SyncModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DD18C251995C1C4C1E01177 /* SyncModelTests.swift */; };
+		3DB15AD6C4899AD33CF23E38 /* TestFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0AE436DD98CE70BB9206FFA /* TestFixtures.swift */; };
+		4D7EFD5229130AE3650F7A4F /* GatewaySettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8FEB66CCC822D0EF01594D3 /* GatewaySettingsTests.swift */; };
+		52E90234B12963ACE1E1DCF6 /* VitalAgentSyncApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3FA998604244111CB3C237C /* VitalAgentSyncApp.swift */; };
+		6284747872F398B2D22B26B1 /* GatewaySettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A7BF3D1A49C2CFC8DA6F100 /* GatewaySettings.swift */; };
+		88E5E5CDF4066AFDED042D04 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC9EE1CF0DF701CDF618B05C /* ContentView.swift */; };
+		AAE601CB962DB62DBFD763A3 /* HealthKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 853EBEF810560AF6E052E02A /* HealthKitService.swift */; };
+		ACB48595DEE0AD96834552DA /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 6F733AD907913EC696FB614C /* InfoPlist.strings */; };
+		B35D57734B98536B7D2BB2F0 /* BackgroundSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E74772B1B1B5CFB709D1185B /* BackgroundSyncManager.swift */; };
+		C9157A4AF99D33B68F0A6C21 /* GatewayAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A767A920D5DD8BEA34E790C /* GatewayAPIClient.swift */; };
+		E3805EA02235485C003C951E /* GatewayErrorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8DA8B9192A8662930EA245C /* GatewayErrorTests.swift */; };
+		E5E87469ACB31DFB4C46A23D /* PairingAndPayloadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08B20D36782A3996ED287DFD /* PairingAndPayloadTests.swift */; };
+		E85DB0ECAA8CE5F743E91F47 /* SyncCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB17EFAB1331704C0BD8AC01 /* SyncCoordinator.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		193B306D952B604771C07E97 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7742D8BE9675D2431BB4EDF2 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 498AFB73209F99F9DE6CE523;
+			remoteInfo = VitalAgentSync;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		08B20D36782A3996ED287DFD /* PairingAndPayloadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingAndPayloadTests.swift; sourceTree = "<group>"; };
+		0A767A920D5DD8BEA34E790C /* GatewayAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayAPIClient.swift; sourceTree = "<group>"; };
+		226B76306EA47B0B0CCE8FB9 /* PairingScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingScannerView.swift; sourceTree = "<group>"; };
+		57C1FB36C03C41412CD47BA5 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
+		5A7BF3D1A49C2CFC8DA6F100 /* GatewaySettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewaySettings.swift; sourceTree = "<group>"; };
+		5CD7D093F3B454A55990BAC8 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		67808A0519BFAE67E399B083 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		6DEBBD0B8576FD6C78327552 /* VitalAgentSync.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = VitalAgentSync.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8397B066DD0C035A16337D21 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		853EBEF810560AF6E052E02A /* HealthKitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitService.swift; sourceTree = "<group>"; };
+		9DD18C251995C1C4C1E01177 /* SyncModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncModelTests.swift; sourceTree = "<group>"; };
+		A788FFE8A7F89AC873762742 /* VitalAgentSyncTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = VitalAgentSyncTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AE47B679A5C56557FA1D4953 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		B5B626B3103600DF238A4937 /* VitalAgentSync.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VitalAgentSync.entitlements; sourceTree = "<group>"; };
+		BB17EFAB1331704C0BD8AC01 /* SyncCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncCoordinator.swift; sourceTree = "<group>"; };
+		BD76DC3CB1CCC6F2C600FAF4 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		CC9EE1CF0DF701CDF618B05C /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		D0AE436DD98CE70BB9206FFA /* TestFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestFixtures.swift; sourceTree = "<group>"; };
+		E22B5BB22FD66409B8D03D23 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		E3FA998604244111CB3C237C /* VitalAgentSyncApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VitalAgentSyncApp.swift; sourceTree = "<group>"; };
+		E74772B1B1B5CFB709D1185B /* BackgroundSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundSyncManager.swift; sourceTree = "<group>"; };
+		E8FEB66CCC822D0EF01594D3 /* GatewaySettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewaySettingsTests.swift; sourceTree = "<group>"; };
+		F8DA8B9192A8662930EA245C /* GatewayErrorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayErrorTests.swift; sourceTree = "<group>"; };
+		FE0F19F5512220BCE50D2D51 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		192331ED1D4B15F6D142B941 = {
+			isa = PBXGroup;
+			children = (
+				956024172CA01E2DD1C05556 /* App */,
+				D8C339CF25A1EA4EB61D999C /* Resources */,
+				F830847689DA70486A84ED4B /* VitalAgentSyncTests */,
+				BB8996AC309DEB6F98DBCE45 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		956024172CA01E2DD1C05556 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				E74772B1B1B5CFB709D1185B /* BackgroundSyncManager.swift */,
+				CC9EE1CF0DF701CDF618B05C /* ContentView.swift */,
+				0A767A920D5DD8BEA34E790C /* GatewayAPIClient.swift */,
+				5A7BF3D1A49C2CFC8DA6F100 /* GatewaySettings.swift */,
+				853EBEF810560AF6E052E02A /* HealthKitService.swift */,
+				67808A0519BFAE67E399B083 /* Info.plist */,
+				57C1FB36C03C41412CD47BA5 /* KeychainStore.swift */,
+				BD76DC3CB1CCC6F2C600FAF4 /* Models.swift */,
+				226B76306EA47B0B0CCE8FB9 /* PairingScannerView.swift */,
+				BB17EFAB1331704C0BD8AC01 /* SyncCoordinator.swift */,
+				B5B626B3103600DF238A4937 /* VitalAgentSync.entitlements */,
+				E3FA998604244111CB3C237C /* VitalAgentSyncApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		BB8996AC309DEB6F98DBCE45 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				6DEBBD0B8576FD6C78327552 /* VitalAgentSync.app */,
+				A788FFE8A7F89AC873762742 /* VitalAgentSyncTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		D8C339CF25A1EA4EB61D999C /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				8397B066DD0C035A16337D21 /* Assets.xcassets */,
+				6F733AD907913EC696FB614C /* InfoPlist.strings */,
+				6C3791556A1CC07C1C82CA3A /* Localizable.strings */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		F830847689DA70486A84ED4B /* VitalAgentSyncTests */ = {
+			isa = PBXGroup;
+			children = (
+				F8DA8B9192A8662930EA245C /* GatewayErrorTests.swift */,
+				E8FEB66CCC822D0EF01594D3 /* GatewaySettingsTests.swift */,
+				08B20D36782A3996ED287DFD /* PairingAndPayloadTests.swift */,
+				9DD18C251995C1C4C1E01177 /* SyncModelTests.swift */,
+				D0AE436DD98CE70BB9206FFA /* TestFixtures.swift */,
+			);
+			name = VitalAgentSyncTests;
+			path = Tests/VitalAgentSyncTests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		498AFB73209F99F9DE6CE523 /* VitalAgentSync */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 018866205AB5C094CFDEBCC8 /* Build configuration list for PBXNativeTarget "VitalAgentSync" */;
+			buildPhases = (
+				1FD97BE73E4F0512F99DD4AA /* Sources */,
+				79746B00517396A00CAAB05F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = VitalAgentSync;
+			productName = VitalAgentSync;
+			productReference = 6DEBBD0B8576FD6C78327552 /* VitalAgentSync.app */;
+			productType = "com.apple.product-type.application";
+		};
+		96749EC2F636F901CCB316F2 /* VitalAgentSyncTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FA2217FCA1CB7ADBD7380C51 /* Build configuration list for PBXNativeTarget "VitalAgentSyncTests" */;
+			buildPhases = (
+				9136A8AB1848A68CD1FA60A9 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				6A5D52C9874A7FA85BEF5B52 /* PBXTargetDependency */,
+			);
+			name = VitalAgentSyncTests;
+			productName = VitalAgentSyncTests;
+			productReference = A788FFE8A7F89AC873762742 /* VitalAgentSyncTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		7742D8BE9675D2431BB4EDF2 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					498AFB73209F99F9DE6CE523 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					96749EC2F636F901CCB316F2 = {
+						DevelopmentTeam = "";
+					};
+				};
+			};
+			buildConfigurationList = 582299F382A2805B38477F4A /* Build configuration list for PBXProject "VitalAgentSync" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+				"zh-Hans",
+			);
+			mainGroup = 192331ED1D4B15F6D142B941;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				498AFB73209F99F9DE6CE523 /* VitalAgentSync */,
+				96749EC2F636F901CCB316F2 /* VitalAgentSyncTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		79746B00517396A00CAAB05F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1D122698F1639754F3BC5702 /* Assets.xcassets in Resources */,
+				ACB48595DEE0AD96834552DA /* InfoPlist.strings in Resources */,
+				23E5D2B751D100E252B6437B /* Localizable.strings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		1FD97BE73E4F0512F99DD4AA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B35D57734B98536B7D2BB2F0 /* BackgroundSyncManager.swift in Sources */,
+				88E5E5CDF4066AFDED042D04 /* ContentView.swift in Sources */,
+				C9157A4AF99D33B68F0A6C21 /* GatewayAPIClient.swift in Sources */,
+				6284747872F398B2D22B26B1 /* GatewaySettings.swift in Sources */,
+				AAE601CB962DB62DBFD763A3 /* HealthKitService.swift in Sources */,
+				19F66C34BF23329231E5CD74 /* KeychainStore.swift in Sources */,
+				381966B2EFDEAF035AD337B4 /* Models.swift in Sources */,
+				12B3D294EDE9A7154566A8F4 /* PairingScannerView.swift in Sources */,
+				E85DB0ECAA8CE5F743E91F47 /* SyncCoordinator.swift in Sources */,
+				52E90234B12963ACE1E1DCF6 /* VitalAgentSyncApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9136A8AB1848A68CD1FA60A9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E3805EA02235485C003C951E /* GatewayErrorTests.swift in Sources */,
+				4D7EFD5229130AE3650F7A4F /* GatewaySettingsTests.swift in Sources */,
+				E5E87469ACB31DFB4C46A23D /* PairingAndPayloadTests.swift in Sources */,
+				3A73BC9799340177E3C8658F /* SyncModelTests.swift in Sources */,
+				3DB15AD6C4899AD33CF23E38 /* TestFixtures.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		6A5D52C9874A7FA85BEF5B52 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 498AFB73209F99F9DE6CE523 /* VitalAgentSync */;
+			targetProxy = 193B306D952B604771C07E97 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXVariantGroup section */
+		6C3791556A1CC07C1C82CA3A /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				E22B5BB22FD66409B8D03D23 /* en */,
+				5CD7D093F3B454A55990BAC8 /* zh-Hans */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+		6F733AD907913EC696FB614C /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				FE0F19F5512220BCE50D2D51 /* en */,
+				AE47B679A5C56557FA1D4953 /* zh-Hans */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
+/* Begin XCBuildConfiguration section */
+		27F1C9CCF235B0BDD3D04FED /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.2.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		3B38800B875DA8D699A768D5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
+				CODE_SIGN_ENTITLEMENTS = App/VitalAgentSync.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.vitalmcp.ios;
+				PRODUCT_NAME = VitalAgentSync;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		45B034412718E2B6DF134621 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.vitalmcp.ios.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/VitalAgentSync.app/VitalAgentSync";
+			};
+			name = Debug;
+		};
+		955484DF02CEB9DF3C68E875 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
+				CODE_SIGN_ENTITLEMENTS = App/VitalAgentSync.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.vitalmcp.ios;
+				PRODUCT_NAME = VitalAgentSync;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		AAD16A7F41327261CFB19B14 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.2.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		BA34CE3D3C675FED1B07DA4E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.vitalmcp.ios.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/VitalAgentSync.app/VitalAgentSync";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		018866205AB5C094CFDEBCC8 /* Build configuration list for PBXNativeTarget "VitalAgentSync" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3B38800B875DA8D699A768D5 /* Debug */,
+				955484DF02CEB9DF3C68E875 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		582299F382A2805B38477F4A /* Build configuration list for PBXProject "VitalAgentSync" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AAD16A7F41327261CFB19B14 /* Debug */,
+				27F1C9CCF235B0BDD3D04FED /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		FA2217FCA1CB7ADBD7380C51 /* Build configuration list for PBXNativeTarget "VitalAgentSyncTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				45B034412718E2B6DF134621 /* Debug */,
+				BA34CE3D3C675FED1B07DA4E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 7742D8BE9675D2431BB4EDF2 /* Project object */;
+}

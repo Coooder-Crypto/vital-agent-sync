@@ -608,7 +608,7 @@ struct RelayEnvelopePostResponse: Codable {
     let envelope_id: String
 }
 
-enum HealthLinkCallbackPolicy {
+enum VitalAgentCallbackPolicy {
     static func safeCallbackURL(rawCallbackURL: String?, requestID: String?, status: String) -> URL? {
         guard allowedStatuses.contains(status),
               let rawCallbackURL,

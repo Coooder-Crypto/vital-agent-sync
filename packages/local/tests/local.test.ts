@@ -354,7 +354,7 @@ test("relay pull decrypts encrypted health sync envelopes into MCP-readable SQLi
     const envelope = encryptHealthSyncPayload({
       config,
       sequence: 1,
-      createdAt: "2026-07-08T00:00:00.000Z",
+      createdAt: new Date().toISOString(),
       payload: {
         device_id: config.source_device_id,
         sync_id: "sync_relay_test_001",
