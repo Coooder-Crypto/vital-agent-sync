@@ -6,7 +6,7 @@ import {
   readRelayRuntimeConfig,
   type RelayRuntimeConfig
 } from "./relay-runtime.js";
-import { openHealthLinkDatabase } from "./database.js";
+import { openVitalAgentDatabase } from "./database.js";
 import { join } from "node:path";
 
 export type RelayLifecycleOptions = {
@@ -154,14 +154,14 @@ async function postRelayLifecycle(
   relayApiTokenOverride: string | undefined
 ): Promise<unknown> {
   const relayApiToken = normalizeOptionalToken(
-    relayApiTokenOverride ?? config.relay_api_token ?? process.env.HEALTHLINK_RELAY_API_TOKEN
+    relayApiTokenOverride ?? config.relay_api_token ?? process.env.VITALMCP_RELAY_API_TOKEN
   );
   const headers: Record<string, string> = {
     "content-type": "application/json",
     authorization: `Bearer ${config.relay_access_token}`
   };
   if (relayApiToken) {
-    headers["x-healthlink-relay-api-key"] = relayApiToken;
+    headers["x-vital-agent-relay-api-key"] = relayApiToken;
   }
   const response = await fetchImpl(url, {
     method: "POST",
@@ -196,8 +196,8 @@ function setLocalRelayDeviceRevoked(
   revoked: boolean,
   options: Pick<RelayLifecycleOptions, "stateDir" | "databasePath">
 ): void {
-  const databasePath = options.databasePath ?? (options.stateDir ? join(options.stateDir, "healthlink.sqlite") : undefined);
-  const database = openHealthLinkDatabase({ path: databasePath });
+  const databasePath = options.databasePath ?? (options.stateDir ? join(options.stateDir, "vital-agent.sqlite") : undefined);
+  const database = openVitalAgentDatabase({ path: databasePath });
   try {
     database.sqlite.prepare(`
       update devices

@@ -9,17 +9,17 @@ export type DatabaseConfig = {
   path: string;
 };
 
-export type HealthLinkDatabase = {
+export type VitalAgentDatabase = {
   path: string;
   sqlite: BetterSqliteDatabase;
   close: () => void;
 };
 
 export function getDefaultDatabasePath(): string {
-  return join(homedir(), ".healthlink", "healthlink.sqlite");
+  return join(homedir(), ".vital-agent-sync", "vital-agent.sqlite");
 }
 
-export function openHealthLinkDatabase(config: Partial<DatabaseConfig> = {}): HealthLinkDatabase {
+export function openVitalAgentDatabase(config: Partial<DatabaseConfig> = {}): VitalAgentDatabase {
   const usesDefaultPath = config.path === undefined;
   const databasePath = expandHomePath(config.path ?? getDefaultDatabasePath());
   const databaseDir = dirname(databasePath);

@@ -6,13 +6,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const root = process.cwd();
-const tempDir = mkdtempSync(join(tmpdir(), "healthlink-package-audit-"));
+const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-package-audit-"));
 const packDir = join(tempDir, "pack");
 const installPrefix = join(tempDir, "prefix");
 const npmCache = join(tempDir, "npm-cache");
 const isolatedHome = join(tempDir, "home");
 const stateDir = join(tempDir, "state");
-const databasePath = join(tempDir, "healthlink.sqlite");
+const databasePath = join(tempDir, "vital-agent.sqlite");
 const relayDatabasePath = join(tempDir, "relay.sqlite");
 const skillDir = join(tempDir, "openclaw-skill");
 const workBuddySkillDir = join(tempDir, "workbuddy-skill");
@@ -70,7 +70,7 @@ function verifyPinnedNpxFallback(tarballPath) {
     "vitalmcp",
     "--version"
   ], { cwd: tempDir, env: npmEnv, timeoutMs: 5 * 60_000 }).trim();
-  assert(version === "vitalmcp 0.4.1", "Pinned npm exec fallback reports the wrong version.");
+  assert(version === "vitalmcp 0.5.0", "Pinned npm exec fallback reports the wrong version.");
   console.log(version);
   const status = JSON.parse(capture("npm", [
     "exec",
@@ -83,7 +83,7 @@ function verifyPinnedNpxFallback(tarballPath) {
     "--state-dir",
     join(tempDir, "npx-state"),
     "--db",
-    join(tempDir, "npx-healthlink.sqlite"),
+    join(tempDir, "npx-vital-agent.sqlite"),
     "--output",
     "json"
   ], { cwd: tempDir, env: npmEnv, timeoutMs: 5 * 60_000 }));
@@ -104,7 +104,7 @@ function packVitalAgentSync() {
   const packed = JSON.parse(output);
   const artifact = packed[0];
   assert(artifact?.name === "vitalmcp", "npm pack returned the wrong package name.");
-  assert(artifact.version === "0.4.1", "npm pack returned the wrong package version.");
+  assert(artifact.version === "0.5.0", "npm pack returned the wrong package version.");
   assert(Array.isArray(artifact.files), "npm pack did not report package files.");
   const packagePaths = artifact.files.map((entry) => entry.path);
   for (const required of [
@@ -160,7 +160,7 @@ function resolveInstalledBinary() {
 function verifyInstalledCli(binaryPath) {
   console.log("\n==> isolated installed CLI");
   const version = capture(binaryPath, ["--version"], { cwd: tempDir, env: npmEnv }).trim();
-  assert(version === "vitalmcp 0.4.1", "Installed CLI reports the wrong version.");
+  assert(version === "vitalmcp 0.5.0", "Installed CLI reports the wrong version.");
   const help = capture(binaryPath, ["--help"], { cwd: tempDir, env: npmEnv });
   for (const expected of [
     "setup --transport relay",
@@ -180,11 +180,11 @@ async function verifyInstalledRelayFlow(binaryPath) {
     cwd: tempDir,
     env: {
       ...npmEnv,
-      HEALTHLINK_RELAY_HOST: "127.0.0.1",
-      HEALTHLINK_RELAY_PORT: String(port),
-      HEALTHLINK_RELAY_DB: relayDatabasePath,
-      HEALTHLINK_RELAY_API_TOKEN: relayApiToken,
-      HEALTHLINK_RELAY_METRICS_TOKEN: metricsToken
+      VITALMCP_RELAY_HOST: "127.0.0.1",
+      VITALMCP_RELAY_PORT: String(port),
+      VITALMCP_RELAY_DB: relayDatabasePath,
+      VITALMCP_RELAY_API_TOKEN: relayApiToken,
+      VITALMCP_RELAY_METRICS_TOKEN: metricsToken
     },
     stdio: ["ignore", "pipe", "pipe"]
   });
@@ -215,7 +215,7 @@ async function verifyInstalledRelayFlow(binaryPath) {
     "7777"
   ], { cwd: tempDir, env: npmEnv });
   const envelope = JSON.parse(envelopeOutput);
-  assert(envelope.protocol === "healthlink-e2ee-v1", "Installed CLI emitted the wrong relay protocol.");
+  assert(envelope.protocol === "vital-agent-e2ee-v1", "Installed CLI emitted the wrong relay protocol.");
   assert(envelope.sequence === 1, "Installed CLI emitted the wrong fixture sequence.");
   assert(typeof envelope.crypto?.ciphertext === "string", "Installed CLI fixture is missing ciphertext.");
   assert(!envelopeOutput.includes("PRIVATE KEY"), "Installed CLI fixture exposed private key material.");
@@ -228,7 +228,7 @@ async function verifyInstalledRelayFlow(binaryPath) {
     headers: {
       "content-type": "application/json",
       authorization: `Bearer ${config.relay_access_token}`,
-      "x-healthlink-relay-api-key": relayApiToken
+      "x-vital-agent-relay-api-key": relayApiToken
     },
     body: JSON.stringify(envelope),
     signal: AbortSignal.timeout(3000)
@@ -302,8 +302,8 @@ function verifyInstalledSkillExport(binaryPath) {
   const readme = readFileSync(join(skillDir, "README.md"), "utf8");
   for (const expected of [
     "name: vitalmcp-personal-context",
-    "version: 0.4.1",
-    "vitalmcp@0.4.1",
+    "version: 0.5.0",
+    "vitalmcp@0.5.0",
     "vitalmcp pull"
   ]) {
     assert(skill.includes(expected), `Installed CLI skill export is missing: ${expected}.`);
@@ -313,7 +313,7 @@ function verifyInstalledSkillExport(binaryPath) {
   for (const forbidden of [relayApiToken, metricsToken, "BEGIN PRIVATE KEY"]) {
     assert(!exported.includes(forbidden), "Installed CLI skill export contains sensitive runtime material.");
   }
-  console.log(JSON.stringify({ files: ["README.md", "SKILL.md"], version: "0.4.1" }));
+  console.log(JSON.stringify({ files: ["README.md", "SKILL.md"], version: "0.5.0" }));
 
   console.log("\n==> isolated installed WorkBuddy SkillHub export");
   capture(binaryPath, [
@@ -330,7 +330,7 @@ function verifyInstalledSkillExport(binaryPath) {
   const workBuddySkill = readFileSync(join(workBuddySkillDir, "SKILL.md"), "utf8");
   for (const expected of [
     "name: vital-agent-sync",
-    "vitalmcp@0.4.1",
+    "vitalmcp@0.5.0",
     "~/.workbuddy/mcp.json",
     "setup --transport lan --agent workbuddy --output json",
     "next_action.url"
@@ -340,7 +340,7 @@ function verifyInstalledSkillExport(binaryPath) {
   for (const forbidden of [relayApiToken, metricsToken, "BEGIN PRIVATE KEY", "relay_access_token", "upload_auth_secret"]) {
     assert(!workBuddySkill.includes(forbidden), "Installed CLI WorkBuddy export contains sensitive runtime material.");
   }
-  console.log(JSON.stringify({ files: ["SKILL.md"], version: "0.4.1", agent: "workbuddy" }));
+  console.log(JSON.stringify({ files: ["SKILL.md"], version: "0.5.0", agent: "workbuddy" }));
 }
 
 function verifyRelayLogs() {

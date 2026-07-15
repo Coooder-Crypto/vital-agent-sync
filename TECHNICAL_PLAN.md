@@ -11,7 +11,7 @@ The first production-worthy shape should be:
 ```text
 Vital Agent iOS app
   -> local network sync
-  -> @healthlink/local
+  -> vitalmcp
   -> SQLite
   -> MCP tools
   -> user's Agent
@@ -30,13 +30,13 @@ Combine v0.1 and v0.2 into one Local Pairing MVP.
 The goal is to make a user install and pair quickly:
 
 ```bash
-npx -y @healthlink/local init
+npx -y vitalmcp init
 ```
 
 Then:
 
 ```text
-1. @healthlink/local starts a local HTTP server.
+1. vitalmcp starts a local HTTP server.
 2. It opens or prints a pairing URL.
 3. The pairing page shows a QR code.
 4. Vital Agent iOS app scans the QR code.
@@ -46,7 +46,7 @@ Then:
 8. Agent queries data through local MCP tools.
 ```
 
-The current development command is `npm run dev:local`. The published-package target is `npx -y @healthlink/local init`.
+The current development command is `npm run dev:local`. The published-package target is `npx -y vitalmcp init`.
 
 This gives a complete end-to-end product path before adding background sync, remote tunnel mode, or hosted cloud.
 
@@ -79,17 +79,17 @@ Vital Agent iOS app repo
 Early package:
 
 ```text
-@healthlink/local
+vitalmcp
 ```
 
-Do not split `@healthlink/mcp` or `@healthlink/sdk` yet. Keep MCP, schemas, SQLite, and HTTP ingest inside `@healthlink/local` until the interfaces stabilize.
+Do not split `@vital-agent-sync/mcp` or `@vital-agent-sync/sdk` yet. Keep MCP, schemas, SQLite, and HTTP ingest inside `vitalmcp` until the interfaces stabilize.
 
 Later split:
 
 ```text
-@healthlink/local  local daemon, SQLite, pairing, HTTP ingest
-@healthlink/mcp    MCP server adapter if it becomes reusable
-@healthlink/sdk    schemas, typed client, verifier helpers
+vitalmcp  local daemon, SQLite, pairing, HTTP ingest
+@vital-agent-sync/mcp    MCP server adapter if it becomes reusable
+@vital-agent-sync/sdk    schemas, typed client, verifier helpers
 ```
 
 ## 4. Local Agent Server
@@ -99,16 +99,16 @@ Later split:
 The package exposes:
 
 ```bash
-npx -y @healthlink/local
-npx -y @healthlink/local --port 8787
-npx -y @healthlink/local --db ~/.healthlink/healthlink.sqlite
-npx -y @healthlink/local mcp
+npx -y vitalmcp
+npx -y vitalmcp --port 8787
+npx -y vitalmcp --db ~/.vital-agent-sync/vital-agent.sqlite
+npx -y vitalmcp mcp
 ```
 
 The target setup command is:
 
 ```bash
-npx -y @healthlink/local init
+npx -y vitalmcp init
 ```
 
 `init` should wrap server startup, pairing session creation, QR display, and MCP config output.
@@ -120,8 +120,8 @@ Vital Agent Sync runtime running
 
 Pairing page: http://127.0.0.1:8787/pair
 LAN address:  http://192.168.1.23:8787
-MCP command:  npx -y @healthlink/local mcp
-Database:     ~/.healthlink/healthlink.sqlite
+MCP command:  npx -y vitalmcp mcp
+Database:     ~/.vital-agent-sync/vital-agent.sqlite
 ```
 
 MCP currently runs over stdio, not HTTP.
@@ -166,7 +166,7 @@ GET  /pair
 ```json
 {
   "pairing_code": "8K2F-J91Q",
-  "pairing_url": "healthlink://pair?server=http://192.168.1.23:8787&code=8K2F-J91Q",
+  "pairing_url": "vitalmcp://pair?server=http://192.168.1.23:8787&code=8K2F-J91Q",
   "server_url": "http://192.168.1.23:8787",
   "agent_name": "Local Agent",
   "requested_scopes": [
@@ -177,7 +177,7 @@ GET  /pair
 }
 ```
 
-The QR code can encode either the `healthlink://pair?...` URL or a JSON payload. Prefer the URL form first because it maps cleanly to an iOS deep link later. Until deep links are implemented, scanning can parse the same URL inside the app.
+The QR code can encode either the `vitalmcp://pair?...` URL or a JSON payload. Prefer the URL form first because it maps cleanly to an iOS deep link later. Until deep links are implemented, scanning can parse the same URL inside the app.
 
 ### Confirm Pairing
 
@@ -200,7 +200,7 @@ Server returns:
 ```json
 {
   "device_id": "dev_01J...",
-  "device_token": "hl_dev_...",
+  "device_token": "va_dev_...",
   "server_time": "2026-06-23T10:15:00+08:00"
 }
 ```
@@ -439,7 +439,7 @@ For the Local Pairing MVP, expose a small MCP stdio tool surface.
 Implemented tools:
 
 ```text
-healthlink_status
+vital_agent_status
 get_daily_health_summary
 get_calendar_availability
 get_sleep_trend
@@ -632,7 +632,7 @@ Status: partially complete. MCP stdio exists and tools can query SQLite; freshne
 
 ### Milestone E: Foolproof Agent Linking
 
-- Add `@healthlink/local init`.
+- Add `vitalmcp init`.
 - Add `print-mcp-config`.
 - Add `install-hermes`.
 - Add `install-claude` or generic MCP install docs.
@@ -695,7 +695,7 @@ The current Agent-side package already has:
 
 The next code work should be:
 
-1. Add `@healthlink/local init`.
+1. Add `vitalmcp init`.
 2. Add iOS QR scanner.
 3. Add iOS pairing confirmation UI with scopes.
 4. Add `print-mcp-config`.

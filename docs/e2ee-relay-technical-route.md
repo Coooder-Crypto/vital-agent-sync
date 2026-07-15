@@ -112,7 +112,7 @@ iPhone
   -> HTTPS outbound
   -> Vital Agent Sync hosted relay
   -> vitalmcp pull
-  -> ~/.healthlink/healthlink.sqlite
+  -> ~/.vital-agent-sync/vital-agent.sqlite
   -> MCP stdio
   -> Agent
 ```
@@ -196,13 +196,13 @@ Rules:
 The local runtime generates and stores long-lived local secrets:
 
 ```text
-~/.healthlink/
+~/.vital-agent-sync/
   config.json
   secrets/
     signing_private_key.pem
     encryption_private_key.pem
   relay-cursor.json
-  healthlink.sqlite
+  vital-agent.sqlite
 ```
 
 The iOS app receives onboarding material containing public encryption data and sensitive source credentials:
@@ -223,7 +223,7 @@ The iOS app should not receive local private keys. The upload authentication sec
 Final v1 primitives:
 
 - X25519 key agreement
-- HKDF-SHA256 with the fixed `healthlink-e2ee-v1 envelope` context
+- HKDF-SHA256 with the fixed `vital-agent-e2ee-v1 envelope` context
 - ChaCha20-Poly1305 payload encryption
 - HMAC-SHA256 over canonical envelope metadata and ciphertext using the onboarding upload authentication secret
 - SHA-256 fingerprints for human-visible verification
@@ -236,9 +236,9 @@ The local runtime creates an onboarding QR and optional hex/text fallback.
 
 ```json
 {
-  "protocol": "healthlink-e2ee-v1",
+  "protocol": "vital-agent-e2ee-v1",
   "mode": "hosted_relay",
-  "relay_url": "https://relay.healthlink.app",
+  "relay_url": "https://relay.vital-agent-sync.app",
   "user_id": "usr_...",
   "agent_name": "OpenClaw",
   "encryption_public_key": "...",
@@ -268,7 +268,7 @@ The relay stores opaque envelopes:
 
 ```json
 {
-  "protocol": "healthlink-e2ee-v1",
+  "protocol": "vital-agent-e2ee-v1",
   "user_id": "usr_...",
   "device_id": "dev_...",
   "envelope_id": "env_...",
@@ -423,7 +423,7 @@ Example callback:
 openclaw://callback?request_id=req_123&status=ok&synced_days=1
 ```
 
-Current iOS implementation keeps callbacks status-only and allowlisted. `vitalmcp://sync?...&callback=openclaw%3A%2F%2Fcallback` and `vitalmcp://status?...&callback=openclaw%3A%2F%2Fcallback` can return `request_id`, `status`, and `source=healthlink`; they do not return health payloads, bearer tokens, envelope IDs, or error details. The app continues accepting legacy `healthlink://` links.
+Current iOS implementation keeps callbacks status-only and allowlisted. `vitalmcp://sync?...&callback=openclaw%3A%2F%2Fcallback` and `vitalmcp://status?...&callback=openclaw%3A%2F%2Fcallback` can return `request_id`, `status`, and `source=vital-agent-sync`; they do not return health payloads, bearer tokens, envelope IDs, or error details. The app registers only the `vitalmcp://` scheme.
 
 ## Agent Adapter Contract
 
@@ -434,11 +434,11 @@ The core runtime exposes one stdio MCP server and one local SQLite model. Agent 
 - choose setup, pull, status, and deep-link control commands
 - provide an Agent-specific reload hint
 
-They must not implement relay cryptography, ingest health payloads, fork the tool schema, or read relay secrets. `generic` prints standard `mcpServers` JSON, Hermes writes `mcp_servers.healthlink`, and OpenClaw writes its adapter-specific MCP shape. All three point to the same `vitalmcp mcp --db <path>` process.
+They must not implement relay cryptography, ingest health payloads, fork the tool schema, or read relay secrets. `generic` prints standard `mcpServers` JSON, Hermes writes `mcp_servers.vital-agent-sync`, and OpenClaw writes its adapter-specific MCP shape. All three point to the same `vitalmcp mcp --db <path>` process.
 
 Agent-first setup does not change this boundary. Skills invoke the shared bootstrap, present a redacted plan, offer one onboarding action, and verify the first sync through MCP. The website installer and marketplace packages are distribution surfaces over the same setup state.
 
-The repeatable compatibility gate is `npm run audit:agent-adapters`. It calls `healthlink_status` through a generic MCP client, installs Hermes config and skill state into a temporary HOME, then uses the locally installed Hermes CLI to connect and discover all 12 Vital Agent Sync tools. An Agent-specific marketplace package is not required for this gate.
+The repeatable compatibility gate is `npm run audit:agent-adapters`. It calls `vital_agent_status` through a generic MCP client, installs Hermes config and skill state into a temporary HOME, then uses the locally installed Hermes CLI to connect and discover all 12 Vital Agent Sync tools. An Agent-specific marketplace package is not required for this gate.
 
 ## Optional OpenClaw Adapter
 
@@ -497,10 +497,10 @@ Agent mobile app
 If OpenClaw later exposes a stable node command extension model, Vital Agent Sync can add a node bridge with control commands only:
 
 ```text
-healthlink.status
-healthlink.sync
-healthlink.open_onboarding
-healthlink.unlink
+vital-agent-sync.status
+vital-agent-sync.sync
+vital-agent-sync.open_onboarding
+vital-agent-sync.unlink
 ```
 
 Those commands should not return health plaintext. MCP remains the data access path.
@@ -591,7 +591,7 @@ Operational requirements:
 
 - Add key generation to `vitalmcp setup --transport relay`.
 - Add `print-onboarding`.
-- Store config and secrets under `~/.healthlink`.
+- Store config and secrets under `~/.vital-agent-sync`.
 - Add QR and hex onboarding output.
 
 ### Phase 3: Relay MVP
@@ -612,7 +612,7 @@ Operational requirements:
 
 - Verify generic MCP and Hermes as the baseline Agent paths.
 - Optionally publish an OpenClaw skill that wraps setup, onboarding, pull, summaries, and CronJob guidance.
-- Add `vitalmcp://sync` deep link while accepting the legacy scheme.
+- Add the `vitalmcp://sync` deep link and keep one canonical scheme.
 - Add safe callback status support.
 - Keep MCP as the health data access path.
 

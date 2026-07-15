@@ -12,24 +12,26 @@
 - Positioning: a private, local-first Apple Health bridge for AI agents
 - App icon: retain the current symbol for the first beta because it contains no legacy wordmark
 
-The final public release still requires the formal brand-clearance, domain, support-email, copyright, and trademark-policy work tracked in issue #73.
+The final public release still requires formal brand clearance plus decisions for the domain, support email, copyright notice, and trademark policy.
 
-## Compatibility Boundary
+## Runtime Identity
 
-The npm package and CLI are renamed directly from `healthlink-local` to `vitalmcp`. No compatibility package or legacy binary is maintained because the product has no production users yet.
+The project uses a single pre-release identity. No compatibility package, legacy binary, state migration, MCP alias, or old deep-link handler is maintained because the product has no production users yet.
 
-The following non-npm identifiers remain unchanged because they are persisted paths or interoperability contracts:
+The current technical identifiers are:
 
-- E2EE protocol and HKDF context: `healthlink-e2ee-v1`
-- legacy iOS deep links: `healthlink://`
-- local state path: `~/.healthlink`
-- MCP server key and tool compatibility identifiers using `healthlink`
-- relay header: `X-HealthLink-Relay-API-Key`
-- callback metadata source: `healthlink`
-- legacy Relay protocol, state, and MCP identifiers until the runtime identifier migration
-
-The Vital Agent iOS app registers and accepts both `vitalmcp://` and `healthlink://`. The current `vitalmcp` runtime generates the primary scheme; legacy links remain accepted at the protocol boundary.
+- npm package and CLI: `vitalmcp`
+- iOS deep links: `vitalmcp://`
+- local state path: `~/.vital-agent-sync`
+- local database: `~/.vital-agent-sync/vital-agent.sqlite`
+- MCP server key: `vital-agent-sync`
+- MCP status tool: `vital_agent_status`
+- E2EE protocol and HKDF context: `vital-agent-e2ee-v1`
+- direct protocol: `vital-agent-direct-v1`
+- relay header: `X-Vital-Agent-Relay-API-Key`
+- callback metadata source: `vital-agent-sync`
+- runtime environment variable prefix: `VITALMCP_`
 
 ## Pre-Release Migration Note
 
-Changing the Bundle ID from `app.healthlink.ios` to `com.vitalmcp.ios` makes this a separate development install and changes its default Keychain access group. Before physical-device validation, remove the old development build if necessary, install Vital Agent, and pair the iPhone again. The previously published `healthlink-local` npm package is not a supported migration path; publish and document `vitalmcp` as the only current CLI. There are no production users to migrate at this stage.
+The current Bundle ID remains `com.vitalmcp.ios` until Apple Developer enrollment. Changing a Bundle ID later creates a separate app identity and changes the default Keychain access group, so the final identifier should be chosen before external TestFlight distribution. If a development install predates this cutover, remove it, install the current Vital Agent build, and pair again. Publish and document `vitalmcp` as the only current CLI.

@@ -1176,7 +1176,7 @@ struct RelayOnboardingConfirmationView: View {
                     Label("Health summaries are encrypted before they are sent to the relay.", systemImage: "lock")
                     Label("The relay stores encrypted envelopes. Your local runtime decrypts them after vitalmcp pull.", systemImage: "tray.and.arrow.down")
                     Label("This onboarding code contains access credentials. Vital Agent Sync stores them in Keychain.", systemImage: "key")
-                    Label("Do not share your local ~/.healthlink/secrets folder.", systemImage: "exclamationmark.shield")
+                    Label("Do not share your local ~/.vital-agent-sync/secrets folder.", systemImage: "exclamationmark.shield")
                 }
                 .font(.footnote)
             }

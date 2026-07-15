@@ -35,7 +35,7 @@ import {
   withBootstrapLock,
   writeBootstrapState
 } from "../src/bootstrap.js";
-import { openHealthLinkDatabase } from "../src/database.js";
+import { openVitalAgentDatabase } from "../src/database.js";
 import { listDevices, revokeDevice } from "../src/devices.js";
 import { buildDockerComposeYaml, buildRelayDockerComposeYaml } from "../src/docker-compose.js";
 import { listFeedbackEvents, recordFeedback } from "../src/feedback.js";
@@ -49,7 +49,7 @@ import {
   getWorkoutLoad
 } from "../src/health-query.js";
 import {
-  buildHealthLinkMcpServerConfig,
+  buildVitalAgentMcpServerConfig,
   getHermesMcpInstallStatus,
   getWorkBuddyMcpInstallStatus,
   installHermesMcpConfig,
@@ -97,9 +97,9 @@ import {
   revokeSourceDevice
 } from "../src/source-devices.js";
 import {
-  buildHealthLinkSkillMarkdown,
-  exportHealthLinkSkillPackage,
-  installHermesHealthLinkSkill,
+  buildVitalAgentSkillMarkdown,
+  exportVitalAgentSkillPackage,
+  installHermesVitalAgentSkill,
   readInstalledHermesSkill
 } from "../src/skill.js";
 import { renderTerminalQr } from "../src/terminal-qr.js";
@@ -121,12 +121,12 @@ function relayDataHeaders(
   return {
     "content-type": "application/json",
     authorization: `Bearer ${config.relay_access_token}`,
-    ...(relayApiToken ? { "x-healthlink-relay-api-key": relayApiToken } : {})
+    ...(relayApiToken ? { "x-vital-agent-relay-api-key": relayApiToken } : {})
   };
 }
 
 function readDeviceRevokedAt(databasePath: string, deviceId: string): string | null | undefined {
-  const database = openHealthLinkDatabase({ path: databasePath });
+  const database = openVitalAgentDatabase({ path: databasePath });
   try {
     const row = database.sqlite.prepare(`
       select revoked_at as revokedAt
@@ -140,10 +140,10 @@ function readDeviceRevokedAt(databasePath: string, deviceId: string): string | n
 }
 
 test("health and relay SQLite files use private POSIX permissions", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-sqlite-mode-test-"));
-  const healthPath = join(tempDir, "healthlink.sqlite");
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-sqlite-mode-test-"));
+  const healthPath = join(tempDir, "vital-agent.sqlite");
   const relayPath = join(tempDir, "relay.sqlite");
-  const health = openHealthLinkDatabase({ path: healthPath });
+  const health = openVitalAgentDatabase({ path: healthPath });
   const relay = openRelayDatabase(relayPath);
   try {
     assert.equal(health.sqlite.pragma("foreign_keys", { simple: true }), 1);
@@ -168,7 +168,7 @@ test("health and relay SQLite files use private POSIX permissions", () => {
 
 test("pairing creates a scoped device that can sync and be queried", () => {
   withTempDatabase((databasePath) => {
-    const database = openHealthLinkDatabase({ path: databasePath });
+    const database = openVitalAgentDatabase({ path: databasePath });
     try {
       const pairings = new PairingStore(database);
       const session = pairings.createSession({
@@ -252,7 +252,7 @@ test("pairing creates a scoped device that can sync and be queried", () => {
 
 test("shared health sync ingest validates payloads, scopes, devices, and idempotency", () => {
   withTempDatabase((databasePath) => {
-    const database = openHealthLinkDatabase({ path: databasePath });
+    const database = openVitalAgentDatabase({ path: databasePath });
     try {
       const pairings = new PairingStore(database);
       const session = pairings.createSession({
@@ -329,12 +329,12 @@ test("shared health sync ingest validates payloads, scopes, devices, and idempot
 });
 
 test("relay pull decrypts encrypted health sync envelopes into MCP-readable SQLite", async () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-relay-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-relay-test-"));
   let app: ReturnType<typeof createRelayApp> | undefined;
   let relayDb: RelayDatabase | undefined;
   try {
     const stateDir = join(tempDir, "state");
-    const healthDbPath = join(tempDir, "healthlink.sqlite");
+    const healthDbPath = join(tempDir, "vital-agent.sqlite");
     relayDb = openRelayDatabase(join(tempDir, "relay.sqlite"));
     app = createRelayApp(relayDb);
     await app.listen({ host: "127.0.0.1", port: 0 });
@@ -419,7 +419,7 @@ test("relay pull decrypts encrypted health sync envelopes into MCP-readable SQLi
     assert.equal(pull.latest_sequence, 26);
     assert.equal(readdirSync(stateDir).some((name) => name.endsWith(".tmp")), false);
 
-    const database = openHealthLinkDatabase({ path: healthDbPath });
+    const database = openVitalAgentDatabase({ path: healthDbPath });
     try {
       const health = getDailyHealthSummary(database, { date: "2026-07-08" }) as {
         health: {
@@ -428,8 +428,8 @@ test("relay pull decrypts encrypted health sync envelopes into MCP-readable SQLi
           active_energy_kcal: number;
         };
       };
-      const previousStateDir = process.env.HEALTHLINK_STATE_DIR;
-      process.env.HEALTHLINK_STATE_DIR = stateDir;
+      const previousStateDir = process.env.VITALMCP_STATE_DIR;
+      process.env.VITALMCP_STATE_DIR = stateDir;
       const context = getPersonalContext(database, { date: "2026-07-08" }) as {
         metadata: {
           relay: {
@@ -444,9 +444,9 @@ test("relay pull decrypts encrypted health sync envelopes into MCP-readable SQLi
         };
       };
       if (previousStateDir === undefined) {
-        delete process.env.HEALTHLINK_STATE_DIR;
+        delete process.env.VITALMCP_STATE_DIR;
       } else {
-        process.env.HEALTHLINK_STATE_DIR = previousStateDir;
+        process.env.VITALMCP_STATE_DIR = previousStateDir;
       }
       assert.equal(health.health.steps, 7777);
       assert.equal(health.health.sleep_minutes, 411);
@@ -476,7 +476,7 @@ test("relay pull decrypts encrypted health sync envelopes into MCP-readable SQLi
 });
 
 test("relay crypto rejects tampered, stale, duplicate, and mismatched envelopes", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-crypto-negative-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-crypto-negative-test-"));
   try {
     const config = initializeRelayRuntime({
       stateDir: tempDir,
@@ -563,7 +563,7 @@ test("relay crypto rejects tampered, stale, duplicate, and mismatched envelopes"
 });
 
 test("relay envelope shape rejects malformed routing and cryptographic fields before queueing", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-envelope-shape-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-envelope-shape-test-"));
   try {
     const config = initializeRelayRuntime({ stateDir: tempDir, mode: "self_hosted_relay" });
     const envelope = buildRelayFixtureEnvelope({
@@ -607,7 +607,7 @@ test("relay envelope shape rejects malformed routing and cryptographic fields be
 });
 
 test("relay decrypts legacy HMAC and Ed25519 development envelopes without emitting them", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-legacy-envelope-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-legacy-envelope-test-"));
   try {
     const config = initializeRelayRuntime({ stateDir: tempDir, mode: "self_hosted_relay" });
     const payload = buildRelayFixturePayload(config, {
@@ -632,7 +632,7 @@ test("relay decrypts legacy HMAC and Ed25519 development envelopes without emitt
 });
 
 test("relay fixture generator creates decryptable health sync envelopes", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-relay-fixture-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-relay-fixture-test-"));
   try {
     const config = initializeRelayRuntime({
       stateDir: tempDir,
@@ -683,13 +683,13 @@ test("relay fixture generator creates decryptable health sync envelopes", () => 
 });
 
 test("relay runtime resolves hosted and self-hosted relay URLs from environment", () => {
-  const previousHosted = process.env.HEALTHLINK_HOSTED_RELAY_URL;
-  const previousSelfHosted = process.env.HEALTHLINK_SELF_HOSTED_RELAY_URL;
-  const previousGeneric = process.env.HEALTHLINK_RELAY_URL;
+  const previousHosted = process.env.VITALMCP_HOSTED_RELAY_URL;
+  const previousSelfHosted = process.env.VITALMCP_SELF_HOSTED_RELAY_URL;
+  const previousGeneric = process.env.VITALMCP_RELAY_URL;
   try {
-    process.env.HEALTHLINK_HOSTED_RELAY_URL = "https://relay.example.test/";
-    process.env.HEALTHLINK_SELF_HOSTED_RELAY_URL = "http://192.168.31.53:8790/";
-    process.env.HEALTHLINK_RELAY_URL = "https://generic-relay.example.test/";
+    process.env.VITALMCP_HOSTED_RELAY_URL = "https://relay.example.test/";
+    process.env.VITALMCP_SELF_HOSTED_RELAY_URL = "http://192.168.31.53:8790/";
+    process.env.VITALMCP_RELAY_URL = "https://generic-relay.example.test/";
 
     assert.equal(resolveDefaultRelayUrl({ mode: "hosted_relay" }), "https://relay.example.test");
     assert.equal(resolveDefaultRelayUrl({ mode: "self_hosted_relay" }), "http://192.168.31.53:8790");
@@ -698,7 +698,7 @@ test("relay runtime resolves hosted and self-hosted relay URLs from environment"
       relayUrl: "https://explicit.example.test/"
     }), "https://explicit.example.test");
 
-    delete process.env.HEALTHLINK_HOSTED_RELAY_URL;
+    delete process.env.VITALMCP_HOSTED_RELAY_URL;
     assert.equal(resolveDefaultRelayUrl({ mode: "hosted_relay" }), "https://generic-relay.example.test");
     assert.throws(
       () => resolveDefaultRelayUrl({ relayUrl: "ftp://relay.example.test" }),
@@ -716,22 +716,22 @@ test("relay runtime resolves hosted and self-hosted relay URLs from environment"
       () => resolveDefaultRelayUrl({ mode: "hosted_relay", relayUrl: "http://relay.example.test" }),
       /must use HTTPS/
     );
-    delete process.env.HEALTHLINK_RELAY_URL;
+    delete process.env.VITALMCP_RELAY_URL;
     assert.throws(
       () => resolveDefaultRelayUrl({ mode: "hosted_relay" }),
       /is not configured/
     );
-    delete process.env.HEALTHLINK_SELF_HOSTED_RELAY_URL;
+    delete process.env.VITALMCP_SELF_HOSTED_RELAY_URL;
     assert.equal(resolveDefaultRelayUrl({ mode: "self_hosted_relay" }), "http://127.0.0.1:8790");
   } finally {
-    restoreEnv("HEALTHLINK_HOSTED_RELAY_URL", previousHosted);
-    restoreEnv("HEALTHLINK_SELF_HOSTED_RELAY_URL", previousSelfHosted);
-    restoreEnv("HEALTHLINK_RELAY_URL", previousGeneric);
+    restoreEnv("VITALMCP_HOSTED_RELAY_URL", previousHosted);
+    restoreEnv("VITALMCP_SELF_HOSTED_RELAY_URL", previousSelfHosted);
+    restoreEnv("VITALMCP_RELAY_URL", previousGeneric);
   }
 });
 
 test("relay runtime setup is idempotent, migrates access tokens, hardens files, and rejects malformed config", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-relay-runtime-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-relay-runtime-test-"));
   try {
     const first = initializeRelayRuntime({
       stateDir: tempDir,
@@ -772,7 +772,7 @@ test("relay runtime setup is idempotent, migrates access tokens, hardens files, 
     rmSync(migrated.signing_private_key_path);
     assert.deepEqual(validateRelayRuntimeState(migrated), ["signing private key file is missing"]);
 
-    writeFileSync(getRelayConfigPath(tempDir), JSON.stringify({ protocol: "healthlink-e2ee-v1" }), "utf8");
+    writeFileSync(getRelayConfigPath(tempDir), JSON.stringify({ protocol: "vital-agent-e2ee-v1" }), "utf8");
     assert.throws(
       () => readRelayRuntimeConfig({ stateDir: tempDir }),
       /runtime config is invalid/
@@ -783,7 +783,7 @@ test("relay runtime setup is idempotent, migrates access tokens, hardens files, 
 });
 
 test("relay onboarding supports deep-link and text-code handoff without private keys", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-relay-onboarding-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-relay-onboarding-test-"));
   try {
     const config = initializeRelayRuntime({
       stateDir: tempDir,
@@ -794,7 +794,7 @@ test("relay onboarding supports deep-link and text-code handoff without private 
     const payload = buildRelayOnboardingPayload(config);
     const code = encodeRelayOnboardingPayload(payload);
     const link = buildRelayOnboardingDeepLink(payload);
-    const encoded = code.slice("healthlink-e2ee-v1:".length);
+    const encoded = code.slice("vital-agent-e2ee-v1:".length);
     const decoded = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8")) as typeof payload;
     const linkURL = new URL(link);
     const output = formatRelayOnboarding(config);
@@ -806,7 +806,7 @@ test("relay onboarding supports deep-link and text-code handoff without private 
     assert.equal(linkURL.searchParams.get("payload"), code);
     assert.match(output, /Sensitive: this onboarding material/);
     assert.match(output, /vitalmcp:\/\/onboard/);
-    assert.match(output, /healthlink-e2ee-v1:/);
+    assert.match(output, /vital-agent-e2ee-v1:/);
     assert.doesNotMatch(output, /BEGIN PRIVATE KEY/);
     assert.doesNotMatch(output, new RegExp(readFileSync(config.encryption_private_key_path, "utf8").slice(0, 32)));
 
@@ -829,7 +829,7 @@ test("relay onboarding supports deep-link and text-code handoff without private 
 });
 
 test("hosted relay operations reject HTTP overrides before sending credentials", async () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-hosted-http-rejection-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-hosted-http-rejection-test-"));
   try {
     initializeRelayRuntime({
       stateDir: tempDir,
@@ -862,12 +862,12 @@ test("hosted relay operations reject HTTP overrides before sending credentials",
 });
 
 test("relay pull records failed envelopes without acking or advancing past them", async () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-relay-failure-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-relay-failure-test-"));
   let app: ReturnType<typeof createRelayApp> | undefined;
   let relayDb: RelayDatabase | undefined;
   try {
     const stateDir = join(tempDir, "state");
-    const healthDbPath = join(tempDir, "healthlink.sqlite");
+    const healthDbPath = join(tempDir, "vital-agent.sqlite");
     relayDb = openRelayDatabase(join(tempDir, "relay.sqlite"));
     app = createRelayApp(relayDb);
     await app.listen({ host: "127.0.0.1", port: 0 });
@@ -944,7 +944,7 @@ test("relay pull records failed envelopes without acking or advancing past them"
 });
 
 test("relay server expires old envelopes and rate limits uploads", async () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-relay-controls-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-relay-controls-test-"));
   let app: ReturnType<typeof createRelayApp> | undefined;
   let relayDb: RelayDatabase | undefined;
   try {
@@ -1031,7 +1031,7 @@ test("relay server expires old envelopes and rate limits uploads", async () => {
 });
 
 test("relay trusted-proxy mode rate limits distinct forwarded client IPs independently", async () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-relay-trust-proxy-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-relay-trust-proxy-test-"));
   const stateDir = join(tempDir, "state");
   const relayDb = openRelayDatabase(join(tempDir, "relay.sqlite"));
   const app = createRelayApp(relayDb, {
@@ -1073,7 +1073,7 @@ test("relay trusted-proxy mode rate limits distinct forwarded client IPs indepen
 });
 
 test("relay server enforces per-user queue quota and exposes body-free metrics", async () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-relay-quota-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-relay-quota-test-"));
   let app: ReturnType<typeof createRelayApp> | undefined;
   let relayDb: RelayDatabase | undefined;
   try {
@@ -1159,7 +1159,7 @@ test("relay server enforces per-user queue quota and exposes body-free metrics",
 });
 
 test("relay enforces active device quotas and sweeps expired envelopes without request traffic", async () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-relay-device-retention-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-relay-device-retention-test-"));
   let app: ReturnType<typeof createRelayApp> | undefined;
   let relayDb: RelayDatabase | undefined;
   try {
@@ -1221,7 +1221,7 @@ test("relay enforces active device quotas and sweeps expired envelopes without r
 });
 
 test("relay metrics can require a bearer token without exposing the token in status", async () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-relay-metrics-token-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-relay-metrics-token-test-"));
   let app: ReturnType<typeof createRelayApp> | undefined;
   let relayDb: RelayDatabase | undefined;
   try {
@@ -1267,7 +1267,7 @@ test("relay metrics can require a bearer token without exposing the token in sta
 });
 
 test("relay data endpoints can require a bearer token without exposing the token in status", async () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-relay-api-token-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-relay-api-token-test-"));
   let app: ReturnType<typeof createRelayApp> | undefined;
   let relayDb: RelayDatabase | undefined;
   try {
@@ -1327,12 +1327,12 @@ test("relay data endpoints can require a bearer token without exposing the token
 
     const missingTenantList = await fetch(`${relayUrl}/v1/envelopes?user_id=${encodeURIComponent(config.user_id)}&after=0`, {
       headers: {
-        "x-healthlink-relay-api-key": "test-relay-api-token"
+        "x-vital-agent-relay-api-key": "test-relay-api-token"
       }
     });
     assert.equal(missingTenantList.status, 401);
 
-    const healthDbPath = join(tempDir, "healthlink.sqlite");
+    const healthDbPath = join(tempDir, "vital-agent.sqlite");
     const pull = await pullRelayEnvelopes({
       stateDir,
       databasePath: healthDbPath,
@@ -1357,7 +1357,7 @@ test("relay data endpoints can require a bearer token without exposing the token
 });
 
 test("relay tenant tokens isolate users and lifecycle commands unlink, rotate, and reset safely", async () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-relay-lifecycle-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-relay-lifecycle-test-"));
   let app: ReturnType<typeof createRelayApp> | undefined;
   let relayDb: RelayDatabase | undefined;
   try {
@@ -1370,7 +1370,7 @@ test("relay tenant tokens isolate users and lifecycle commands unlink, rotate, a
     const relayUrl = `http://127.0.0.1:${(address as AddressInfo).port}`;
     const stateDirA = join(tempDir, "state-a");
     const stateDirB = join(tempDir, "state-b");
-    const healthDbPath = join(tempDir, "healthlink.sqlite");
+    const healthDbPath = join(tempDir, "vital-agent.sqlite");
     const configA = initializeRelayRuntime({
       stateDir: stateDirA,
       relayUrl,
@@ -1385,7 +1385,7 @@ test("relay tenant tokens isolate users and lifecycle commands unlink, rotate, a
       agentName: "Tenant B",
       mode: "self_hosted_relay"
     });
-    const healthDatabase = openHealthLinkDatabase({ path: healthDbPath });
+    const healthDatabase = openVitalAgentDatabase({ path: healthDbPath });
     ensureRelaySourceDevice(healthDatabase, configA);
     healthDatabase.close();
     const envelopeA = buildRelayFixtureEnvelope({ config: configA, options: { sequence: 1, createdAt: new Date().toISOString() } });
@@ -1429,7 +1429,7 @@ test("relay tenant tokens isolate users and lifecycle commands unlink, rotate, a
       method: "POST",
       headers: {
         authorization: `Bearer ${configB.relay_access_token}`,
-        "x-healthlink-relay-api-key": relayApiToken
+        "x-vital-agent-relay-api-key": relayApiToken
       }
     });
     assert.equal(crossTenantAck.ok, true);
@@ -1490,7 +1490,7 @@ test("relay tenant tokens isolate users and lifecycle commands unlink, rotate, a
     assert.notEqual(reset.user_id, rotated.user_id);
     assert.notEqual(reset.source_device_id, rotated.source_device_id);
     assert.notEqual(readDeviceRevokedAt(healthDbPath, rotated.source_device_id), null);
-    const resetHealthDatabase = openHealthLinkDatabase({ path: healthDbPath });
+    const resetHealthDatabase = openVitalAgentDatabase({ path: healthDbPath });
     ensureRelaySourceDevice(resetHealthDatabase, reset.config);
     resetHealthDatabase.close();
     assert.equal(readDeviceRevokedAt(healthDbPath, reset.source_device_id), null);
@@ -1562,7 +1562,7 @@ test("relay tenant tokens isolate users and lifecycle commands unlink, rotate, a
 });
 
 test("relay deployment audit checks aggregate status without sensitive fields", async () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-relay-audit-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-relay-audit-test-"));
   let app: ReturnType<typeof createRelayApp> | undefined;
   let relayDb: RelayDatabase | undefined;
   try {
@@ -1622,7 +1622,7 @@ test("relay deployment audit checks aggregate status without sensitive fields", 
 });
 
 test("relay deployment audit supports protected metrics", async () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-relay-protected-audit-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-relay-protected-audit-test-"));
   let app: ReturnType<typeof createRelayApp> | undefined;
   let relayDb: RelayDatabase | undefined;
   try {
@@ -1655,7 +1655,7 @@ test("relay deployment audit supports protected metrics", async () => {
 });
 
 test("relay active deployment audit verifies tenant isolation and lifecycle controls", async () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-relay-active-audit-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-relay-active-audit-test-"));
   let app: ReturnType<typeof createRelayApp> | undefined;
   let relayDb: RelayDatabase | undefined;
   try {
@@ -1729,7 +1729,7 @@ test("relay active deployment audit verifies tenant isolation and lifecycle cont
 
 test("agent audit log records MCP-style reads", () => {
   withTempDatabase((databasePath) => {
-    const database = openHealthLinkDatabase({ path: databasePath });
+    const database = openVitalAgentDatabase({ path: databasePath });
     try {
       const agent = ensureDefaultMcpAgentClient(database);
       const entry = recordAgentRead(database, {
@@ -1750,7 +1750,7 @@ test("agent audit log records MCP-style reads", () => {
 
 test("feedback events persist user corrections for agent loops", () => {
   withTempDatabase((databasePath) => {
-    const database = openHealthLinkDatabase({ path: databasePath });
+    const database = openVitalAgentDatabase({ path: databasePath });
     try {
       const first = recordFeedback(database, {
         source: "agent",
@@ -1782,7 +1782,7 @@ test("feedback events persist user corrections for agent loops", () => {
 
 test("revoked device token can no longer authenticate", () => {
   withTempDatabase((databasePath) => {
-    const database = openHealthLinkDatabase({ path: databasePath });
+    const database = openVitalAgentDatabase({ path: databasePath });
     try {
       const pairings = new PairingStore(database);
       const session = pairings.createSession({
@@ -1811,7 +1811,7 @@ test("revoked device token can no longer authenticate", () => {
 
 test("source-device wrapper preserves device compatibility", () => {
   withTempDatabase((databasePath) => {
-    const database = openHealthLinkDatabase({ path: databasePath });
+    const database = openVitalAgentDatabase({ path: databasePath });
     try {
       const pairings = new PairingStore(database);
       const session = pairings.createSession({
@@ -1840,7 +1840,7 @@ test("source-device wrapper preserves device compatibility", () => {
 
 test("trend queries collapse duplicate dates to the newest summary", () => {
   withTempDatabase((databasePath) => {
-    const database = openHealthLinkDatabase({ path: databasePath });
+    const database = openVitalAgentDatabase({ path: databasePath });
     try {
       const pairings = new PairingStore(database);
       const firstSession = pairings.createSession({
@@ -1934,19 +1934,19 @@ test("trend queries collapse duplicate dates to the newest summary", () => {
   });
 });
 
-test("Hermes MCP install writes healthlink server idempotently with backups", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-hermes-test-"));
+test("Hermes MCP install writes vital-agent-sync server idempotently with backups", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-hermes-test-"));
   try {
     const configPath = join(tempDir, "config.yaml");
     writeFileSync(configPath, "model:\n  provider: test\n", "utf8");
 
     const first = installHermesMcpConfig({
       configPath,
-      databasePath: join(tempDir, "healthlink.sqlite")
+      databasePath: join(tempDir, "vital-agent.sqlite")
     });
     const second = installHermesMcpConfig({
       configPath,
-      databasePath: join(tempDir, "healthlink.sqlite")
+      databasePath: join(tempDir, "vital-agent.sqlite")
     });
     const status = getHermesMcpInstallStatus({ configPath });
 
@@ -1960,10 +1960,10 @@ test("Hermes MCP install writes healthlink server idempotently with backups", ()
 });
 
 test("WorkBuddy MCP install merges project config idempotently with backups and fails closed", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-workbuddy-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-workbuddy-test-"));
   try {
     const configPath = join(tempDir, ".workbuddy", "mcp.json");
-    const databasePath = join(tempDir, "healthlink.sqlite");
+    const databasePath = join(tempDir, "vital-agent.sqlite");
     mkdirSync(dirname(configPath), { recursive: true });
     writeFileSync(configPath, JSON.stringify({
       workspace: { name: "personal" },
@@ -1987,8 +1987,8 @@ test("WorkBuddy MCP install merges project config idempotently with backups and 
     assert.notEqual(first.backupPath, second.backupPath);
     assert.equal(installed.workspace.name, "personal");
     assert.deepEqual(installed.mcpServers.existing.args, ["serve"]);
-    assert.deepEqual(installed.mcpServers.healthlink.args.slice(0, 2), ["mcp", "--db"]);
-    assert.equal(installed.mcpServers.healthlink.args[2], databasePath);
+    assert.deepEqual(installed.mcpServers["vital-agent-sync"].args.slice(0, 2), ["mcp", "--db"]);
+    assert.equal(installed.mcpServers["vital-agent-sync"].args[2], databasePath);
 
     const invalidPath = join(tempDir, "invalid-workbuddy.mcp.json");
     const invalid = "{ invalid json";
@@ -1998,29 +1998,29 @@ test("WorkBuddy MCP install merges project config idempotently with backups and 
       /WorkBuddy config must be valid JSON/
     );
     assert.equal(readFileSync(invalidPath, "utf8"), invalid);
-    assert.equal(readdirSync(tempDir).some((name) => name.startsWith("invalid-workbuddy.mcp.json.healthlink-backup-")), false);
+    assert.equal(readdirSync(tempDir).some((name) => name.startsWith("invalid-workbuddy.mcp.json.vital-agent-sync-backup-")), false);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
 
 test("Agent adapters expose generic MCP config and Hermes install behavior", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-agent-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-agent-test-"));
   try {
     const generic = getAgentAdapter("generic");
     const genericConfig = JSON.parse(generic.formatMcpConfig({
-      databasePath: join(tempDir, "healthlink.sqlite")
+      databasePath: join(tempDir, "vital-agent.sqlite")
     })) as {
-      mcpServers: { healthlink: { args: string[] } };
+      mcpServers: { "vital-agent-sync": { args: string[] } };
     };
-    assert.deepEqual(genericConfig.mcpServers.healthlink.args.slice(0, 2), ["mcp", "--db"]);
+    assert.deepEqual(genericConfig.mcpServers["vital-agent-sync"].args.slice(0, 2), ["mcp", "--db"]);
     assert.equal(generic.detect().installed, true);
 
     const hermes = getAgentAdapter("hermes");
     const configPath = join(tempDir, "config.yaml");
     writeFileSync(configPath, "model:\n  provider: test\n", "utf8");
     const installed = hermes.installMcp({
-      databasePath: join(tempDir, "healthlink.sqlite")
+      databasePath: join(tempDir, "vital-agent.sqlite")
     }, {
       hermesConfigPath: configPath
     });
@@ -2028,44 +2028,44 @@ test("Agent adapters expose generic MCP config and Hermes install behavior", () 
 
     assert.equal(installed.id, "hermes");
     assert.equal(status.installed, true);
-    assert.match(hermes.formatMcpConfig({ databasePath: join(tempDir, "healthlink.sqlite") }), /mcp_servers:/);
+    assert.match(hermes.formatMcpConfig({ databasePath: join(tempDir, "vital-agent.sqlite") }), /mcp_servers:/);
 
     const openclaw = getAgentAdapter("openclaw");
     const openclawConfigPath = join(tempDir, "openclaw.json");
     writeFileSync(openclawConfigPath, JSON.stringify({ model: { provider: "test" } }, null, 2), "utf8");
     const openclawInstalled = openclaw.installMcp({
-      databasePath: join(tempDir, "healthlink.sqlite")
+      databasePath: join(tempDir, "vital-agent.sqlite")
     }, {
       openclawConfigPath
     });
     const openclawStatus = openclaw.detect({ openclawConfigPath });
     const openclawConfig = JSON.parse(openclaw.formatMcpConfig({
-      databasePath: join(tempDir, "healthlink.sqlite")
+      databasePath: join(tempDir, "vital-agent.sqlite")
     })) as {
-      mcp: { servers: { healthlink: { args: string[] } } };
+      mcp: { servers: { "vital-agent-sync": { args: string[] } } };
     };
 
     assert.equal(openclawInstalled.id, "openclaw");
     assert.equal(openclawStatus.installed, true);
-    assert.deepEqual(openclawConfig.mcp.servers.healthlink.args.slice(0, 2), ["mcp", "--db"]);
+    assert.deepEqual(openclawConfig.mcp.servers["vital-agent-sync"].args.slice(0, 2), ["mcp", "--db"]);
 
     const workbuddy = getAgentAdapter("workbuddy");
     const workbuddyProjectPath = join(tempDir, "workbuddy-project");
     const workbuddyInstalled = workbuddy.installMcp({
-      databasePath: join(tempDir, "healthlink.sqlite")
+      databasePath: join(tempDir, "vital-agent.sqlite")
     }, {
       workbuddyProjectPath
     });
     const workbuddyStatus = workbuddy.detect({ workbuddyProjectPath });
     const workbuddyConfig = JSON.parse(workbuddy.formatMcpConfig({
-      databasePath: join(tempDir, "healthlink.sqlite")
+      databasePath: join(tempDir, "vital-agent.sqlite")
     })) as {
-      mcpServers: { healthlink: { args: string[] } };
+      mcpServers: { "vital-agent-sync": { args: string[] } };
     };
     assert.equal(workbuddyInstalled.id, "workbuddy");
     assert.equal(workbuddyStatus.installed, true);
     assert.equal(workbuddyInstalled.configPath, join(workbuddyProjectPath, ".workbuddy", "mcp.json"));
-    assert.deepEqual(workbuddyConfig.mcpServers.healthlink.args.slice(0, 2), ["mcp", "--db"]);
+    assert.deepEqual(workbuddyConfig.mcpServers["vital-agent-sync"].args.slice(0, 2), ["mcp", "--db"]);
     assert.match(workbuddy.reloadHint(), /restart WorkBuddy/i);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
@@ -2073,7 +2073,7 @@ test("Agent adapters expose generic MCP config and Hermes install behavior", () 
 });
 
 test("Agent auto-detection prefers installed or available specific adapters before generic MCP", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-agent-autodetect-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-agent-autodetect-test-"));
   try {
     const hermesConfigPath = join(tempDir, "config.yaml");
     const openclawConfigPath = join(tempDir, "openclaw.json");
@@ -2118,13 +2118,13 @@ test("Agent auto-detection prefers installed or available specific adapters befo
 });
 
 test("Vital Agent Sync skill can be printed and installed for Hermes", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-skill-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-skill-test-"));
   try {
     const skillPath = join(tempDir, "skills", "health", "vitalmcp-personal-context", "SKILL.md");
-    const markdown = buildHealthLinkSkillMarkdown();
-    const hermesMarkdown = buildHealthLinkSkillMarkdown({ agent: "hermes" });
-    const openclawMarkdown = buildHealthLinkSkillMarkdown({ agent: "openclaw" });
-    const workbuddyMarkdown = buildHealthLinkSkillMarkdown({ agent: "workbuddy" });
+    const markdown = buildVitalAgentSkillMarkdown();
+    const hermesMarkdown = buildVitalAgentSkillMarkdown({ agent: "hermes" });
+    const openclawMarkdown = buildVitalAgentSkillMarkdown({ agent: "openclaw" });
+    const workbuddyMarkdown = buildVitalAgentSkillMarkdown({ agent: "workbuddy" });
     assert.match(markdown, /name: vitalmcp-personal-context/);
     assert.match(markdown, /get_personal_context/);
     assert.match(markdown, /vitalmcp setup --transport lan --agent generic/);
@@ -2144,8 +2144,8 @@ test("Vital Agent Sync skill can be printed and installed for Hermes", () => {
     assert.match(openclawMarkdown, /Hosted Relay is not available, recommended, or required in the Local Preview flow/);
     assert.match(openclawMarkdown, /vitalmcp setup --transport relay --relay-url https:\/\/HOSTED-RELAY --agent openclaw/);
     assert.match(openclawMarkdown, /Never invent a relay domain/);
-    assert.match(openclawMarkdown, /npx -y vitalmcp@0\.4\.1 --version/);
-    assert.match(openclawMarkdown, /prefix every local CLI invocation below with `npx -y vitalmcp@0\.4\.1`/);
+    assert.match(openclawMarkdown, /npx -y vitalmcp@0\.5\.0 --version/);
+    assert.match(openclawMarkdown, /prefix every local CLI invocation below with `npx -y vitalmcp@0\.5\.0`/);
     assert.match(openclawMarkdown, /Do not switch runners midway through setup/);
     assert.match(openclawMarkdown, /setup --resume --yes --output json/);
     assert.match(openclawMarkdown, /next_action\.url/);
@@ -2156,8 +2156,8 @@ test("Vital Agent Sync skill can be printed and installed for Hermes", () => {
     assert.match(openclawMarkdown, /Daily report:/);
     assert.match(openclawMarkdown, /Weekly report:/);
     assert.match(openclawMarkdown, /latest source generated time/);
-    assert.match(openclawMarkdown, /healthlink_status\.relay\.suggested_next_action/);
-    assert.match(openclawMarkdown, /Never print, request, summarize, or copy files under `~\/\.healthlink\/secrets`/);
+    assert.match(openclawMarkdown, /vital_agent_status\.relay\.suggested_next_action/);
+    assert.match(openclawMarkdown, /Never print, request, summarize, or copy files under `~\/\.vital-agent-sync\/secrets`/);
     assert.match(openclawMarkdown, /upload_auth_secret/);
     assert.match(openclawMarkdown, /relay_access_token/);
     assert.match(openclawMarkdown, /vitalmcp relay unlink --yes/);
@@ -2170,7 +2170,7 @@ test("Vital Agent Sync skill can be printed and installed for Hermes", () => {
     assert.match(workbuddyMarkdown, /# Vital Agent Sync for WorkBuddy/);
     assert.match(workbuddyMarkdown, /name: vital-agent-sync/);
     assert.match(workbuddyMarkdown, /npm install --global --prefix/);
-    assert.match(workbuddyMarkdown, /vitalmcp@0\.4\.1/);
+    assert.match(workbuddyMarkdown, /vitalmcp@0\.5\.0/);
     assert.match(workbuddyMarkdown, /~\/\.workbuddy\/mcp\.json/);
     assert.match(workbuddyMarkdown, /setup --transport lan --agent workbuddy --output json/);
     assert.match(workbuddyMarkdown, /open <next_action\.url>/);
@@ -2182,14 +2182,14 @@ test("Vital Agent Sync skill can be printed and installed for Hermes", () => {
     const consentIndex = openclawMarkdown.indexOf("obtain explicit approval");
     const resumeIndex = openclawMarkdown.indexOf("setup --resume --yes --output json", consentIndex);
     const onboardingIndex = openclawMarkdown.indexOf("next_action.url", resumeIndex);
-    const firstSyncIndex = openclawMarkdown.indexOf("healthlink_status", onboardingIndex);
+    const firstSyncIndex = openclawMarkdown.indexOf("vital_agent_status", onboardingIndex);
     const firstAnswerIndex = openclawMarkdown.indexOf("get_personal_context", firstSyncIndex);
     assert.ok(planIndex >= 0 && planIndex < consentIndex);
     assert.ok(consentIndex < resumeIndex && resumeIndex < onboardingIndex);
     assert.ok(onboardingIndex < firstSyncIndex && firstSyncIndex < firstAnswerIndex);
 
-    const first = installHermesHealthLinkSkill({ skillPath });
-    const second = installHermesHealthLinkSkill({ skillPath });
+    const first = installHermesVitalAgentSkill({ skillPath });
+    const second = installHermesVitalAgentSkill({ skillPath });
     const installed = readInstalledHermesSkill({ skillPath });
 
     assert.equal(first.skillPath, skillPath);
@@ -2204,12 +2204,12 @@ test("Vital Agent Sync skill can be printed and installed for Hermes", () => {
 });
 
 test("Vital Agent Sync skill can be exported as an OpenClaw package", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-openclaw-skill-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-openclaw-skill-test-"));
   try {
     const packageDir = join(tempDir, "vitalmcp-personal-context");
     mkdirSync(packageDir, { recursive: true });
     writeFileSync(join(packageDir, "clawhub.json"), "{\"legacy\":true}\n", "utf8");
-    const result = exportHealthLinkSkillPackage({
+    const result = exportVitalAgentSkillPackage({
       agent: "openclaw",
       outputDir: packageDir
     });
@@ -2233,12 +2233,12 @@ test("Vital Agent Sync skill can be exported as an OpenClaw package", () => {
     assert.equal(result.packageDir, packageDir);
     assert.deepEqual(readdirSync(packageDir).sort(), ["README.md", "SKILL.md"]);
     assert.equal(frontmatter.name, "vitalmcp-personal-context");
-    assert.equal(frontmatter.version, "0.4.1");
+    assert.equal(frontmatter.version, "0.5.0");
     assert.equal(frontmatter.license, undefined);
     assert.deepEqual(frontmatter.metadata.openclaw.requires.bins, ["vitalmcp"]);
     assert.deepEqual(frontmatter.metadata.openclaw.install, [{
       kind: "node",
-      package: "vitalmcp@0.4.1",
+      package: "vitalmcp@0.5.0",
       bins: ["vitalmcp"]
     }]);
     assert.deepEqual(frontmatter.metadata.openclaw.os, ["macos", "linux", "windows"]);
@@ -2250,19 +2250,19 @@ test("Vital Agent Sync skill can be exported as an OpenClaw package", () => {
     assert.match(readme, /openclaw skills install <owner-or-final-slug>/);
     assert.match(readme, /MIT-0/);
     assert.doesNotMatch(skill, /BEGIN PRIVATE KEY/);
-    assert.doesNotMatch(readme, /healthlink\.sqlite/);
+    assert.doesNotMatch(readme, /vital-agent-sync\.sqlite/);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
 
 test("Vital Agent Sync skill can be exported as a WorkBuddy and SkillHub package", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-workbuddy-skill-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-workbuddy-skill-test-"));
   try {
     const packageDir = join(tempDir, "vital-agent-sync");
     mkdirSync(packageDir, { recursive: true });
     writeFileSync(join(packageDir, "README.md"), "stale\n", "utf8");
-    const result = exportHealthLinkSkillPackage({
+    const result = exportVitalAgentSkillPackage({
       agent: "workbuddy",
       outputDir: packageDir
     });
@@ -2277,7 +2277,7 @@ test("Vital Agent Sync skill can be exported as a WorkBuddy and SkillHub package
     assert.deepEqual(Object.keys(frontmatter).sort(), ["description", "name"]);
     assert.equal(frontmatter.name, "vital-agent-sync");
     assert.match(String(frontmatter.description), /WorkBuddy/);
-    assert.match(skill, /vitalmcp@0\.4\.1/);
+    assert.match(skill, /vitalmcp@0\.5\.0/);
     assert.match(skill, /~\/\.workbuddy\/mcp\.json/);
     assert.match(skill, /next_action\.url/);
     assert.doesNotMatch(skill, /BEGIN PRIVATE KEY|relay_access_token|upload_auth_secret/);
@@ -2290,33 +2290,33 @@ test("Vital Agent Sync skill can be exported as a WorkBuddy and SkillHub package
 });
 
 test("removing or upgrading a Skill preserves runtime identity, history, and generic MCP", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-skill-isolation-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-skill-isolation-test-"));
   try {
-    const stateDir = join(tempDir, ".healthlink");
-    const databasePath = join(stateDir, "healthlink.sqlite");
+    const stateDir = join(tempDir, ".vital-agent-sync");
+    const databasePath = join(stateDir, "vital-agent.sqlite");
     const skillPath = join(tempDir, "agent", "skills", "vitalmcp-personal-context", "SKILL.md");
     const runtime = initializeRelayRuntime({
       stateDir,
       relayUrl: "http://127.0.0.1:8790",
       mode: "self_hosted_relay"
     });
-    const database = openHealthLinkDatabase({ path: databasePath });
+    const database = openVitalAgentDatabase({ path: databasePath });
     database.close();
-    const genericMcpBefore = buildHealthLinkMcpServerConfig({ databasePath });
+    const genericMcpBefore = buildVitalAgentMcpServerConfig({ databasePath });
 
-    installHermesHealthLinkSkill({ skillPath });
-    installHermesHealthLinkSkill({ skillPath });
+    installHermesVitalAgentSkill({ skillPath });
+    installHermesVitalAgentSkill({ skillPath });
     rmSync(dirname(skillPath), { recursive: true, force: true });
 
     const preserved = readRelayRuntimeConfig({ stateDir });
-    const genericMcpAfter = buildHealthLinkMcpServerConfig({ databasePath });
+    const genericMcpAfter = buildVitalAgentMcpServerConfig({ databasePath });
     assert.equal(preserved.user_id, runtime.user_id);
     assert.equal(preserved.source_device_id, runtime.source_device_id);
     assert.equal(preserved.encryption_public_key_x25519, runtime.encryption_public_key_x25519);
     assert.equal(preserved.relay_access_token, runtime.relay_access_token);
     assert.equal(existsSync(databasePath), true);
     assert.deepEqual(genericMcpAfter, genericMcpBefore);
-    const reopened = openHealthLinkDatabase({ path: databasePath });
+    const reopened = openVitalAgentDatabase({ path: databasePath });
     reopened.close();
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
@@ -2337,18 +2337,18 @@ test("Transport providers keep LAN default and require secure iOS-compatible Tai
     id: "tailscale",
     bindHost: "0.0.0.0",
     port: 8787,
-    serverUrl: "https://healthlink.example.ts.net/"
+    serverUrl: "https://vital-agent-sync.example.ts.net/"
   });
-  assert.equal(await tailscale.getAdvertisedUrl(), "https://healthlink.example.ts.net");
+  assert.equal(await tailscale.getAdvertisedUrl(), "https://vital-agent-sync.example.ts.net");
   assert.equal((await tailscale.healthCheck?.())?.status, "ok");
 
   const tailscaleMagicDns = createTransportProvider({
     id: "tailscale",
     bindHost: "0.0.0.0",
     port: 8787,
-    tailscaleName: "healthlink.tailnet.ts.net."
+    tailscaleName: "vital-agent-sync.tailnet.ts.net."
   });
-  assert.equal(await tailscaleMagicDns.getAdvertisedUrl(), "https://healthlink.tailnet.ts.net");
+  assert.equal(await tailscaleMagicDns.getAdvertisedUrl(), "https://vital-agent-sync.tailnet.ts.net");
 
   const insecureTailscale = createTransportProvider({
     id: "tailscale",
@@ -2368,7 +2368,7 @@ test("Transport providers keep LAN default and require secure iOS-compatible Tai
 });
 
 test("Tailscale transport configures and verifies a private Serve HTTPS route", async () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-tailscale-serve-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-tailscale-serve-test-"));
   try {
     const command = join(tempDir, "tailscale");
     const marker = join(tempDir, "configured");
@@ -2376,12 +2376,12 @@ test("Tailscale transport configures and verifies a private Serve HTTPS route", 
     writeFileSync(command, `#!/bin/sh
 printf '%s\\n' "$*" >> '${log}'
 if [ "$1" = "status" ]; then
-  printf '%s\\n' '{"BackendState":"Running","Self":{"DNSName":"healthlink.tailnet.ts.net."}}'
+  printf '%s\\n' '{"BackendState":"Running","Self":{"DNSName":"vital-agent-sync.tailnet.ts.net."}}'
   exit 0
 fi
 if [ "$1" = "serve" ] && [ "$2" = "status" ]; then
   if [ -f '${marker}' ]; then
-    printf '%s\\n' '{"TCP":{"443":{"HTTPS":true}},"Web":{"healthlink.tailnet.ts.net:443":{"Handlers":{"/":{"Proxy":"http://127.0.0.1:8787"}}}}}'
+    printf '%s\\n' '{"TCP":{"443":{"HTTPS":true}},"Web":{"vital-agent-sync.tailnet.ts.net:443":{"Handlers":{"/":{"Proxy":"http://127.0.0.1:8787"}}}}}'
   else
     printf '%s\\n' '{}'
   fi
@@ -2409,7 +2409,7 @@ touch '${marker}'
     });
     assert.equal((await tailscale.healthCheck?.())?.status, "fail");
     await tailscale.start?.();
-    assert.equal(await tailscale.getAdvertisedUrl(), "https://healthlink.tailnet.ts.net");
+    assert.equal(await tailscale.getAdvertisedUrl(), "https://vital-agent-sync.tailnet.ts.net");
     const health = await tailscale.healthCheck?.();
     assert.equal(health?.status, "ok");
     assert.match(health?.detail ?? "", /private Tailscale Serve HTTPS/);
@@ -2422,16 +2422,16 @@ touch '${marker}'
 test("Tailscale Serve inspection refuses conflicting or public routes", () => {
   const conflict = inspectTailscaleServeConfig(JSON.stringify({
     TCP: { "443": { HTTPS: true } },
-    Web: { "healthlink.tailnet.ts.net:443": { Handlers: { "/": { Proxy: "http://127.0.0.1:9999" } } } }
-  }), "healthlink.tailnet.ts.net", "http://127.0.0.1:8787");
+    Web: { "vital-agent-sync.tailnet.ts.net:443": { Handlers: { "/": { Proxy: "http://127.0.0.1:9999" } } } }
+  }), "vital-agent-sync.tailnet.ts.net", "http://127.0.0.1:8787");
   assert.equal(conflict.status, "conflict");
   assert.match(conflict.detail, /will not overwrite/);
 
   const funnel = inspectTailscaleServeConfig(JSON.stringify({
     TCP: { "443": { HTTPS: true } },
-    Web: { "healthlink.tailnet.ts.net:443": { Handlers: { "/": { Proxy: "http://127.0.0.1:8787" } } } },
-    AllowFunnel: { "healthlink.tailnet.ts.net:443": true }
-  }), "healthlink.tailnet.ts.net", "http://127.0.0.1:8787");
+    Web: { "vital-agent-sync.tailnet.ts.net:443": { Handlers: { "/": { Proxy: "http://127.0.0.1:8787" } } } },
+    AllowFunnel: { "vital-agent-sync.tailnet.ts.net:443": true }
+  }), "vital-agent-sync.tailnet.ts.net", "http://127.0.0.1:8787");
   assert.equal(funnel.status, "public");
   assert.match(funnel.detail, /will not overwrite or advertise a public route/);
 });
@@ -2529,9 +2529,9 @@ test("Docker Compose output uses persistent SQLite volume and explicit server UR
   });
 
   assert.match(yaml, /8787:8787/);
-  assert.match(yaml, /\.\/healthlink-data:\/data/);
-  assert.match(yaml, /HEALTHLINK_DB: \/data\/healthlink\.sqlite/);
-  assert.match(yaml, /HEALTHLINK_SERVER_URL: "http:\/\/192\.168\.31\.53:8787"/);
+  assert.match(yaml, /\.\/vital-agent-sync-data:\/data/);
+  assert.match(yaml, /VITALMCP_DB: \/data\/vital-agent\.sqlite/);
+  assert.match(yaml, /VITALMCP_SERVER_URL: "http:\/\/192\.168\.31\.53:8787"/);
   assert.match(yaml, /image: node:22-bookworm-slim/);
   assert.match(yaml, /npx -y vitalmcp daemon/);
 });
@@ -2541,14 +2541,14 @@ test("relay Docker Compose output runs the self-hosted relay with persistent sto
     port: 8790
   });
 
-  assert.match(yaml, /healthlink-relay:/);
+  assert.match(yaml, /vital-agent-sync-relay:/);
   assert.match(yaml, /8790:8790/);
-  assert.match(yaml, /\.\/healthlink-relay-data:\/data/);
-  assert.match(yaml, /HEALTHLINK_RELAY_DB: \/data\/relay\.sqlite/);
-  assert.match(yaml, /HEALTHLINK_RELAY_API_TOKEN: ""/);
-  assert.match(yaml, /HEALTHLINK_RELAY_MAX_DEVICES_PER_USER: "5"/);
-  assert.match(yaml, /HEALTHLINK_RELAY_TRUST_PROXY: "false"/);
-  assert.match(yaml, /HEALTHLINK_RELAY_METRICS_TOKEN: ""/);
+  assert.match(yaml, /\.\/vital-agent-sync-relay-data:\/data/);
+  assert.match(yaml, /VITALMCP_RELAY_DB: \/data\/relay\.sqlite/);
+  assert.match(yaml, /VITALMCP_RELAY_API_TOKEN: ""/);
+  assert.match(yaml, /VITALMCP_RELAY_MAX_DEVICES_PER_USER: "5"/);
+  assert.match(yaml, /VITALMCP_RELAY_TRUST_PROXY: "false"/);
+  assert.match(yaml, /VITALMCP_RELAY_METRICS_TOKEN: ""/);
   assert.match(yaml, /npx -y vitalmcp relay serve/);
 });
 
@@ -2572,52 +2572,52 @@ test("relay deployment artifacts build a bounded relay service", () => {
   const productionEnv = readFileSync(resolve(packageRoot, "..", "..", "deploy", "relay", ".env.production.example"), "utf8");
 
   assert.match(dockerfile, /CMD \["node", "packages\/local\/dist\/cli\.js", "relay", "serve"\]/);
-  assert.match(dockerfile, /HEALTHLINK_RELAY_RETENTION_DAYS=30/);
-  assert.match(dockerfile, /HEALTHLINK_RELAY_MAX_ENVELOPE_BYTES=524288/);
-  assert.match(dockerfile, /HEALTHLINK_RELAY_MAX_UPLOADS_PER_MINUTE=120/);
-  assert.match(dockerfile, /HEALTHLINK_RELAY_MAX_QUEUED_ENVELOPES_PER_USER=1000/);
-  assert.match(dockerfile, /HEALTHLINK_RELAY_MAX_DEVICES_PER_USER=5/);
+  assert.match(dockerfile, /VITALMCP_RELAY_RETENTION_DAYS=30/);
+  assert.match(dockerfile, /VITALMCP_RELAY_MAX_ENVELOPE_BYTES=524288/);
+  assert.match(dockerfile, /VITALMCP_RELAY_MAX_UPLOADS_PER_MINUTE=120/);
+  assert.match(dockerfile, /VITALMCP_RELAY_MAX_QUEUED_ENVELOPES_PER_USER=1000/);
+  assert.match(dockerfile, /VITALMCP_RELAY_MAX_DEVICES_PER_USER=5/);
   assert.match(dockerfile, /COPY tsconfig\.base\.json \.\//);
   assert.match(dockerfile, /npm prune --omit=dev --workspace vitalmcp/);
   assert.match(dockerfile, /COPY --from=build \/app\/node_modules node_modules/);
-  assert.doesNotMatch(dockerfile, /^ENV HEALTHLINK_RELAY_(?:API|METRICS)_TOKEN=/m);
-  assert.match(dockerfile, /HEALTHLINK_RELAY_TRUST_PROXY=false/);
+  assert.doesNotMatch(dockerfile, /^ENV VITALMCP_RELAY_(?:API|METRICS)_TOKEN=/m);
+  assert.match(dockerfile, /VITALMCP_RELAY_TRUST_PROXY=false/);
   assert.match(dockerfile, /^USER node$/m);
   const runtimeStage = dockerfile.slice(dockerfile.lastIndexOf("FROM node:22-bookworm-slim"));
   assert.doesNotMatch(runtimeStage, /apt-get|python3|make g\+\+/);
   assert.match(compose, /dockerfile: deploy\/relay\/Dockerfile/);
-  assert.match(compose, /healthlink-relay-data:\/data/);
-  assert.match(compose, /HEALTHLINK_RELAY_DB: \/data\/relay\.sqlite/);
-  assert.match(compose, /HEALTHLINK_RELAY_API_TOKEN: ""/);
-  assert.match(compose, /HEALTHLINK_RELAY_MAX_DEVICES_PER_USER: "5"/);
-  assert.match(compose, /HEALTHLINK_RELAY_METRICS_TOKEN: ""/);
-  assert.match(compose, /HEALTHLINK_RELAY_TRUST_PROXY: "false"/);
+  assert.match(compose, /vital-agent-sync-relay-data:\/data/);
+  assert.match(compose, /VITALMCP_RELAY_DB: \/data\/relay\.sqlite/);
+  assert.match(compose, /VITALMCP_RELAY_API_TOKEN: ""/);
+  assert.match(compose, /VITALMCP_RELAY_MAX_DEVICES_PER_USER: "5"/);
+  assert.match(compose, /VITALMCP_RELAY_METRICS_TOKEN: ""/);
+  assert.match(compose, /VITALMCP_RELAY_TRUST_PROXY: "false"/);
   assert.match(dockerignore, /^\.git$/m);
   assert.match(dockerignore, /^\*\*\/node_modules$/m);
   assert.match(dockerignore, /^\*\*\/\*\.sqlite$/m);
   assert.match(dockerignore, /^\*\*\/\.env\.\*$/m);
-  assert.match(dockerignore, /^\*\*\/healthlink-relay-data$/m);
+  assert.match(dockerignore, /^\*\*\/vital-agent-sync-relay-data$/m);
   assert.match(gitignore, /^\*\*\/\.env\.\*$/m);
   assert.match(gitignore, /^!\*\*\/\.env\.\*\.example$/m);
 
-  const productionRelay = productionCompose.services["healthlink-relay"]!;
+  const productionRelay = productionCompose.services["vital-agent-sync-relay"]!;
   const productionCaddy = productionCompose.services.caddy!;
   assert.equal(productionRelay.ports, undefined);
   assert.deepEqual(productionRelay.expose, ["8790"]);
-  assert.equal(productionRelay.environment?.HEALTHLINK_RELAY_TRUST_PROXY, "true");
-  assert.match(productionRelay.environment?.HEALTHLINK_RELAY_API_TOKEN ?? "", /\?Set a random deployment API token/);
-  assert.match(productionRelay.environment?.HEALTHLINK_RELAY_METRICS_TOKEN ?? "", /\?Set a separate random metrics token/);
+  assert.equal(productionRelay.environment?.VITALMCP_RELAY_TRUST_PROXY, "true");
+  assert.match(productionRelay.environment?.VITALMCP_RELAY_API_TOKEN ?? "", /\?Set a random deployment API token/);
+  assert.match(productionRelay.environment?.VITALMCP_RELAY_METRICS_TOKEN ?? "", /\?Set a separate random metrics token/);
   assert.equal(productionRelay.read_only, true);
   assert.deepEqual(productionRelay.cap_drop, ["ALL"]);
   assert.deepEqual(productionCaddy.ports, ["80:80", "443:443", "443:443/udp"]);
   assert.equal(productionCaddy.read_only, true);
   assert.match(productionComposeText, /caddy:2\.11\.4-alpine/);
-  assert.match(caddyfile, /^\{\$HEALTHLINK_RELAY_DOMAIN\} \{/m);
+  assert.match(caddyfile, /^\{\$VITALMCP_RELAY_DOMAIN\} \{/m);
   assert.match(caddyfile, /max_size 512KiB/);
-  assert.match(caddyfile, /reverse_proxy healthlink-relay:8790/);
+  assert.match(caddyfile, /reverse_proxy vital-agent-sync-relay:8790/);
   assert.doesNotMatch(caddyfile, /^\s*log\s*\{/m);
-  assert.match(productionEnv, /HEALTHLINK_RELAY_API_TOKEN=replace-with-a-random-32-byte-value/);
-  assert.match(productionEnv, /HEALTHLINK_RELAY_METRICS_TOKEN=replace-with-a-different-random-32-byte-value/);
+  assert.match(productionEnv, /VITALMCP_RELAY_API_TOKEN=replace-with-a-random-32-byte-value/);
+  assert.match(productionEnv, /VITALMCP_RELAY_METRICS_TOKEN=replace-with-a-different-random-32-byte-value/);
 });
 
 test("relay serve config reads deployment environment with CLI override precedence", () => {
@@ -2643,17 +2643,17 @@ test("relay serve config reads deployment environment with CLI override preceden
     relayMetricsTokenProvided: false
   };
   const env = {
-    HEALTHLINK_RELAY_HOST: "127.0.0.1",
-    HEALTHLINK_RELAY_PORT: "9191",
-    HEALTHLINK_RELAY_DB: "/tmp/relay-env.sqlite",
-    HEALTHLINK_RELAY_RETENTION_DAYS: "7",
-    HEALTHLINK_RELAY_MAX_ENVELOPE_BYTES: "123456",
-    HEALTHLINK_RELAY_MAX_UPLOADS_PER_MINUTE: "44",
-    HEALTHLINK_RELAY_MAX_QUEUED_ENVELOPES_PER_USER: "55",
-    HEALTHLINK_RELAY_MAX_DEVICES_PER_USER: "3",
-    HEALTHLINK_RELAY_TRUST_PROXY: "true",
-    HEALTHLINK_RELAY_API_TOKEN: "env-api-token",
-    HEALTHLINK_RELAY_METRICS_TOKEN: "env-metrics-token"
+    VITALMCP_RELAY_HOST: "127.0.0.1",
+    VITALMCP_RELAY_PORT: "9191",
+    VITALMCP_RELAY_DB: "/tmp/relay-env.sqlite",
+    VITALMCP_RELAY_RETENTION_DAYS: "7",
+    VITALMCP_RELAY_MAX_ENVELOPE_BYTES: "123456",
+    VITALMCP_RELAY_MAX_UPLOADS_PER_MINUTE: "44",
+    VITALMCP_RELAY_MAX_QUEUED_ENVELOPES_PER_USER: "55",
+    VITALMCP_RELAY_MAX_DEVICES_PER_USER: "3",
+    VITALMCP_RELAY_TRUST_PROXY: "true",
+    VITALMCP_RELAY_API_TOKEN: "env-api-token",
+    VITALMCP_RELAY_METRICS_TOKEN: "env-metrics-token"
   };
 
   const fromEnv = resolveRelayServeConfig(defaults, env);
@@ -2722,15 +2722,15 @@ test("relay serve config reads deployment environment with CLI override preceden
 
   assert.throws(
     () => resolveRelayServeConfig(defaults, {
-      HEALTHLINK_RELAY_PORT: "not-a-port"
+      VITALMCP_RELAY_PORT: "not-a-port"
     }),
-    /HEALTHLINK_RELAY_PORT must be a positive integer/
+    /VITALMCP_RELAY_PORT must be a positive integer/
   );
   assert.throws(
     () => resolveRelayServeConfig(defaults, {
-      HEALTHLINK_RELAY_TRUST_PROXY: "sometimes"
+      VITALMCP_RELAY_TRUST_PROXY: "sometimes"
     }),
-    /HEALTHLINK_RELAY_TRUST_PROXY must be true, false, 1, or 0/
+    /VITALMCP_RELAY_TRUST_PROXY must be true, false, 1, or 0/
   );
 });
 
@@ -2755,12 +2755,12 @@ test("server URL diagnostics warn for loopback and container deployment URLs", (
 });
 
 test("launchd service plist uses daemon command and expected keepalive settings", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-service-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-service-test-"));
   try {
     const plist = buildLaunchdPlist({
       homeDir: tempDir,
       cliCommand: "/tmp/vitalmcp",
-      databasePath: join(tempDir, "healthlink.sqlite"),
+      databasePath: join(tempDir, "vital-agent.sqlite"),
       host: "0.0.0.0",
       port: 8787,
       transport: "lan"
@@ -2774,7 +2774,7 @@ test("launchd service plist uses daemon command and expected keepalive settings"
     assert.match(plist, /<string>--port<\/string>/);
     assert.match(plist, /<string>8787<\/string>/);
     assert.match(plist, /<string>--db<\/string>/);
-    assert.match(plist, new RegExp(`<string>${escapeRegExp(join(tempDir, "healthlink.sqlite"))}</string>`));
+    assert.match(plist, new RegExp(`<string>${escapeRegExp(join(tempDir, "vital-agent.sqlite"))}</string>`));
     assert.match(plist, /<string>--transport<\/string>/);
     assert.match(plist, /<string>lan<\/string>/);
     assert.match(plist, /daemon\.out\.log/);
@@ -2786,14 +2786,14 @@ test("launchd service plist uses daemon command and expected keepalive settings"
       platform: "darwin",
       homeDir: tempDir,
       cliCommand: "/tmp/vitalmcp",
-      databasePath: join(tempDir, "healthlink.sqlite"),
+      databasePath: join(tempDir, "vital-agent.sqlite"),
       host: "0.0.0.0",
       port: 8787,
       transport: "lan"
     });
     const paths = getLaunchdServicePaths({
       homeDir: tempDir,
-      databasePath: join(tempDir, "healthlink.sqlite")
+      databasePath: join(tempDir, "vital-agent.sqlite")
     });
 
     assert.equal(status.installed, true);
@@ -2806,9 +2806,9 @@ test("launchd service plist uses daemon command and expected keepalive settings"
 });
 
 test("relay pull service units run periodic pull without receiver ports", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-relay-pull-service-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-relay-pull-service-test-"));
   try {
-    const databasePath = join(tempDir, "healthlink.sqlite");
+    const databasePath = join(tempDir, "vital-agent.sqlite");
     const stateDir = join(tempDir, "state");
     const options = {
       homeDir: tempDir,
@@ -2862,9 +2862,9 @@ test("relay pull service units run periodic pull without receiver ports", () => 
 });
 
 test("systemd service unit uses daemon command and restart policy", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-systemd-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-systemd-test-"));
   try {
-    const databasePath = join(tempDir, "healthlink.sqlite");
+    const databasePath = join(tempDir, "vital-agent.sqlite");
     const unit = buildSystemdUnit({
       homeDir: tempDir,
       cliCommand: "/tmp/vitalmcp",
@@ -2872,7 +2872,7 @@ test("systemd service unit uses daemon command and restart policy", () => {
       host: "0.0.0.0",
       port: 8787,
       transport: "tailscale",
-      tailscaleName: "healthlink.tailnet.ts.net"
+      tailscaleName: "vital-agent-sync.tailnet.ts.net"
     });
     const paths = getSystemdServicePaths({
       homeDir: tempDir,
@@ -2884,7 +2884,7 @@ test("systemd service unit uses daemon command and restart policy", () => {
     assert.match(unit, /\[Unit\]/);
     assert.match(unit, /Description=Vital Agent Sync Local Receiver/);
     assert.match(unit, /ExecStart=\/tmp\/vitalmcp daemon --host 0\.0\.0\.0 --port 8787 --db /);
-    assert.match(unit, /--transport tailscale --tailscale-name healthlink\.tailnet\.ts\.net/);
+    assert.match(unit, /--transport tailscale --tailscale-name vital-agent-sync\.tailnet\.ts\.net/);
     assert.match(unit, /Restart=on-failure/);
     assert.match(unit, /WantedBy=default\.target/);
   } finally {
@@ -2900,7 +2900,7 @@ test("service manager selection distinguishes macOS, Linux, Windows, and overrid
 
   const windowsStatus = getManualServiceStatus({
     platform: "win32",
-    homeDir: "/tmp/healthlink-win"
+    homeDir: "/tmp/vital-agent-sync-win"
   });
   assert.equal(windowsStatus.manager, "manual");
   assert.match(windowsStatus.detail ?? "", /Windows background service installation is not implemented yet/);
@@ -2960,7 +2960,7 @@ test("port diagnostics find the next available TCP port", async () => {
 });
 
 test("launchd service log reader tails stdout and stderr logs", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-service-log-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-service-log-test-"));
   try {
     const paths = getLaunchdServicePaths({ homeDir: tempDir });
     const missing = readLaunchdServiceLog({
@@ -2975,7 +2975,7 @@ test("launchd service log reader tails stdout and stderr logs", () => {
       platform: "darwin",
       homeDir: tempDir,
       cliCommand: "/tmp/vitalmcp",
-      databasePath: join(tempDir, "healthlink.sqlite"),
+      databasePath: join(tempDir, "vital-agent.sqlite"),
       host: "0.0.0.0",
       port: 8787,
       transport: "lan"
@@ -3015,7 +3015,7 @@ test("local package manifest is ready for public npm packing", () => {
   };
 
   assert.equal(manifest.name, "vitalmcp");
-  assert.equal(manifest.version, "0.4.1");
+  assert.equal(manifest.version, "0.5.0");
   assert.equal(manifest.private, undefined);
   assert.equal(manifest.license, "MIT");
   assert.equal(manifest.bin?.["vitalmcp"], "./dist/cli.js");
@@ -3103,15 +3103,15 @@ test("root package exposes repeatable relay release audit gates", () => {
   assert.match(auditScript, /e2ee-relay-ios-interop\.mjs/);
   assert.match(auditScript, /readdirSync\(join\(root, "App"\)\)/);
   assert.match(auditScript, /relay audit CLI/);
-  assert.match(auditScript, /HEALTHLINK_RELAY_PORT/);
-  assert.match(auditScript, /HEALTHLINK_RELAY_DB/);
-  assert.match(auditScript, /HEALTHLINK_RELAY_MAX_QUEUED_ENVELOPES_PER_USER/);
-  assert.match(auditScript, /HEALTHLINK_RELAY_MAX_DEVICES_PER_USER/);
-  assert.match(auditScript, /HEALTHLINK_RELAY_API_TOKEN|fixture-flow-relay-api-token/);
-  assert.match(auditScript, /HEALTHLINK_RELAY_METRICS_TOKEN/);
+  assert.match(auditScript, /VITALMCP_RELAY_PORT/);
+  assert.match(auditScript, /VITALMCP_RELAY_DB/);
+  assert.match(auditScript, /VITALMCP_RELAY_MAX_QUEUED_ENVELOPES_PER_USER/);
+  assert.match(auditScript, /VITALMCP_RELAY_MAX_DEVICES_PER_USER/);
+  assert.match(auditScript, /VITALMCP_RELAY_API_TOKEN|fixture-flow-relay-api-token/);
+  assert.match(auditScript, /VITALMCP_RELAY_METRICS_TOKEN/);
   assert.match(auditScript, /--metrics-token/);
   assert.match(auditScript, /compiled hosted setup fail-closed/);
-  assert.match(auditScript, /HEALTHLINK_HOSTED_RELAY_URL/);
+  assert.match(auditScript, /VITALMCP_HOSTED_RELAY_URL/);
   assert.match(auditScript, /config\.json/);
   assert.match(auditScript, /compiled CLI argument validation/);
   assert.match(auditScript, /Unknown option/);
@@ -3146,15 +3146,15 @@ test("root package exposes repeatable relay release audit gates", () => {
   assert.match(packageAuditScript, /let installProcess/);
   assert.match(packageAuditScript, /child\.kill\("SIGTERM"\)/);
   assert.match(packageAuditScript, /rmSync\(tempDir/);
-  assert.match(agentAdapterAuditScript, /HEALTHLINK_HERMES_BIN/);
+  assert.match(agentAdapterAuditScript, /VITALMCP_HERMES_BIN/);
   assert.match(agentAdapterAuditScript, /HERMES_HOME/);
   assert.match(agentAdapterAuditScript, /Generic MCP discovered/);
-  assert.match(agentAdapterAuditScript, /mcp", "test", "healthlink/);
+  assert.match(agentAdapterAuditScript, /mcp", "test", "vital-agent-sync/);
   assert.match(agentAdapterAuditScript, /Tools discovered: 12/);
   assert.match(agentAdapterAuditScript, /rmSync\(tempDir/);
-  assert.match(hostedAuditScript, /HEALTHLINK_HOSTED_RELAY_URL/);
-  assert.match(hostedAuditScript, /HEALTHLINK_RELAY_API_TOKEN/);
-  assert.match(hostedAuditScript, /HEALTHLINK_RELAY_METRICS_TOKEN/);
+  assert.match(hostedAuditScript, /VITALMCP_HOSTED_RELAY_URL/);
+  assert.match(hostedAuditScript, /VITALMCP_RELAY_API_TOKEN/);
+  assert.match(hostedAuditScript, /VITALMCP_RELAY_METRICS_TOKEN/);
   assert.match(hostedAuditScript, /protocol !== "https:"/);
   assert.match(hostedAuditScript, /--active", "--yes"/);
   assert.doesNotMatch(hostedAuditScript, /--relay-api-token/);
@@ -3177,7 +3177,7 @@ test("root package exposes repeatable relay release audit gates", () => {
   assert.doesNotMatch(npmReleasePreflightScript, /npm", \["publish"/);
   assert.match(releaseSecretScanScript, /git", \[\s*"ls-files"/);
   assert.match(releaseSecretScanScript, /private-key-pem/);
-  assert.match(releaseSecretScanScript, /healthlink-secret-literal/);
+  assert.match(releaseSecretScanScript, /vital-agent-sync-secret-literal/);
   assert.match(releaseSecretScanScript, /sensitive_values_printed: false/);
   assert.match(releaseSecretScanScript, /runSelfTest\(\)/);
   assert.match(releaseSecretScanScript, /:\(exclude\)apps\/www/);
@@ -3223,7 +3223,7 @@ test("pairing client reports unreachable daemon and parses pair/start responses"
 });
 
 test("portable installer uses a user prefix and manages its PATH block idempotently", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-installer-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-installer-"));
   try {
     const home = join(tempDir, "home");
     const fakeBin = join(tempDir, "bin");
@@ -3233,8 +3233,8 @@ test("portable installer uses a user prefix and manages its PATH block idempoten
     const installScript = resolve(packageRoot, "..", "..", "install.sh");
     const websiteInstallScript = resolve(packageRoot, "..", "..", "apps", "www", "public", "install.sh");
     mkdirSync(fakeBin, { recursive: true });
-    mkdirSync(join(home, ".healthlink"), { recursive: true });
-    writeFileSync(join(home, ".healthlink", "preserve-me"), "local history", "utf8");
+    mkdirSync(join(home, ".vital-agent-sync"), { recursive: true });
+    writeFileSync(join(home, ".vital-agent-sync", "preserve-me"), "local history", "utf8");
     writeFileSync(join(fakeBin, "node"), "#!/bin/sh\nprintf '24\\n'\n", "utf8");
     writeFileSync(join(fakeBin, "npm"), "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$TEST_NPM_LOG\"\n", "utf8");
     writeFileSync(join(fakeBin, "uname"), "#!/bin/sh\nprintf 'Linux\\n'\n", "utf8");
@@ -3248,13 +3248,13 @@ test("portable installer uses a user prefix and manages its PATH block idempoten
       PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
       VITALMCP_PROFILE: profile,
       VITALMCP_INSTALL_PREFIX: prefix,
-      WSL_DISTRO_NAME: "HealthLinkTestWSL",
+      WSL_DISTRO_NAME: "VitalAgentTestWSL",
       TEST_NPM_LOG: npmLog
     };
 
     let lastStdout = "";
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      const result = spawnSync("sh", [installScript, "--version", "0.4.1"], { env, encoding: "utf8" });
+      const result = spawnSync("sh", [installScript, "--version", "0.5.0"], { env, encoding: "utf8" });
       assert.equal(result.status, 0, result.stderr);
       lastStdout = result.stdout;
     }
@@ -3262,13 +3262,13 @@ test("portable installer uses a user prefix and manages its PATH block idempoten
     const installedProfile = readFileSync(profile, "utf8");
     assert.equal((installedProfile.match(/# >>> vitalmcp >>>/g) ?? []).length, 1);
     assert.match(installedProfile, new RegExp(escapeRegExp(`export PATH="${prefix}/bin:$PATH"`)));
-    assert.match(readFileSync(npmLog, "utf8"), /install --global --prefix .*vitalmcp@0\.4\.1/);
+    assert.match(readFileSync(npmLog, "utf8"), /install --global --prefix .*vitalmcp@0\.5\.0/);
     assert.equal(readFileSync(websiteInstallScript, "utf8"), readFileSync(installScript, "utf8"));
 
     const uninstall = spawnSync("sh", [installScript, "--uninstall"], { env, encoding: "utf8" });
     assert.equal(uninstall.status, 0, uninstall.stderr);
     assert.doesNotMatch(readFileSync(profile, "utf8"), /vitalmcp/);
-    assert.equal(readFileSync(join(home, ".healthlink", "preserve-me"), "utf8"), "local history");
+    assert.equal(readFileSync(join(home, ".vital-agent-sync", "preserve-me"), "utf8"), "local history");
     assert.match(readFileSync(npmLog, "utf8"), /uninstall --global --prefix .*vitalmcp/);
 
     const malformedProfile = "user setting before\n# >>> vitalmcp >>>\nunrelated user setting after\n";
@@ -3282,7 +3282,7 @@ test("portable installer uses a user prefix and manages its PATH block idempoten
 });
 
 test("portable installer selects macOS, Linux, and WSL shell profiles without a system prefix", () => {
-  const rootTemp = mkdtempSync(join(tmpdir(), "healthlink-installer-platforms-"));
+  const rootTemp = mkdtempSync(join(tmpdir(), "vital-agent-sync-installer-platforms-"));
   try {
     const installScript = resolve(packageRoot, "..", "..", "install.sh");
     const cases = [
@@ -3326,18 +3326,18 @@ test("portable installer selects macOS, Linux, and WSL shell profiles without a 
 });
 
 test("CLI doctor reports the verified iOS-compatible Tailscale HTTPS endpoint", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-cli-tailscale-doctor-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-cli-tailscale-doctor-"));
   try {
     const fakeBin = join(tempDir, "bin");
     mkdirSync(fakeBin, { recursive: true });
     const tailscale = join(fakeBin, "tailscale");
     writeFileSync(tailscale, `#!/bin/sh
 if [ "$1" = "status" ]; then
-  printf '%s\\n' '{"BackendState":"Running","Self":{"DNSName":"healthlink.tailnet.ts.net."}}'
+  printf '%s\\n' '{"BackendState":"Running","Self":{"DNSName":"vital-agent-sync.tailnet.ts.net."}}'
   exit 0
 fi
 if [ "$1" = "serve" ] && [ "$2" = "status" ]; then
-  printf '%s\\n' '{"TCP":{"443":{"HTTPS":true}},"Web":{"healthlink.tailnet.ts.net:443":{"Handlers":{"/":{"Proxy":"http://127.0.0.1:8787"}}}}}'
+  printf '%s\\n' '{"TCP":{"443":{"HTTPS":true}},"Web":{"vital-agent-sync.tailnet.ts.net:443":{"Handlers":{"/":{"Proxy":"http://127.0.0.1:8787"}}}}}'
   exit 0
 fi
 exit 1
@@ -3348,9 +3348,9 @@ exit 1
       "--import", "tsx", cliPath,
       "doctor",
       "--transport", "tailscale",
-      "--tailscale-name", "healthlink.tailnet.ts.net",
+      "--tailscale-name", "vital-agent-sync.tailnet.ts.net",
       "--manager", "manual",
-      "--db", join(tempDir, "healthlink.sqlite"),
+      "--db", join(tempDir, "vital-agent.sqlite"),
       "--output", "json"
     ], {
       env: { ...process.env, HOME: tempDir, PATH: `${fakeBin}:${process.env.PATH ?? ""}` },
@@ -3364,18 +3364,18 @@ exit 1
     const transport = output.details.checks.find((check) => check.label === "Tailscale transport");
     assert.equal(output.status, "complete");
     assert.equal(transport?.status, "OK");
-    assert.match(transport?.detail ?? "", /https:\/\/healthlink\.tailnet\.ts\.net/);
+    assert.match(transport?.detail ?? "", /https:\/\/vital-agent-sync\.tailnet\.ts\.net/);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
 
 test("CLI setup emits one redacted JSON document for plan and resumable failure", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-cli-bootstrap-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-cli-bootstrap-"));
   try {
     const cliPath = join(packageRoot, "src", "cli.ts");
     const stateDir = join(tempDir, "state");
-    const databasePath = join(tempDir, "healthlink.sqlite");
+    const databasePath = join(tempDir, "vital-agent.sqlite");
     const commonArgs = [
       "--import", "tsx", cliPath,
       "--state-dir", stateDir,
@@ -3423,7 +3423,7 @@ test("CLI setup emits one redacted JSON document for plan and resumable failure"
     const resumeOutput = JSON.parse(resume.stdout) as { status: string; error: { code: string; message: string } };
     assert.equal(resumeOutput.status, "failed");
     assert.equal(typeof resumeOutput.error.code, "string");
-    assert.doesNotMatch(resume.stdout, /relay_access_token|upload_auth_secret|BEGIN PRIVATE KEY|healthlink-e2ee-v1:/);
+    assert.doesNotMatch(resume.stdout, /relay_access_token|upload_auth_secret|BEGIN PRIVATE KEY|vital-agent-e2ee-v1:/);
     assert.equal(resume.stderr, "");
 
     for (const commandArgs of [
@@ -3432,7 +3432,7 @@ test("CLI setup emits one redacted JSON document for plan and resumable failure"
       ["print-onboarding", "--format", "qr", "--output", "json"]
     ]) {
       const result = spawnSync(process.execPath, [...commonArgs, ...commandArgs], { env, encoding: "utf8" });
-      assert.doesNotMatch(result.stdout, /relay_access_token|upload_auth_secret|relay_api_token|BEGIN PRIVATE KEY|healthlink-e2ee-v1:/);
+      assert.doesNotMatch(result.stdout, /relay_access_token|upload_auth_secret|relay_api_token|BEGIN PRIVATE KEY|vital-agent-e2ee-v1:/);
       assert.doesNotThrow(() => JSON.parse(result.stdout), `${commandArgs[0]} must emit one JSON document`);
     }
   } finally {
@@ -3441,7 +3441,7 @@ test("CLI setup emits one redacted JSON document for plan and resumable failure"
 });
 
 test("CLI setup persists the WorkBuddy project path before consent", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-cli-workbuddy-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-cli-workbuddy-"));
   try {
     const cliPath = join(packageRoot, "src", "cli.ts");
     const stateDir = join(tempDir, "state");
@@ -3454,7 +3454,7 @@ test("CLI setup persists the WorkBuddy project path before consent", () => {
       "--transport", "lan",
       "--manager", "manual",
       "--state-dir", stateDir,
-      "--db", join(tempDir, "healthlink.sqlite"),
+      "--db", join(tempDir, "vital-agent.sqlite"),
       "--output", "json"
     ], {
       env: { ...process.env, HOME: tempDir },
@@ -3544,7 +3544,7 @@ test("service ensure workflow installs missing service, starts it, waits, then p
 });
 
 test("bootstrap plan and state are versioned, private, resumable, and idempotent", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-bootstrap-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-bootstrap-"));
   try {
     const config = {
       agent_id: "openclaw" as const,
@@ -3583,7 +3583,7 @@ test("bootstrap plan and state are versioned, private, resumable, and idempotent
 test("bootstrap workflow resumes safely after every mutating stage", async () => {
   const stages = ["runtime_initialized", "agent_configured", "service_installed", "service_started", "onboarding_created"] as const;
   for (const failingStage of stages) {
-    const tempDir = mkdtempSync(join(tmpdir(), `healthlink-bootstrap-${failingStage}-`));
+    const tempDir = mkdtempSync(join(tmpdir(), `vital-agent-sync-bootstrap-${failingStage}-`));
     try {
       const state = writeBootstrapState(createBootstrapState({
         agent_id: "generic",
@@ -3613,7 +3613,7 @@ test("bootstrap workflow resumes safely after every mutating stage", async () =>
         service_started: () => call("service_started"),
         onboarding_created: () => {
           call("onboarding_created");
-          return { onboarding_url: "file:///tmp/healthlink-onboarding-fixture.html" };
+          return { onboarding_url: "file:///tmp/vital-agent-sync-onboarding-fixture.html" };
         },
         first_sync_observed: () => true
       };
@@ -3638,7 +3638,7 @@ test("bootstrap workflow resumes safely after every mutating stage", async () =>
 });
 
 test("bootstrap waits for first sync without repeating completed setup actions", async () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-bootstrap-first-sync-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-bootstrap-first-sync-"));
   try {
     const state = writeBootstrapState(createBootstrapState({
       agent_id: "generic",
@@ -3678,7 +3678,7 @@ test("bootstrap waits for first sync without repeating completed setup actions",
 });
 
 test("bootstrap lock rejects concurrent setup and recovers after release", async () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-bootstrap-lock-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-bootstrap-lock-"));
   try {
     await withBootstrapLock({ stateDir: tempDir }, async () => {
       await assert.rejects(
@@ -3697,7 +3697,7 @@ test("Agent output redaction removes secret fields and credential-bearing onboar
     status: "failed",
     relay_access_token: "fixture-secret-token-123456789",
     nested: {
-      message: "healthlink://onboard?payload=fixture-sensitive-payload",
+      message: "vitalmcp://onboard?payload=fixture-sensitive-payload",
       safe: "https://relay.example.com"
     }
   });
@@ -3709,7 +3709,7 @@ test("Agent output redaction removes secret fields and credential-bearing onboar
 });
 
 test("relay onboarding artifact keeps credentials in a private local file", async () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-onboarding-artifact-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-onboarding-artifact-"));
   try {
     const config = initializeRelayRuntime({
       stateDir: tempDir,
@@ -3739,7 +3739,7 @@ test("relay onboarding artifact keeps credentials in a private local file", asyn
     const textArtifact = await writeRelayOnboardingArtifact({ config, stateDir: tempDir, format: "text" });
     const textHtml = readFileSync(textArtifact.local_path, "utf8");
     assert.match(textHtml, /<textarea/);
-    assert.match(textHtml, /healthlink-e2ee-v1:/);
+    assert.match(textHtml, /vital-agent-e2ee-v1:/);
     assert.doesNotMatch(textHtml, />Open Vital Agent Sync</);
     assert.doesNotMatch(textHtml, /Vital Agent Sync onboarding QR code/);
   } finally {
@@ -3793,7 +3793,7 @@ function buildLegacyRelayEnvelope(
     publicKey: createPublicKey(config.encryption_public_key_pem)
   });
   const key = createHash("sha256")
-    .update("healthlink-e2ee-v1 envelope")
+    .update("vital-agent-e2ee-v1 envelope")
     .update(sharedSecret)
     .digest();
   const nonce = randomBytes(12);
@@ -3803,7 +3803,7 @@ function buildLegacyRelayEnvelope(
     cipher.final()
   ]);
   const unsigned: ReturnType<typeof encryptHealthSyncPayload> = {
-    protocol: "healthlink-e2ee-v1",
+    protocol: "vital-agent-e2ee-v1",
     user_id: config.user_id,
     device_id: config.source_device_id,
     envelope_id: `env_legacy_${algorithm.endsWith("ed25519") ? "ed25519" : "hmac"}`,
@@ -3840,9 +3840,9 @@ function buildLegacyRelayEnvelope(
 }
 
 function withTempDatabase(callback: (databasePath: string) => void): void {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-test-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-test-"));
   try {
-    callback(join(tempDir, "healthlink.sqlite"));
+    callback(join(tempDir, "vital-agent.sqlite"));
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }

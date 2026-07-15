@@ -44,53 +44,53 @@ export function resolveRelayServeConfig(
   return {
     host: options.hostProvided
       ? options.host
-      : env.HEALTHLINK_RELAY_HOST ?? options.host,
+      : env.VITALMCP_RELAY_HOST ?? options.host,
     port: options.portProvided
       ? options.port
-      : readPositiveIntegerEnv(env, "HEALTHLINK_RELAY_PORT") ?? 8790,
-    databasePath: options.databasePathProvided ? options.databasePath : env.HEALTHLINK_RELAY_DB ?? options.databasePath,
+      : readPositiveIntegerEnv(env, "VITALMCP_RELAY_PORT") ?? 8790,
+    databasePath: options.databasePathProvided ? options.databasePath : env.VITALMCP_RELAY_DB ?? options.databasePath,
     retentionDays: optionOrEnvNumber(
       env,
       options.relayRetentionDays,
       options.relayRetentionDaysProvided,
-      "HEALTHLINK_RELAY_RETENTION_DAYS"
+      "VITALMCP_RELAY_RETENTION_DAYS"
     ),
     maxEnvelopeBytes: optionOrEnvInteger(
       env,
       options.relayMaxEnvelopeBytes,
       options.relayMaxEnvelopeBytesProvided,
-      "HEALTHLINK_RELAY_MAX_ENVELOPE_BYTES"
+      "VITALMCP_RELAY_MAX_ENVELOPE_BYTES"
     ),
     maxUploadsPerMinute: optionOrEnvInteger(
       env,
       options.relayMaxUploadsPerMinute,
       options.relayMaxUploadsPerMinuteProvided,
-      "HEALTHLINK_RELAY_MAX_UPLOADS_PER_MINUTE"
+      "VITALMCP_RELAY_MAX_UPLOADS_PER_MINUTE"
     ),
     maxQueuedEnvelopesPerUser: optionOrEnvInteger(
       env,
       options.relayMaxQueuedEnvelopesPerUser,
       options.relayMaxQueuedEnvelopesPerUserProvided,
-      "HEALTHLINK_RELAY_MAX_QUEUED_ENVELOPES_PER_USER"
+      "VITALMCP_RELAY_MAX_QUEUED_ENVELOPES_PER_USER"
     ),
     maxDevicesPerUser: optionOrEnvInteger(
       env,
       options.relayMaxDevicesPerUser,
       options.relayMaxDevicesPerUserProvided,
-      "HEALTHLINK_RELAY_MAX_DEVICES_PER_USER"
+      "VITALMCP_RELAY_MAX_DEVICES_PER_USER"
     ),
     trustProxy: options.relayTrustProxyProvided
       ? options.relayTrustProxy
-      : readBooleanEnv(env, "HEALTHLINK_RELAY_TRUST_PROXY") ?? options.relayTrustProxy,
+      : readBooleanEnv(env, "VITALMCP_RELAY_TRUST_PROXY") ?? options.relayTrustProxy,
     apiToken: normalizeOptionalToken(
       options.relayApiTokenProvided
         ? options.relayApiToken
-        : env.HEALTHLINK_RELAY_API_TOKEN ?? options.relayApiToken
+        : env.VITALMCP_RELAY_API_TOKEN ?? options.relayApiToken
     ),
     metricsToken: normalizeOptionalToken(
       options.relayMetricsTokenProvided
         ? options.relayMetricsToken
-        : env.HEALTHLINK_RELAY_METRICS_TOKEN ?? options.relayMetricsToken
+        : env.VITALMCP_RELAY_METRICS_TOKEN ?? options.relayMetricsToken
     )
   };
 }

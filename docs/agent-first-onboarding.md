@@ -73,7 +73,7 @@ npx -y vitalmcp setup
 The planned website bootstrap command may install the package into a user-writable prefix when Node/npm or global npm permissions are unsuitable:
 
 ```bash
-curl -fsSL https://<healthlink-domain>/install.sh | sh
+curl -fsSL https://<vital-agent-sync-domain>/install.sh | sh
 vitalmcp setup
 ```
 
@@ -179,7 +179,7 @@ detect
 
 Each completed stage is persisted without storing plaintext tokens in logs. Re-running setup continues from the first incomplete stage unless the user explicitly requests reset or migration.
 
-The implemented contract uses `schema_version: 1` and stores non-secret progress in `~/.healthlink/setup/state-v1.json` with user-only permissions. Persisted stages are:
+The implemented contract uses `schema_version: 1` and stores non-secret progress in `~/.vital-agent-sync/setup/state-v1.json` with user-only permissions. Persisted stages are:
 
 ```text
 environment_checked
@@ -313,7 +313,7 @@ The Agent-first onboarding milestone is complete when:
 - Tailscale setup states its app, account, and authorized-tailnet prerequisites before making changes
 - the user sees one QR/deep-link/text action, not a dump of credential fields
 - secrets and health plaintext are absent from Agent messages, JSON, logs, and support output
-- first iOS sync is pulled and visible through `healthlink_status` plus the standard MCP tools
+- first iOS sync is pulled and visible through `vital_agent_status` plus the standard MCP tools
 - removing an optional Skill does not remove local data or break MCP
 - generic MCP remains usable without an Agent marketplace listing
 - product copy promises manual sync plus foreground catch-up, with background delivery best-effort and unscheduled

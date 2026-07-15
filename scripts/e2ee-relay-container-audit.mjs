@@ -3,9 +3,9 @@ import { randomBytes } from "node:crypto";
 
 const root = process.cwd();
 const suffix = `${process.pid}-${Date.now()}`;
-const containerName = `healthlink-relay-container-audit-${suffix}`;
-const composeProject = `healthlink-relay-audit-${suffix}`;
-const relayImage = "healthlink-relay:dev";
+const containerName = `vital-agent-sync-relay-container-audit-${suffix}`;
+const composeProject = `vital-agent-sync-relay-audit-${suffix}`;
+const relayImage = "vital-agent-sync-relay:dev";
 const relayApiToken = randomBytes(32).toString("base64url");
 const metricsToken = randomBytes(32).toString("base64url");
 const developmentCompose = "deploy/relay/docker-compose.yml";
@@ -41,7 +41,7 @@ try {
     developmentCompose,
     "build",
     "--pull=false",
-    "healthlink-relay"
+    "vital-agent-sync-relay"
   ]);
 
   verifyImageConfig();
@@ -73,7 +73,7 @@ function verifyImageConfig() {
   assert(image?.Config?.User === "node", "Relay runtime image must run as the node user.");
   const env = Array.isArray(image.Config.Env) ? image.Config.Env : [];
   assert(
-    !env.some((entry) => /^HEALTHLINK_RELAY_(?:API|METRICS)_TOKEN=/.test(entry)),
+    !env.some((entry) => /^VITALMCP_RELAY_(?:API|METRICS)_TOKEN=/.test(entry)),
     "Relay runtime image must not contain API or metrics token defaults."
   );
   assert(
@@ -90,7 +90,7 @@ function verifyRuntimeImage() {
     "const Database=require('better-sqlite3')",
     "const forbidden=['/usr/bin/python3','/usr/bin/make','/usr/bin/g++'].filter(fs.existsSync)",
     "if(forbidden.length)throw new Error('build tools present: '+forbidden.join(','))",
-    "if('HEALTHLINK_RELAY_API_TOKEN' in process.env||'HEALTHLINK_RELAY_METRICS_TOKEN' in process.env)throw new Error('secret-shaped defaults present')",
+    "if('VITALMCP_RELAY_API_TOKEN' in process.env||'VITALMCP_RELAY_METRICS_TOKEN' in process.env)throw new Error('secret-shaped defaults present')",
     "const db=new Database(':memory:')",
     "db.exec('create table probe(value integer)')",
     "db.close()",
@@ -120,7 +120,7 @@ function verifyRuntimeImage() {
     "packages/local/dist/cli.js",
     "--version"
   ]).trim();
-  assert(version === "vitalmcp 0.4.1", "Relay image contains the wrong vitalmcp version.");
+  assert(version === "vitalmcp 0.5.0", "Relay image contains the wrong vitalmcp version.");
   console.log(version);
 }
 
@@ -169,9 +169,9 @@ async function verifyHardenedRelayContainer() {
     "--publish",
     "127.0.0.1::8790",
     "--env",
-    `HEALTHLINK_RELAY_API_TOKEN=${relayApiToken}`,
+    `VITALMCP_RELAY_API_TOKEN=${relayApiToken}`,
     "--env",
-    `HEALTHLINK_RELAY_METRICS_TOKEN=${metricsToken}`,
+    `VITALMCP_RELAY_METRICS_TOKEN=${metricsToken}`,
     relayImage
   ]);
   containerStarted = true;

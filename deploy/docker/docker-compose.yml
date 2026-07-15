@@ -8,10 +8,10 @@ services:
     ports:
       - "8787:8787"
     volumes:
-      - ./healthlink-data:/data
+      - ./vital-agent-sync-data:/data
     environment:
-      HEALTHLINK_HOST: 0.0.0.0
-      HEALTHLINK_PORT: "8787"
-      HEALTHLINK_DB: /data/healthlink.sqlite
-      HEALTHLINK_TRANSPORT: lan
-      HEALTHLINK_SERVER_URL: ${HEALTHLINK_SERVER_URL:?Set this to an iPhone-reachable URL, for example http://192.168.31.53:8787}
+      VITALMCP_HOST: 0.0.0.0
+      VITALMCP_PORT: "8787"
+      VITALMCP_DB: /data/vital-agent.sqlite
+      VITALMCP_TRANSPORT: lan
+      VITALMCP_SERVER_URL: ${VITALMCP_SERVER_URL:?Set this to an iPhone-reachable URL, for example http://192.168.31.53:8787}

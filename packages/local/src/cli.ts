@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import {
   formatStandardMcpConfig,
-  buildHealthLinkMcpServerConfig
+  buildVitalAgentMcpServerConfig
 } from "./mcp-config.js";
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
@@ -24,21 +24,21 @@ import {
   type BootstrapOutput,
   type BootstrapState
 } from "./bootstrap.js";
-import { openHealthLinkDatabase } from "./database.js";
+import { openVitalAgentDatabase } from "./database.js";
 import { buildDockerComposeYaml, buildRelayDockerComposeYaml } from "./docker-compose.js";
 import { getHealthStatus } from "./health-ingest.js";
 import { startLocalServer } from "./server.js";
 import { startMcpServer } from "./mcp.js";
 import {
-  getHealthLinkServiceStatus,
-  installHealthLinkService,
+  getVitalAgentServiceStatus,
+  installVitalAgentService,
   isServiceManagerId,
-  readHealthLinkServiceLog,
-  startHealthLinkService,
-  stopHealthLinkService,
-  uninstallHealthLinkService,
-  type HealthLinkServiceMode,
-  type HealthLinkServiceStatus,
+  readVitalAgentServiceLog,
+  startVitalAgentService,
+  stopVitalAgentService,
+  uninstallVitalAgentService,
+  type VitalAgentServiceMode,
+  type VitalAgentServiceStatus,
   type LaunchdServiceOptions,
   type ServiceManagerId
 } from "./service.js";
@@ -61,7 +61,7 @@ import {
 } from "./relay-runtime.js";
 import { startRelayServer } from "./relay-server.js";
 import { runServiceEnsureWorkflow, runServiceSetupWorkflow } from "./setup.js";
-import { buildHealthLinkSkillMarkdown, exportHealthLinkSkillPackage } from "./skill.js";
+import { buildVitalAgentSkillMarkdown, exportVitalAgentSkillPackage } from "./skill.js";
 import { listSourceDevices } from "./source-devices.js";
 import { renderTerminalQr } from "./terminal-qr.js";
 import { writeRelayOnboardingArtifact } from "./onboarding-artifact.js";
@@ -70,7 +70,7 @@ import { createTransportProvider, getServerUrlDiagnostics, isContainerRuntime, i
 type CliOptions = {
   command: "server" | "init" | "daemon" | "pair" | "setup" | "ensure" | "service" | "logs" | "mcp" | "print-mcp-config" | "print-agent-config" | "print-docker-compose" | "print-relay-docker-compose" | "print-skill" | "export-skill" | "print-onboarding" | "install-hermes" | "install-hermes-skill" | "status" | "doctor" | "pull" | "relay" | "version" | "help";
   serviceAction?: "install" | "start" | "stop" | "status" | "uninstall";
-  serviceMode: HealthLinkServiceMode;
+  serviceMode: VitalAgentServiceMode;
   relayAction?: "serve" | "status" | "fixture" | "audit" | "unlink" | "rotate" | "reset" | "migrate";
   port: number;
   portProvided: boolean;
@@ -502,7 +502,7 @@ async function main(): Promise<void> {
   }
 
   if (options.command === "version") {
-    console.log("vitalmcp 0.4.1");
+    console.log("vitalmcp 0.5.0");
     return;
   }
 
@@ -547,7 +547,7 @@ async function main(): Promise<void> {
   }
 
   if (options.command === "print-skill") {
-    process.stdout.write(buildHealthLinkSkillMarkdown({
+    process.stdout.write(buildVitalAgentSkillMarkdown({
       agent: options.agentId
     }));
     return;
@@ -557,7 +557,7 @@ async function main(): Promise<void> {
     const defaultOutputDir = options.agentId === "workbuddy"
       ? "vital-agent-sync-workbuddy-skill"
       : "vitalmcp-openclaw-skill";
-    const result = exportHealthLinkSkillPackage({
+    const result = exportVitalAgentSkillPackage({
       agent: options.agentId,
       outputDir: options.outputDir ?? defaultOutputDir
     });
@@ -690,7 +690,7 @@ async function main(): Promise<void> {
   });
 
   if (options.command === "init") {
-    const server = buildHealthLinkMcpServerConfig({
+    const server = buildVitalAgentMcpServerConfig({
       databasePath: options.databasePath
     });
     console.log("Agent MCP:");
@@ -717,7 +717,7 @@ async function main(): Promise<void> {
 }
 
 function buildCliHelp(): string {
-  return `Vital Agent Sync runtime 0.4.1
+  return `Vital Agent Sync runtime 0.5.0
 
 Usage:
   vitalmcp <command> [options]
@@ -778,30 +778,30 @@ async function runServiceCommand(options: CliOptions): Promise<void> {
   const action = options.serviceAction ?? "status";
   const serviceOptions = toServiceOptions(options);
   if (action === "install") {
-    const status = installHealthLinkService(serviceOptions);
+    const status = installVitalAgentService(serviceOptions);
     console.log("Vital Agent Sync service installed");
     await printServiceStatusDetails(status, options);
     return;
   }
   if (action === "start") {
-    const status = startHealthLinkService(serviceOptions);
+    const status = startVitalAgentService(serviceOptions);
     console.log("Vital Agent Sync service start requested");
     await printServiceStatusDetails(status, options);
     return;
   }
   if (action === "stop") {
-    const status = stopHealthLinkService(serviceOptions);
+    const status = stopVitalAgentService(serviceOptions);
     console.log("Vital Agent Sync service stop requested");
     await printServiceStatusDetails(status, options);
     return;
   }
   if (action === "uninstall") {
-    const status = uninstallHealthLinkService(serviceOptions);
+    const status = uninstallVitalAgentService(serviceOptions);
     console.log("Vital Agent Sync service uninstalled");
     await printServiceStatusDetails(status, options);
     return;
   }
-  await printServiceStatusDetails(getHealthLinkServiceStatus(serviceOptions), options);
+  await printServiceStatusDetails(getVitalAgentServiceStatus(serviceOptions), options);
 }
 
 async function runSetup(options: CliOptions): Promise<void> {
@@ -996,7 +996,7 @@ async function executeBootstrapSetup(state: BootstrapState, options: CliOptions)
   let relayConfig: ReturnType<typeof initializeRelayRuntime> | undefined;
   const agent = getAgentAdapter(options.agentId);
   if (state.initial_sync_count === undefined) {
-    const database = openHealthLinkDatabase({ path: options.databasePath });
+    const database = openVitalAgentDatabase({ path: options.databasePath });
     try {
       state = writeBootstrapState({
         ...state,
@@ -1031,7 +1031,7 @@ async function executeBootstrapSetup(state: BootstrapState, options: CliOptions)
         });
         await transport.start?.();
       }
-      const database = openHealthLinkDatabase({ path: options.databasePath });
+      const database = openVitalAgentDatabase({ path: options.databasePath });
       database.close();
     },
     agent_configured: () => {
@@ -1055,14 +1055,14 @@ async function executeBootstrapSetup(state: BootstrapState, options: CliOptions)
     },
     service_installed: () => {
       const serviceOptions = toServiceOptions(effectiveOptions);
-      if (!getHealthLinkServiceStatus(serviceOptions).installed) {
-        installHealthLinkService(serviceOptions);
+      if (!getVitalAgentServiceStatus(serviceOptions).installed) {
+        installVitalAgentService(serviceOptions);
       }
     },
     service_started: async () => {
       const serviceOptions = toServiceOptions(effectiveOptions);
-      if (!getHealthLinkServiceStatus(serviceOptions).running) {
-        startHealthLinkService(serviceOptions);
+      if (!getVitalAgentServiceStatus(serviceOptions).running) {
+        startVitalAgentService(serviceOptions);
       }
       if (!relayMode) {
         await waitForLocalReceiver(effectiveOptions);
@@ -1082,7 +1082,7 @@ async function executeBootstrapSetup(state: BootstrapState, options: CliOptions)
       return { onboarding_url: `http://127.0.0.1:${effectiveOptions.port}/pair` };
     },
     first_sync_observed: () => {
-      const database = openHealthLinkDatabase({ path: effectiveOptions.databasePath });
+      const database = openVitalAgentDatabase({ path: effectiveOptions.databasePath });
       try {
         return getHealthStatus(database).sync_count > (state.initial_sync_count ?? 0);
       } finally {
@@ -1108,7 +1108,7 @@ function buildBootstrapOutput(state: BootstrapState, options: CliOptions): Boots
       }
     });
   }
-  const database = openHealthLinkDatabase({ path: options.databasePath ?? state.config.database_path });
+  const database = openVitalAgentDatabase({ path: options.databasePath ?? state.config.database_path });
   try {
     const health = getHealthStatus(database);
     const relay = getRelayLocalStatus({ stateDir: options.stateDir });
@@ -1157,7 +1157,7 @@ function printBootstrapResult(state: BootstrapState, options: CliOptions): void 
   if (state.status === "awaiting_first_sync") {
     console.log("Next: connect the Vital Agent app, run the first sync, then run vitalmcp setup --resume --yes.");
   } else if (state.status === "complete") {
-    console.log("First sync observed. Verify freshness with healthlink_status, then ask: How am I doing today?");
+    console.log("First sync observed. Verify freshness with vital_agent_status, then ask: How am I doing today?");
     console.log(agent.reloadHint());
   }
 }
@@ -1169,11 +1169,11 @@ function printJson(value: unknown): void {
 async function runEnsure(options: CliOptions): Promise<void> {
   const ensureOptions = await resolveAutoServicePort(options);
   const serviceOptions = toServiceOptions(ensureOptions);
-  let lastStatus: HealthLinkServiceStatus | undefined;
+  let lastStatus: VitalAgentServiceStatus | undefined;
   console.log("Ensuring Vital Agent Sync receiver service");
   await runServiceEnsureWorkflow({
     getStatus: () => {
-      lastStatus = getHealthLinkServiceStatus(serviceOptions);
+      lastStatus = getVitalAgentServiceStatus(serviceOptions);
       return lastStatus;
     },
     installService: () => {
@@ -1181,18 +1181,18 @@ async function runEnsure(options: CliOptions): Promise<void> {
         throw new Error(`${lastStatus.detail ?? "This platform does not have a supported service manager."} Run vitalmcp daemon under Docker, PM2, Task Scheduler, or another process manager.`);
       }
       console.log(`Service not installed for ${lastStatus?.manager ?? resolveServiceManagerIdForCli(options)}; installing...`);
-      lastStatus = installHealthLinkService(serviceOptions);
+      lastStatus = installVitalAgentService(serviceOptions);
     },
     startService: () => {
       if (lastStatus?.manager === "manual") {
         throw new Error(`${lastStatus.detail ?? "This platform does not have a supported service manager."} Run vitalmcp daemon under Docker, PM2, Task Scheduler, or another process manager.`);
       }
       console.log("Service not running; starting...");
-      lastStatus = startHealthLinkService(serviceOptions);
+      lastStatus = startVitalAgentService(serviceOptions);
     },
     waitForReady: () => waitForLocalReceiver(ensureOptions),
     printStatus: async () => {
-      const status = getHealthLinkServiceStatus(serviceOptions);
+      const status = getVitalAgentServiceStatus(serviceOptions);
       console.log("Vital Agent Sync receiver is ready.");
       await printServiceStatusDetails(status, ensureOptions);
     }
@@ -1328,8 +1328,8 @@ function toServiceOptions(options: CliOptions): LaunchdServiceOptions {
   };
 }
 
-async function printServiceStatusDetails(status: HealthLinkServiceStatus, options: CliOptions): Promise<void> {
-  const database = openHealthLinkDatabase({ path: options.databasePath });
+async function printServiceStatusDetails(status: VitalAgentServiceStatus, options: CliOptions): Promise<void> {
+  const database = openVitalAgentDatabase({ path: options.databasePath });
   try {
     const health = getHealthStatus(database);
     const receiver = await probeLocalReceiver(options);
@@ -1361,13 +1361,13 @@ async function printServiceStatusDetails(status: HealthLinkServiceStatus, option
 }
 
 function printServiceLogs(options: CliOptions): void {
-  const stdout = readHealthLinkServiceLog({
+  const stdout = readVitalAgentServiceLog({
     manager: options.serviceManager,
     databasePath: options.databasePath,
     stream: "stdout",
     lines: options.logLines
   });
-  const stderr = readHealthLinkServiceLog({
+  const stderr = readVitalAgentServiceLog({
     manager: options.serviceManager,
     databasePath: options.databasePath,
     stream: "stderr",
@@ -1379,7 +1379,7 @@ function printServiceLogs(options: CliOptions): void {
   printLogSection("stderr", stderr);
 }
 
-function printLogSection(label: string, log: ReturnType<typeof readHealthLinkServiceLog>): void {
+function printLogSection(label: string, log: ReturnType<typeof readVitalAgentServiceLog>): void {
   console.log("");
   console.log(`[${label}] ${log.path}`);
   if (!log.exists) {
@@ -1448,14 +1448,14 @@ function runRelaySetup(options: CliOptions): void {
     serviceMode: "relay_pull" as const,
     relayUrl: config.relay_url
   };
-  const serviceStatus = installHealthLinkService(toServiceOptions(serviceOptions));
-  startHealthLinkService(toServiceOptions(serviceOptions));
+  const serviceStatus = installVitalAgentService(toServiceOptions(serviceOptions));
+  startVitalAgentService(toServiceOptions(serviceOptions));
   console.log(`Relay pull service: installed for ${serviceStatus.manager}`);
   console.log(`Relay pull config:  ${serviceStatus.configPath}`);
   console.log(`Relay pull logs:    ${serviceStatus.stdoutPath}`);
 
   console.log("");
-  console.log(`State: ${options.stateDir ?? "~/.healthlink"}`);
+  console.log(`State: ${options.stateDir ?? "~/.vital-agent-sync"}`);
   console.log(`Relay: ${config.relay_url}`);
   console.log("");
   process.stdout.write(onboarding);
@@ -1556,7 +1556,7 @@ async function runRelayCommand(options: CliOptions): Promise<void> {
               stateDir: options.stateDir,
               databasePath: options.databasePath,
               targetRelayUrl: options.relayUrl!,
-              targetRelayApiToken: options.relayApiToken ?? process.env.HEALTHLINK_RELAY_API_TOKEN,
+              targetRelayApiToken: options.relayApiToken ?? process.env.VITALMCP_RELAY_API_TOKEN,
               targetMode: options.transportId === "self_hosted_relay" ? "self_hosted_relay" : "hosted_relay"
             });
     console.log(`Vital Agent Sync relay ${result.action} complete`);
@@ -1621,8 +1621,8 @@ async function runRelayCommand(options: CliOptions): Promise<void> {
     const relayUrl = options.relayUrl ?? local.relay_url ?? readRelayRuntimeConfig({ stateDir: options.stateDir }).relay_url;
     const result = await auditRelayDeployment({
       relayUrl,
-      metricsToken: options.relayMetricsToken ?? process.env.HEALTHLINK_RELAY_METRICS_TOKEN,
-      relayApiToken: options.relayApiToken ?? process.env.HEALTHLINK_RELAY_API_TOKEN,
+      metricsToken: options.relayMetricsToken ?? process.env.VITALMCP_RELAY_METRICS_TOKEN,
+      relayApiToken: options.relayApiToken ?? process.env.VITALMCP_RELAY_API_TOKEN,
       active: options.relayAuditActive
     });
     console.log(JSON.stringify(result, null, 2));
@@ -1675,7 +1675,7 @@ function defaultAgentName(agentId: AgentAdapterId): string {
 }
 
 function printStatus(options: CliOptions): void {
-  const database = openHealthLinkDatabase({ path: options.databasePath });
+  const database = openVitalAgentDatabase({ path: options.databasePath });
   try {
     const status = getHealthStatus(database);
     const sourceDevices = listSourceDevices(database);
@@ -1757,7 +1757,7 @@ async function printDoctor(options: CliOptions): Promise<void> {
 
   let databasePath = options.databasePath ?? "";
   try {
-    const database = openHealthLinkDatabase({ path: options.databasePath });
+    const database = openVitalAgentDatabase({ path: options.databasePath });
     databasePath = database.path;
     const status = getHealthStatus(database);
     results.push({
@@ -1775,7 +1775,7 @@ async function printDoctor(options: CliOptions): Promise<void> {
   }
 
   try {
-    const mcp = buildHealthLinkMcpServerConfig({ databasePath: options.databasePath });
+    const mcp = buildVitalAgentMcpServerConfig({ databasePath: options.databasePath });
     results.push({
       status: "OK",
       label: "MCP config",
@@ -1802,7 +1802,7 @@ async function printDoctor(options: CliOptions): Promise<void> {
     detail: agentStatus.detail
   });
 
-  const serviceStatus = getHealthLinkServiceStatus(toServiceOptions(options));
+  const serviceStatus = getVitalAgentServiceStatus(toServiceOptions(options));
   results.push({
     status: serviceStatus.running ? "OK" : serviceStatus.installed ? "WARN" : "WARN",
     label: `${serviceStatus.manager} service`,

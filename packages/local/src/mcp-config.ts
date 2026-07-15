@@ -68,7 +68,7 @@ export type WorkBuddyMcpInstallStatus = {
   server?: unknown;
 };
 
-export function buildHealthLinkMcpServerConfig(options: McpConfigOptions = {}): McpCommandConfig {
+export function buildVitalAgentMcpServerConfig(options: McpConfigOptions = {}): McpCommandConfig {
   return {
     command: getCliCommandPath(),
     args: [
@@ -81,12 +81,12 @@ export function buildHealthLinkMcpServerConfig(options: McpConfigOptions = {}): 
 
 export function buildStandardMcpConfig(options: McpConfigOptions = {}): {
   mcpServers: {
-    healthlink: McpCommandConfig;
+    "vital-agent-sync": McpCommandConfig;
   };
 } {
   return {
     mcpServers: {
-      healthlink: buildHealthLinkMcpServerConfig(options)
+      "vital-agent-sync": buildVitalAgentMcpServerConfig(options)
     }
   };
 }
@@ -97,10 +97,10 @@ export function formatStandardMcpConfig(options: McpConfigOptions = {}): string 
 
 export function buildWorkBuddyMcpConfig(options: McpConfigOptions = {}): {
   mcpServers: {
-    healthlink: McpCommandConfig;
+    "vital-agent-sync": McpCommandConfig;
   };
 } {
-  const server = buildHealthLinkMcpServerConfig(options);
+  const server = buildVitalAgentMcpServerConfig(options);
   const guiSafeServer = server.command.endsWith(".js")
     ? {
         command: process.execPath,
@@ -109,7 +109,7 @@ export function buildWorkBuddyMcpConfig(options: McpConfigOptions = {}): {
     : server;
   return {
     mcpServers: {
-      healthlink: guiSafeServer
+      "vital-agent-sync": guiSafeServer
     }
   };
 }
@@ -121,14 +121,14 @@ export function formatWorkBuddyMcpConfig(options: McpConfigOptions = {}): string
 export function buildOpenClawMcpConfig(options: McpConfigOptions = {}): {
   mcp: {
     servers: {
-      healthlink: McpCommandConfig;
+      "vital-agent-sync": McpCommandConfig;
     };
   };
 } {
   return {
     mcp: {
       servers: {
-        healthlink: buildHealthLinkMcpServerConfig(options)
+        "vital-agent-sync": buildVitalAgentMcpServerConfig(options)
       }
     }
   };
@@ -154,11 +154,11 @@ export function installHermesMcpConfig(options: HermesInstallOptions = {}): Herm
   const value = document.toJSON() as unknown;
   const root = isRecord(value) ? value : {};
   const mcpServers = isRecord(root.mcp_servers) ? root.mcp_servers : {};
-  const server = buildHealthLinkMcpServerConfig(options);
+  const server = buildVitalAgentMcpServerConfig(options);
 
   root.mcp_servers = {
     ...mcpServers,
-    healthlink: server
+    "vital-agent-sync": server
   };
 
   writeFileSync(configPath, YAML.stringify(root), "utf8");
@@ -183,13 +183,13 @@ export function installOpenClawMcpConfig(options: OpenClawInstallOptions = {}): 
   const root = existing.trim().length > 0 ? parseJsonRecord(existing, "OpenClaw") : {};
   const mcp = isRecord(root.mcp) ? root.mcp : {};
   const servers = isRecord(mcp.servers) ? mcp.servers : {};
-  const server = buildHealthLinkMcpServerConfig(options);
+  const server = buildVitalAgentMcpServerConfig(options);
 
   root.mcp = {
     ...mcp,
     servers: {
       ...servers,
-      healthlink: server
+      "vital-agent-sync": server
     }
   };
 
@@ -209,7 +209,7 @@ export function installWorkBuddyMcpConfig(options: WorkBuddyInstallOptions = {})
   const existing = existsSync(configPath) ? readFileSync(configPath, "utf8") : "";
   const root = existing.trim().length > 0 ? parseJsonRecord(existing, "WorkBuddy") : {};
   const mcpServers = isRecord(root.mcpServers) ? root.mcpServers : {};
-  const server = buildWorkBuddyMcpConfig(options).mcpServers.healthlink;
+  const server = buildWorkBuddyMcpConfig(options).mcpServers["vital-agent-sync"];
   const backupPath = existsSync(configPath) ? uniqueBackupPath(configPath) : undefined;
   if (backupPath) {
     copyFileSync(configPath, backupPath);
@@ -217,7 +217,7 @@ export function installWorkBuddyMcpConfig(options: WorkBuddyInstallOptions = {})
 
   root.mcpServers = {
     ...mcpServers,
-    healthlink: server
+    "vital-agent-sync": server
   };
 
   writeFileSync(configPath, `${JSON.stringify(root, null, 2)}\n`, "utf8");
@@ -241,7 +241,7 @@ export function getHermesMcpInstallStatus(options: HermesInstallOptions = {}): H
 
   const config = parseYamlRecord(readFileSync(configPath, "utf8"));
   const mcpServers = isRecord(config.mcp_servers) ? config.mcp_servers : {};
-  const server = mcpServers.healthlink;
+  const server = mcpServers["vital-agent-sync"];
   return {
     configPath,
     exists: true,
@@ -263,7 +263,7 @@ export function getOpenClawMcpInstallStatus(options: OpenClawInstallOptions = {}
   const config = parseJsonRecord(readFileSync(configPath, "utf8"), "OpenClaw");
   const mcp = isRecord(config.mcp) ? config.mcp : {};
   const servers = isRecord(mcp.servers) ? mcp.servers : {};
-  const server = servers.healthlink;
+  const server = servers["vital-agent-sync"];
   return {
     configPath,
     exists: true,
@@ -284,7 +284,7 @@ export function getWorkBuddyMcpInstallStatus(options: WorkBuddyInstallOptions = 
 
   const config = parseJsonRecord(readFileSync(configPath, "utf8"), "WorkBuddy");
   const mcpServers = isRecord(config.mcpServers) ? config.mcpServers : {};
-  const server = mcpServers.healthlink;
+  const server = mcpServers["vital-agent-sync"];
   return {
     configPath,
     exists: true,
@@ -356,7 +356,7 @@ function timestampForFilename(): string {
 }
 
 function uniqueBackupPath(configPath: string): string {
-  const base = `${configPath}.healthlink-backup-${timestampForFilename()}`;
+  const base = `${configPath}.vital-agent-sync-backup-${timestampForFilename()}`;
   if (!existsSync(base)) {
     return base;
   }

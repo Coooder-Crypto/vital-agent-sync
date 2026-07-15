@@ -158,13 +158,12 @@ struct LastSyncDetail: Codable, Identifiable {
 
 enum AppDeepLinkScheme {
     static let primary = "vitalmcp"
-    static let legacy = "healthlink"
 
     static func isSupported(_ scheme: String?) -> Bool {
         guard let scheme = scheme?.lowercased() else {
             return false
         }
-        return scheme == primary || scheme == legacy
+        return scheme == primary
     }
 }
 
@@ -279,7 +278,7 @@ struct DirectTransportExchange {
 }
 
 enum DirectTransportCrypto {
-    static let protocolVersion = "vitalmcp-direct-v1"
+    static let protocolVersion = "vital-agent-direct-v1"
     static let algorithm = "x25519-hkdf-sha256-chacha20poly1305"
 
     static func makeRequest<T: Encodable>(
@@ -499,7 +498,7 @@ struct RelayOnboardingPayload: Codable, Identifiable {
             }
             data = rawData
         } else {
-            let prefix = "healthlink-e2ee-v1:"
+            let prefix = "vital-agent-e2ee-v1:"
             let base64URL = encodedValue.hasPrefix(prefix)
                 ? String(encodedValue.dropFirst(prefix.count))
                 : encodedValue
@@ -520,7 +519,7 @@ struct RelayOnboardingPayload: Codable, Identifiable {
               (decoded.mode == "hosted_relay" ? relayScheme == "https" : ["http", "https"].contains(relayScheme)) else {
             throw GatewayError.invalidPairingURL
         }
-        guard decoded.protocolVersion == "healthlink-e2ee-v1",
+        guard decoded.protocolVersion == "vital-agent-e2ee-v1",
               decoded.relay_url.count <= 2_048,
               Self.isIdentifier(decoded.user_id),
               Self.isIdentifier(decoded.source_device_id),
@@ -626,7 +625,7 @@ enum VitalAgentCallbackPolicy {
             queryItems.append(URLQueryItem(name: "request_id", value: requestID))
         }
         queryItems.append(URLQueryItem(name: "status", value: status))
-        queryItems.append(URLQueryItem(name: "source", value: "healthlink"))
+        queryItems.append(URLQueryItem(name: "source", value: "vital-agent-sync"))
         components.queryItems = queryItems
         components.fragment = nil
         return components.url
@@ -667,7 +666,7 @@ enum RelayCrypto {
         let sequence = sequence ?? Int(Date().timeIntervalSince1970 * 1_000)
         let createdAt = ISO8601DateFormatter.gatewayDateTime.string(from: Date())
         let unsigned = RelayEncryptedEnvelope(
-            protocolVersion: "healthlink-e2ee-v1",
+            protocolVersion: "vital-agent-e2ee-v1",
             user_id: onboarding.user_id,
             device_id: payload.device_id,
             envelope_id: "env_\(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased())",
@@ -709,7 +708,7 @@ enum RelayCrypto {
         sharedSecret.hkdfDerivedSymmetricKey(
             using: SHA256.self,
             salt: Data(),
-            sharedInfo: Data("healthlink-e2ee-v1 envelope".utf8),
+            sharedInfo: Data("vital-agent-e2ee-v1 envelope".utf8),
             outputByteCount: 32
         )
     }

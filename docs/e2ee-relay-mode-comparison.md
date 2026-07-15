@@ -41,7 +41,7 @@ Common commands:
 ```bash
 vitalmcp setup --transport lan
 vitalmcp setup --transport tailscale
-vitalmcp setup --transport public_https --server-url https://agent.example.com/healthlink
+vitalmcp setup --transport public_https --server-url https://agent.example.com/vital-agent-sync
 vitalmcp pair
 vitalmcp status
 ```

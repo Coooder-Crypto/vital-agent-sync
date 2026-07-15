@@ -260,7 +260,7 @@ function isTailscaleCertificateName(value: string): boolean {
 function assertTailscaleMagicDnsMatchesLocal(tailscaleCommand: string, advertisedName: string): void {
   const detectedName = detectTailscaleMagicDnsName(tailscaleCommand);
   if (detectedName && detectedName.toLowerCase() !== advertisedName.toLowerCase()) {
-    throw new Error(`Configured Tailscale name ${advertisedName} does not match this node's MagicDNS name ${detectedName}. Use the exact Self.DNSName from \`tailscale status --json\`; HealthLink will not change Serve configuration for a mismatched hostname.`);
+    throw new Error(`Configured Tailscale name ${advertisedName} does not match this node's MagicDNS name ${detectedName}. Use the exact Self.DNSName from \`tailscale status --json\`; VitalAgent will not change Serve configuration for a mismatched hostname.`);
   }
 }
 
@@ -288,16 +288,16 @@ export function inspectTailscaleServeConfig(raw: string, magicDnsName: string, b
   const tcp = parsed.TCP?.[String(TAILSCALE_HTTPS_PORT)];
   const rootProxy = parsed.Web?.[hostPort]?.Handlers?.["/"]?.Proxy;
   if (parsed.AllowFunnel?.[hostPort]) {
-    return { status: "public", detail: `Tailscale Funnel is enabled for ${hostPort}. HealthLink will not overwrite or advertise a public route; disable Funnel on port ${TAILSCALE_HTTPS_PORT} before setup.` };
+    return { status: "public", detail: `Tailscale Funnel is enabled for ${hostPort}. VitalAgent will not overwrite or advertise a public route; disable Funnel on port ${TAILSCALE_HTTPS_PORT} before setup.` };
   }
   if (tcp?.HTTPS === true && rootProxy === backendUrl) {
     return { status: "ready", detail: `Private HTTPS route ${tailscaleAdvertisedUrl(magicDnsName)} proxies to ${backendUrl}.` };
   }
   if (rootProxy && rootProxy !== backendUrl) {
-    return { status: "conflict", detail: `Tailscale Serve already uses ${hostPort}/ for ${rootProxy}. HealthLink will not overwrite that route; move the existing handler or pass a separate secure --server-url.` };
+    return { status: "conflict", detail: `Tailscale Serve already uses ${hostPort}/ for ${rootProxy}. VitalAgent will not overwrite that route; move the existing handler or pass a separate secure --server-url.` };
   }
   if (tcp && tcp.HTTPS !== true) {
-    return { status: "conflict", detail: `Tailscale Serve port ${TAILSCALE_HTTPS_PORT} is already configured for a non-HTTPS handler. HealthLink will not overwrite it.` };
+    return { status: "conflict", detail: `Tailscale Serve port ${TAILSCALE_HTTPS_PORT} is already configured for a non-HTTPS handler. VitalAgent will not overwrite it.` };
   }
   return { status: "missing", detail: `Private Tailscale HTTPS is not configured. Run \`tailscale serve --bg --yes --https=${TAILSCALE_HTTPS_PORT} ${backendUrl}\`, then rerun pairing or doctor.` };
 }
@@ -514,7 +514,7 @@ function findTailscaleIpv4(): string | undefined {
 }
 
 function getTailscaleMagicDnsName(options: TransportProviderOptions): string | undefined {
-  const explicit = normalizeTailscaleName(options.tailscaleName ?? process.env.HEALTHLINK_TAILSCALE_NAME ?? process.env.TAILSCALE_HOSTNAME);
+  const explicit = normalizeTailscaleName(options.tailscaleName ?? process.env.VITALMCP_TAILSCALE_NAME ?? process.env.TAILSCALE_HOSTNAME);
   if (explicit) {
     return explicit;
   }

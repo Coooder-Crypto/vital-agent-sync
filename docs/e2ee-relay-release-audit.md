@@ -20,9 +20,9 @@ npm run audit:secrets
 Latest repository evidence, 2026-07-11:
 
 - `audit:relay-local` passes, including 56 Node tests, compiled fixture flow, compiled CLI guards, passive and active compiled relay audits, full iOS source typecheck against the installed iPhoneOS SDK, and CryptoKit-to-Node envelope interoperability.
-- `npm run pack:check --workspace healthlink-local` passes for `healthlink-local@0.2.0` with 101 package files.
-- `audit:relay-package` passes against the local `healthlink-local@0.2.0` tarball, proving a clean temporary global install can run the relay crypto/pull path and export the two-file OpenClaw Skill package without relying on workspace modules. The latest cold-cache run completed its dependency install in about 225 seconds while emitting 15-second heartbeats, then passed fixture upload/pull, SQLite verification, active relay audit, skill export, and cleanup.
-- `audit:agent-adapters` passes with Hermes Agent v0.17.0: a generic MCP client discovers 12 tools and calls `healthlink_status`, then Hermes loads an isolated Vital Agent Sync config, connects, and discovers the same 12 tools. A separate test against the user's configured Hermes instance also connects in 186 ms and discovers all 12 tools.
+- `npm run pack:check --workspace vitalmcp` passes for `vitalmcp@0.2.0` with 101 package files.
+- `audit:relay-package` passes against the local `vitalmcp@0.2.0` tarball, proving a clean temporary global install can run the relay crypto/pull path and export the two-file OpenClaw Skill package without relying on workspace modules. The latest cold-cache run completed its dependency install in about 225 seconds while emitting 15-second heartbeats, then passed fixture upload/pull, SQLite verification, active relay audit, skill export, and cleanup.
+- `audit:agent-adapters` passes with Hermes Agent v0.17.0: a generic MCP client discovers 12 tools and calls `vital_agent_status`, then Hermes loads an isolated Vital Agent Sync config, connects, and discovers the same 12 tools. A separate test against the user's configured Hermes instance also connects in 186 ms and discovers all 12 tools.
 - `audit:dependencies` reports zero known production dependency vulnerabilities across all severities for the current lockfile (336 audited dependency nodes on 2026-07-11).
 - `audit:secrets` passes its built-in positive/negative rule self-test and scans the non-website release scope for private keys, common provider tokens, literal Vital Agent Sync credentials, real environment files, SQLite/Keychain export artifacts, and runtime secret paths without printing matched values. The current scan covers 100 text files, skips 18 binary files, and reports zero findings.
 - `audit:relay-container` passes: development and production Relay Compose files validate, the relay image builds successfully, Caddy 2.11.4 reports `Valid configuration`, and all uniquely named temporary containers/networks/volumes are removed. `App/Info.plist` plus non-website `git diff --check` also pass.
@@ -30,10 +30,10 @@ Latest repository evidence, 2026-07-11:
 - A hardened temporary container passes the full active relay audit. Its logs contain startup metadata only; the final relay database contains zero envelopes, zero active audit identities, and two revoked disposable identities.
 - Docker Hub authentication was unreachable from this verification host, so matching Docker Official Node/Caddy images were fetched through AWS ECR Public's `docker/library` mirror and tagged locally. Repository image references remain the standard Docker Official names.
 - A paired iPhone 16 Pro Max running iOS 26.5 with Developer Mode enabled is visible. The selected toolchain is currently Xcode 26.6 (`17F113`) and marks the device's iOS 26.5 Platform component as unavailable even though SDK files exist. The user will complete build/install/workflow validation with the matching Xcode Beta required by macOS 27 beta; repository Swift/iPhoneOS typechecks remain green.
-- `HEALTHLINK_HOSTED_RELAY_URL`, `HEALTHLINK_RELAY_API_TOKEN`, and `HEALTHLINK_RELAY_METRICS_TOKEN` are not configured in the current environment, so no real hosted deployment can be audited from this workspace yet.
+- `VITALMCP_HOSTED_RELAY_URL`, `VITALMCP_RELAY_API_TOKEN`, and `VITALMCP_RELAY_METRICS_TOKEN` are not configured in the current environment, so no real hosted deployment can be audited from this workspace yet.
 - `preflight:relay-production` passes with disposable non-secret test values and proves the interpolated Compose model exposes only Caddy ports, keeps the relay private/read-only/capability-free, preserves named volumes and limits, pins the image, mounts Caddyfile read-only, and emits only token byte lengths. It fails closed without a valid domain or strong distinct tokens.
 - The hosted audit wrapper fails closed without `--yes`, rejects HTTP relay URLs, requires all three hosted environment values, keeps tokens out of child-process arguments, and is ready to run both audits once a real deployment exists.
-- `release:npm-preflight` passed from committed release source for publisher `coooder`, the 101-file `healthlink-local@0.2.0` artifact, a zero-finding secret scan, and the required version advance from registry `0.1.3`. `healthlink-local@0.2.0` was then published on 2026-07-11. The public registry reports `0.2.0` with an integrity hash, and an isolated `/tmp` install using a private npm cache/global prefix reports `healthlink-local 0.2.0` and successfully emits a `healthlink-e2ee-v1` encrypted fixture without private key material. No OpenClaw CLI is installed. A temporary ClawHub 0.23.0 `skill publish --dry-run --json` validation succeeded for `healthlink-personal-context@0.2.0` with exactly `SKILL.md` and `README.md`; the temporary CLI/cache was removed. ClawHub marketplace publication remains an explicit optional external action.
+- `release:npm-preflight` passed from committed release source for publisher `coooder`, the 101-file `vitalmcp@0.2.0` artifact, a zero-finding secret scan, and the required version advance from registry `0.1.3`. `vitalmcp@0.2.0` was then published on 2026-07-11. The public registry reports `0.2.0` with an integrity hash, and an isolated `/tmp` install using a private npm cache/global prefix reports `vitalmcp 0.2.0` and successfully emits a `vital-agent-e2ee-v1` encrypted fixture without private key material. No OpenClaw CLI is installed. A temporary ClawHub 0.23.0 `skill publish --dry-run --json` validation succeeded for `vital-agent-sync-personal-context@0.2.0` with exactly `SKILL.md` and `README.md`; the temporary CLI/cache was removed. ClawHub marketplace publication remains an explicit optional external action.
 
 Vital Agent Sync direct-cutover evidence, 2026-07-12:
 
@@ -72,7 +72,7 @@ Expected coverage:
 - Swift typecheck plus the CryptoKit-to-Node fixture prove the current mobile envelope implementation agrees with Node on X25519, HKDF, ChaCha20-Poly1305, HMAC, canonical JSON, the explicit monotonic sequence field, and core schema validation; the same fixture verifies callback query/fragment stripping and scheme allowlisting.
 - Relay runtime config, private keys, cursor files, health SQLite, relay SQLite, and existing WAL/SHM sidecars are permission-hardened; config/cursor replacement is atomic, SQLite foreign keys are enabled, and default state/secrets/database directories are private on POSIX filesystems.
 - Hosted setup rejects a missing or non-HTTPS relay URL before writing runtime config or installing local integration state. Pull, status, and lifecycle operations reject HTTP overrides before sending tenant credentials; self-hosted mode retains its local HTTP fallback.
-- The compiled relay CLI can serve a temporary local relay from `HEALTHLINK_RELAY_*` environment configuration, require per-user tokens plus an optional deployment API key for data endpoints, require a metrics token, and pass `relay audit --metrics-token`.
+- The compiled relay CLI can serve a temporary local relay from `VITALMCP_RELAY_*` environment configuration, require per-user tokens plus an optional deployment API key for data endpoints, require a metrics token, and pass `relay audit --metrics-token`.
 - The opt-in active audit uses two disposable random tenants and opaque test envelopes to prove deployment API-key enforcement, cross-tenant list/ack/purge/unlink/rotate/revoke isolation, own-tenant lifecycle behavior, old-token rejection, and envelope cleanup without printing generated credentials.
 
 ## Local Deployment Evidence
@@ -114,7 +114,7 @@ npm run audit:relay-container
 
 # Equivalent individual commands:
 docker compose -f deploy/relay/docker-compose.yml config
-docker compose -f deploy/relay/docker-compose.yml build healthlink-relay
+docker compose -f deploy/relay/docker-compose.yml build vital-agent-sync-relay
 docker compose --env-file deploy/relay/.env.production.example -f deploy/relay/docker-compose.production.yml config
 docker compose --env-file deploy/relay/.env.production.example -f deploy/relay/docker-compose.production.yml run --rm --no-deps caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 ```
@@ -126,10 +126,10 @@ The container audit uses a unique Compose project, random container name, random
 These checks cannot be completed inside the repository and must be performed against the actual beta relay URL:
 
 ```bash
-export HEALTHLINK_HOSTED_RELAY_URL=https://relay.example.com
-export HEALTHLINK_RELAY_DOMAIN=relay.example.com
-export HEALTHLINK_RELAY_API_TOKEN=<deployment-api-token>
-export HEALTHLINK_RELAY_METRICS_TOKEN=<operator-metrics-token>
+export VITALMCP_HOSTED_RELAY_URL=https://relay.example.com
+export VITALMCP_RELAY_DOMAIN=relay.example.com
+export VITALMCP_RELAY_API_TOKEN=<deployment-api-token>
+export VITALMCP_RELAY_METRICS_TOKEN=<operator-metrics-token>
 npm run preflight:relay-production
 npm run audit:relay-hosted -- --yes
 ```
@@ -138,12 +138,12 @@ The production preflight parses the final Compose JSON without starting services
 
 - Hosted relay is reachable over HTTPS before traffic enters the public internet.
 - Edge rate limits are configured outside the Node process.
-- `HEALTHLINK_RELAY_API_TOKEN` is set unless the hosting layer provides equivalent upload/list/ack/purge access control.
+- `VITALMCP_RELAY_API_TOKEN` is set unless the hosting layer provides equivalent upload/list/ack/purge access control.
 - `/v1/status` reports `tenantProtected: true`; two disposable identities prove one tenant cannot list, ack, purge, unlink, rotate, or revoke the other.
 - Passive `vitalmcp relay audit --relay-url <hosted-url> --metrics-token <operator-token>` returns `ok: true`.
 - Active `vitalmcp relay audit --relay-url <hosted-url> --metrics-token <operator-token> --relay-api-token <deployment-token> --active --yes` returns `ok: true` and leaves no disposable test envelopes queued or acknowledged.
 - Logs exclude request bodies and do not contain envelope JSON, ciphertext fields, upload secrets, or health plaintext.
-- `/v1/metrics` is internal or access-controlled; hosted deployments should set `HEALTHLINK_RELAY_METRICS_TOKEN` unless infrastructure already restricts access.
+- `/v1/metrics` is internal or access-controlled; hosted deployments should set `VITALMCP_RELAY_METRICS_TOKEN` unless infrastructure already restricts access.
 - Relay SQLite backups are encrypted or disabled and do not retain rows longer than the retention policy.
 - Purge deletes queued and acked envelopes for a test `user_id`; unlink blocks future device uploads; rotate/reset reject old credentials.
 - Retention cleanup removes old test envelopes in the deployed environment.
@@ -154,12 +154,12 @@ The production preflight parses the final Compose JSON without starting services
 These checks require a machine with the matching iOS SDK/runtime and a test device or simulator setup:
 
 - Xcode build succeeds for the app target.
-- Direct pairing works through `vitalmcp://pair?...`; the legacy `healthlink://` scheme remains covered by compatibility tests.
+- Direct pairing works through `vitalmcp://pair?...`; no pre-release legacy deep-link alias is registered.
 - Relay onboarding works through QR/text code and `vitalmcp://onboard?payload=...`.
 - Relay upload sends encrypted envelopes to a local or hosted relay.
 - `vitalmcp://sync?source=<agent>&request_id=...` triggers sync for any Agent. An adapter may include an explicitly allowlisted callback scheme; callbacks return only status metadata.
 - Callback URLs never contain health data, tokens, envelope bodies, upload secrets, or detailed error payloads.
-- Callback output contains only a validated `request_id`, fixed status, and `source=healthlink`; original callback query items and fragments are discarded.
+- Callback output contains only a validated `request_id`, fixed status, and `source=vital-agent-sync`; original callback query items and fragments are discarded.
 
 ## Optional OpenClaw Publishing Gate
 
@@ -189,7 +189,7 @@ Before publishing:
 - Confirm install instructions use the intended package source and hosted relay URL.
 - Confirm `vitalmcp --version` reports `0.4.0` after installation from npm.
 - Confirm the skill tells the agent to use MCP tools for health claims.
-- Confirm the skill does not ask the user to paste `~/.healthlink/secrets` or raw SQLite contents.
+- Confirm the skill does not ask the user to paste `~/.vital-agent-sync/secrets` or raw SQLite contents.
 - Confirm the skill never transcribes onboarding QR/deep-link/text credentials into Agent messages, logs, memory, or tool arguments.
 - Re-run `clawhub skill publish /tmp/vitalmcp-openclaw-skill --slug vitalmcp-personal-context --name "Vital Agent Sync Personal Context" --version 0.4.0 --changelog "Vital Agent Sync E2EE relay release" --dry-run` with the release toolchain.
 - Publish to ClawHub, then smoke test `openclaw skills install <owner-or-final-slug>` from the published listing.

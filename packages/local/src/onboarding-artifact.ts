@@ -18,7 +18,7 @@ export async function writeRelayOnboardingArtifact(options: {
   format?: "qr" | "deeplink" | "text";
 }): Promise<OnboardingArtifact> {
   const format = options.format ?? "qr";
-  const stateDir = expandHome(options.stateDir ?? join(homedir(), ".healthlink"));
+  const stateDir = expandHome(options.stateDir ?? join(homedir(), ".vital-agent-sync"));
   const path = join(stateDir, "onboarding", "index.html");
   const payload = buildRelayOnboardingPayload(options.config, { mode: options.config.relay_mode });
   const deepLink = buildRelayOnboardingDeepLink(payload);

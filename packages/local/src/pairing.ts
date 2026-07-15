@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import type { HealthLinkDatabase } from "./database.js";
+import type { VitalAgentDatabase } from "./database.js";
 import type { SourcePlatform } from "./source-devices.js";
 import type { TransportProviderId } from "./transports.js";
 
@@ -7,7 +7,7 @@ export const defaultScopes = [
   "health.daily_summary.write"
 ] as const;
 
-export type HealthLinkScope = typeof defaultScopes[number];
+export type VitalAgentScope = typeof defaultScopes[number];
 
 export type PairingSession = {
   pairing_code: string;
@@ -50,7 +50,7 @@ export type ConfirmPairingResult = {
 
 export class PairingStore {
   constructor(
-    private readonly database: HealthLinkDatabase,
+    private readonly database: VitalAgentDatabase,
     private readonly directPublicKey?: string
   ) {}
 
@@ -171,7 +171,7 @@ export class PairingStore {
       }
     }
 
-    const deviceToken = `hl_dev_${randomBytes(32).toString("base64url")}`;
+    const deviceToken = `va_dev_${randomBytes(32).toString("base64url")}`;
     const consumedAt = new Date();
     const device: PairedDevice = {
       device_id: `dev_${randomUUID().replaceAll("-", "")}`,

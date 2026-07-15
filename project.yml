@@ -35,7 +35,6 @@ targets:
           - CFBundleURLName: com.vitalmcp.ios
             CFBundleURLSchemes:
               - vitalmcp
-              - healthlink
         UILaunchScreen: {}
         UIBackgroundModes:
           - fetch

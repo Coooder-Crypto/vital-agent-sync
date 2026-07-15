@@ -30,7 +30,6 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>vitalmcp</string>
-				<string>healthlink</string>
 			</array>
 		</dict>
 	</array>

@@ -43,7 +43,7 @@ struct VitalAgentIOSRelayCryptoFixture {
             sequence: 1_750_000_000_001
         )
         guard let callback = VitalAgentCallbackPolicy.safeCallbackURL(
-            rawCallbackURL: "openclaw://healthlink/callback?token=must-not-survive#secret-fragment",
+            rawCallbackURL: "openclaw://vital-agent-sync/callback?token=must-not-survive#secret-fragment",
             requestID: "req_123.valid",
             status: "ok"
         ),

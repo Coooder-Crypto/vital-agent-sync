@@ -3,7 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 import { ensureDefaultMcpAgentClient, recordAgentRead } from "./agent-audit.js";
-import { openHealthLinkDatabase } from "./database.js";
+import { openVitalAgentDatabase } from "./database.js";
 import { listDevices, revokeDevice } from "./devices.js";
 import { listSourceDevices, revokeSourceDevice } from "./source-devices.js";
 import {
@@ -25,7 +25,7 @@ const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional();
 const daysSchema = z.number().int().min(1).max(90).optional();
 
 export async function startMcpServer(options: McpServerOptions = {}): Promise<void> {
-  const database = openHealthLinkDatabase({ path: options.databasePath });
+  const database = openVitalAgentDatabase({ path: options.databasePath });
   const agentClient = ensureDefaultMcpAgentClient(database);
   const server = new McpServer({
     name: "vitalmcp",
@@ -33,12 +33,12 @@ export async function startMcpServer(options: McpServerOptions = {}): Promise<vo
   });
 
   server.registerTool(
-    "healthlink_status",
+    "vital_agent_status",
     {
       title: "Vital Agent Sync Status",
       description: "Check whether Vital Agent Sync is connected and fresh. Use when the user asks if Vital Agent Sync is working, whether iPhone data has synced, how many devices are paired, or when the last sync happened."
     },
-    async () => auditedJsonResult(database, agentClient.id, "healthlink_status", getAgentHealthStatus(database))
+    async () => auditedJsonResult(database, agentClient.id, "vital_agent_status", getAgentHealthStatus(database))
   );
 
   server.registerTool(
@@ -224,7 +224,7 @@ function jsonResult(value: unknown) {
   };
 }
 
-function auditedJsonResult(database: ReturnType<typeof openHealthLinkDatabase>, agentClientId: string, toolName: string, value: unknown) {
+function auditedJsonResult(database: ReturnType<typeof openVitalAgentDatabase>, agentClientId: string, toolName: string, value: unknown) {
   recordAgentRead(database, {
     agentClientId,
     toolName

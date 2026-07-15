@@ -168,7 +168,7 @@ const bootstrapStateSchema = z.object({
 });
 
 const sensitiveKeyPattern = /(?:private|secret|token|credential|authorization|ciphertext|envelope|payload|pairing_(?:code|url)|raw|sqlite_rows?)/i;
-const sensitiveValuePattern = /-----BEGIN [^-]*PRIVATE KEY-----|healthlink-e2ee-v1:|healthlink:\/\/onboard\?payload=|(?:vitalmcp|healthlink):\/\/pair\?|\b[A-Za-z0-9_-]{43}\b/i;
+const sensitiveValuePattern = /-----BEGIN [^-]*PRIVATE KEY-----|vital-agent-e2ee-v1:|vitalmcp:\/\/onboard\?payload=|vitalmcp:\/\/pair\?|\b[A-Za-z0-9_-]{43}\b/i;
 
 export function buildBootstrapPlan(config: BootstrapConfig): BootstrapPlanItem[] {
   const agentLabel = config.agent_id === "generic"
@@ -229,7 +229,7 @@ export function createBootstrapState(config: BootstrapConfig, now = new Date()):
 
 export function getBootstrapStatePath(options: { stateDir?: string; homeDir?: string } = {}): string {
   const home = options.homeDir ?? homedir();
-  const stateDir = expandHome(options.stateDir ?? join(home, ".healthlink"), home);
+  const stateDir = expandHome(options.stateDir ?? join(home, ".vital-agent-sync"), home);
   return join(stateDir, "setup", "state-v1.json");
 }
 
@@ -368,7 +368,7 @@ export function safeErrorMessage(error: unknown): string {
 
 export function classifyBootstrapError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
-  if (/another healthlink setup/i.test(message)) return "setup_locked";
+  if (/another vital-agent-sync setup/i.test(message)) return "setup_locked";
   if (/consent|--yes/i.test(message)) return "consent_required";
   if (/relay.*url|https/i.test(message)) return "relay_url_invalid";
   if (/service.*ready|not reachable|connection/i.test(message)) return "service_unreachable";

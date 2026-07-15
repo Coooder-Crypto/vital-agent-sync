@@ -23,15 +23,15 @@ Out of scope for this document:
 Sensitive assets:
 
 - Health payload plaintext.
-- `~/.healthlink/healthlink.sqlite`.
-- `~/.healthlink/secrets/*`.
+- `~/.vital-agent-sync/vital-agent.sqlite`.
+- `~/.vital-agent-sync/secrets/*`.
 - Relay onboarding payloads that include `upload_auth_secret`, `relay_access_token`, and optional `relay_api_token`.
 - Generated health reports and exported summaries.
 - Onboarding payloads before the user verifies fingerprint and relay URL.
 
 Less sensitive but still private:
 
-- `~/.healthlink/config.json`.
+- `~/.vital-agent-sync/config.json`.
 - Relay user IDs, source device IDs, envelope IDs, sequence numbers, timestamps, and envelope sizes.
 - Relay access-token hashes and device revocation metadata.
 - Agent audit and feedback logs.
@@ -122,7 +122,7 @@ Not yet implemented:
 - [x] Bad signatures, tampered ciphertext, stale timestamps, duplicate IDs, wrong devices, and non-increasing sequences fail tests.
 - [x] Malformed identifiers, fractional sequences, timestamps, key material, nonce, tag, ciphertext, and signatures are rejected before relay queue insertion.
 - [x] `vitalmcp print-onboarding` does not print private keys.
-- [x] Skill instructions forbid printing or copying `~/.healthlink/secrets`.
+- [x] Skill instructions forbid printing or copying `~/.vital-agent-sync/secrets`.
 - [x] Skill instructions classify the complete onboarding value as credentials and require confirmation for lifecycle commands.
 - [x] Cross-tenant list, ack, and purge attempts fail without modifying another tenant's queue in tests.
 - [x] Unlink, rotate, and reset replace or revoke credentials and purge superseded envelopes in tests.

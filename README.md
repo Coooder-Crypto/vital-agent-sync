@@ -2,7 +2,7 @@
 
 Vital Agent Sync is a private iOS data gateway for agent systems. The MVP reads user-authorized Apple Health summaries, uploads compact daily context to the user's Agent-side receiver, stores it locally, and exposes it to agents through MCP tools.
 
-The pre-release product is branded Vital Agent Sync, including the `VitalAgentSync` Xcode project/module and the `vitalmcp` npm package and CLI. Protocol and persisted identifiers such as `healthlink-e2ee-v1`, `healthlink://`, and `~/.healthlink` remain unchanged until the dedicated runtime identifier migration. See [docs/brand-identity.md](docs/brand-identity.md).
+The pre-release product is branded Vital Agent Sync. The iOS project/module is `VitalAgentSync`, the npm package and CLI are `vitalmcp`, runtime state lives under `~/.vital-agent-sync`, and the app accepts the technical `vitalmcp://` deep-link scheme. See [docs/brand-identity.md](docs/brand-identity.md).
 
 It is intentionally not an agent. It is a user-controlled data connector.
 
@@ -82,7 +82,7 @@ MCP development command:
 
 ```bash
 npm run build:local
-node packages/local/dist/cli.js mcp --db ~/.healthlink/healthlink.sqlite
+node packages/local/dist/cli.js mcp --db ~/.vital-agent-sync/vital-agent.sqlite
 ```
 
 Current portable CLI fallback:
@@ -96,7 +96,7 @@ Supported Agents can use the Skill-first flow instead: the generated Vital Agent
 Portable no-sudo installer fallback:
 
 ```bash
-curl -fsSL https://<healthlink-domain>/install.sh | sh
+curl -fsSL https://<vital-agent-sync-domain>/install.sh | sh
 vitalmcp setup
 ```
 
@@ -220,7 +220,7 @@ HealthKit requires a real iPhone for meaningful testing. In Xcode:
 Normal use after setup:
 
 ```text
-iOS syncs latest summaries -> ~/.healthlink/healthlink.sqlite
+iOS syncs latest summaries -> ~/.vital-agent-sync/vital-agent.sqlite
 Hermes calls Vital Agent Sync MCP -> reads the latest summaries
 ```
 
@@ -243,7 +243,7 @@ Product installs should keep the generic MCP path available for non-Hermes agent
 
 ## Sync Contract
 
-Direct LAN and Tailscale pairing/sync use the receiver-pinned `vitalmcp-direct-v1` application envelope. The device token and canonical payload below are ciphertext inside `POST /v1/direct`; they are not an HTTP bearer header or plaintext JSON body. Hosted/self-hosted relay requests continue using their relay authorization and E2EE envelope. See [docs/direct-lan-security.md](docs/direct-lan-security.md) and [docs/server-contract.md](docs/server-contract.md).
+Direct LAN and Tailscale pairing/sync use the receiver-pinned `vital-agent-direct-v1` application envelope. The device token and canonical payload below are ciphertext inside `POST /v1/direct`; they are not an HTTP bearer header or plaintext JSON body. Hosted/self-hosted relay requests continue using their relay authorization and E2EE envelope. See [docs/direct-lan-security.md](docs/direct-lan-security.md) and [docs/server-contract.md](docs/server-contract.md).
 
 Canonical plaintext payload after local receiver decryption:
 

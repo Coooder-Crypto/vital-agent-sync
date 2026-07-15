@@ -2,7 +2,7 @@
 set -eu
 
 PACKAGE_NAME="vitalmcp"
-DEFAULT_VERSION="0.4.1"
+DEFAULT_VERSION="0.5.0"
 VERSION="${VITALMCP_VERSION:-$DEFAULT_VERSION}"
 PREFIX="${VITALMCP_INSTALL_PREFIX:-$HOME/.vitalmcp/npm-global}"
 BIN_DIR="$PREFIX/bin"
@@ -136,7 +136,7 @@ if [ "$ACTION" = "uninstall" ]; then
     remove_profile_block "$profile"
   fi
   printf '%s\n' "Removed the Vital Agent Sync CLI and installer-owned PATH entry."
-  printf '%s\n' "Local data under $HOME/.healthlink was preserved."
+  printf '%s\n' "Local data under $HOME/.vital-agent-sync was preserved."
   exit 0
 fi
 

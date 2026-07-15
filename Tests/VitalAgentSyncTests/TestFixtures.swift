@@ -59,7 +59,7 @@ enum TestFixtures {
 
     static func relayOnboarding() -> RelayOnboardingPayload {
         RelayOnboardingPayload(
-            protocolVersion: "healthlink-e2ee-v1",
+            protocolVersion: "vital-agent-e2ee-v1",
             mode: "hosted_relay",
             relay_url: "https://relay.example.com",
             user_id: "usr_test",

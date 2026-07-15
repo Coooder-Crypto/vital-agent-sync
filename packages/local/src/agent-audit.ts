@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { HealthLinkDatabase } from "./database.js";
+import type { VitalAgentDatabase } from "./database.js";
 
 export type AgentRuntime = "generic_mcp" | "hermes" | "openclaw" | "workbuddy";
 
@@ -22,7 +22,7 @@ export type AuditLogEntry = {
 
 export const DEFAULT_MCP_AGENT_CLIENT_ID = "agent_local_mcp";
 
-export function ensureDefaultMcpAgentClient(database: HealthLinkDatabase): AgentClient {
+export function ensureDefaultMcpAgentClient(database: VitalAgentDatabase): AgentClient {
   const now = new Date().toISOString();
   database.sqlite.prepare(`
     insert into agent_clients (
@@ -55,7 +55,7 @@ export function ensureDefaultMcpAgentClient(database: HealthLinkDatabase): Agent
   return getAgentClient(database, DEFAULT_MCP_AGENT_CLIENT_ID)!;
 }
 
-export function recordAgentRead(database: HealthLinkDatabase, input: {
+export function recordAgentRead(database: VitalAgentDatabase, input: {
   agentClientId?: string;
   toolName: string;
   scopesUsed?: string[];
@@ -98,7 +98,7 @@ export function recordAgentRead(database: HealthLinkDatabase, input: {
   return entry;
 }
 
-export function listAgentAuditLog(database: HealthLinkDatabase, limit = 50): AuditLogEntry[] {
+export function listAgentAuditLog(database: VitalAgentDatabase, limit = 50): AuditLogEntry[] {
   const rows = database.sqlite.prepare(`
     select
       id,
@@ -126,7 +126,7 @@ export function listAgentAuditLog(database: HealthLinkDatabase, limit = 50): Aud
   }));
 }
 
-function getAgentClient(database: HealthLinkDatabase, id: string): AgentClient | undefined {
+function getAgentClient(database: VitalAgentDatabase, id: string): AgentClient | undefined {
   const row = database.sqlite.prepare(`
     select
       id,

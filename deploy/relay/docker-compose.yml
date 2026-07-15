@@ -1,23 +1,23 @@
 services:
-  healthlink-relay:
+  vital-agent-sync-relay:
     build:
       context: ../..
       dockerfile: deploy/relay/Dockerfile
-    image: healthlink-relay:dev
+    image: vital-agent-sync-relay:dev
     restart: unless-stopped
     ports:
       - "8790:8790"
     volumes:
-      - ./healthlink-relay-data:/data
+      - ./vital-agent-sync-relay-data:/data
     environment:
-      HEALTHLINK_RELAY_HOST: 0.0.0.0
-      HEALTHLINK_RELAY_PORT: "8790"
-      HEALTHLINK_RELAY_DB: /data/relay.sqlite
-      HEALTHLINK_RELAY_RETENTION_DAYS: "30"
-      HEALTHLINK_RELAY_MAX_ENVELOPE_BYTES: "524288"
-      HEALTHLINK_RELAY_MAX_UPLOADS_PER_MINUTE: "120"
-      HEALTHLINK_RELAY_MAX_QUEUED_ENVELOPES_PER_USER: "1000"
-      HEALTHLINK_RELAY_MAX_DEVICES_PER_USER: "5"
-      HEALTHLINK_RELAY_TRUST_PROXY: "false"
-      HEALTHLINK_RELAY_API_TOKEN: ""
-      HEALTHLINK_RELAY_METRICS_TOKEN: ""
+      VITALMCP_RELAY_HOST: 0.0.0.0
+      VITALMCP_RELAY_PORT: "8790"
+      VITALMCP_RELAY_DB: /data/relay.sqlite
+      VITALMCP_RELAY_RETENTION_DAYS: "30"
+      VITALMCP_RELAY_MAX_ENVELOPE_BYTES: "524288"
+      VITALMCP_RELAY_MAX_UPLOADS_PER_MINUTE: "120"
+      VITALMCP_RELAY_MAX_QUEUED_ENVELOPES_PER_USER: "1000"
+      VITALMCP_RELAY_MAX_DEVICES_PER_USER: "5"
+      VITALMCP_RELAY_TRUST_PROXY: "false"
+      VITALMCP_RELAY_API_TOKEN: ""
+      VITALMCP_RELAY_METRICS_TOKEN: ""

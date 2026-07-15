@@ -1,7 +1,7 @@
 import Fastify from "fastify";
 import QRCode from "qrcode";
 import { z } from "zod";
-import { openHealthLinkDatabase } from "./database.js";
+import { openVitalAgentDatabase } from "./database.js";
 import { listDevices, revokeDevice } from "./devices.js";
 import {
   DirectTransportError,
@@ -46,7 +46,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
   await transport.start?.();
   const advertisedUrl = await transport.getAdvertisedUrl();
   const agentName = options.agentName ?? "Local Agent";
-  const database = openHealthLinkDatabase({
+  const database = openVitalAgentDatabase({
     path: options.databasePath
   });
   const directTransportKey = loadOrCreateDirectTransportKey(database.path);
@@ -196,7 +196,7 @@ const directDeviceRevokeSchema = z.object({
 });
 
 export function handleDirectRequest(
-  database: ReturnType<typeof openHealthLinkDatabase>,
+  database: ReturnType<typeof openVitalAgentDatabase>,
   pairings: PairingStore,
   purpose: ReturnType<typeof decryptDirectRequest>["envelope"]["purpose"],
   plaintext: unknown
@@ -231,7 +231,7 @@ function plaintextDirectTransportDisabled(_request: unknown, reply: {
 }): unknown {
   return reply.code(426).send(errorResponse(
     "encrypted_direct_transport_required",
-    "Direct pairing and health sync require the encrypted vitalmcp-direct-v1 transport."
+    "Direct pairing and health sync require the encrypted vital-agent-direct-v1 transport."
   ));
 }
 

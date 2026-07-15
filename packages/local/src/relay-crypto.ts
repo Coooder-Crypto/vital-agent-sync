@@ -13,14 +13,14 @@ import {
   timingSafeEqual,
   verify
 } from "node:crypto";
-import { HEALTHLINK_E2EE_PROTOCOL, readPrivateKey, type RelayRuntimeConfig } from "./relay-runtime.js";
+import { VITALMCP_E2EE_PROTOCOL, readPrivateKey, type RelayRuntimeConfig } from "./relay-runtime.js";
 import type { HealthSyncPayload } from "./schemas.js";
 
 export const DEFAULT_MAX_ENVELOPE_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 export const DEFAULT_MAX_FUTURE_SKEW_MS = 10 * 60 * 1000;
 
-export type HealthLinkEncryptedEnvelope = {
-  protocol: typeof HEALTHLINK_E2EE_PROTOCOL;
+export type VitalAgentEncryptedEnvelope = {
+  protocol: typeof VITALMCP_E2EE_PROTOCOL;
   user_id: string;
   device_id: string;
   envelope_id: string;
@@ -53,7 +53,7 @@ export function encryptHealthSyncPayload(input: {
   payload: HealthSyncPayload;
   sequence?: number;
   createdAt?: string;
-}): HealthLinkEncryptedEnvelope {
+}): VitalAgentEncryptedEnvelope {
   const ephemeral = generateKeyPairSync("x25519");
   const recipientPublicKey = createPublicKey(input.config.encryption_public_key_pem);
   const shared = diffieHellman({
@@ -70,8 +70,8 @@ export function encryptHealthSyncPayload(input: {
   const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
   const tag = cipher.getAuthTag();
 
-  const unsignedEnvelope: HealthLinkEncryptedEnvelope = {
-    protocol: HEALTHLINK_E2EE_PROTOCOL,
+  const unsignedEnvelope: VitalAgentEncryptedEnvelope = {
+    protocol: VITALMCP_E2EE_PROTOCOL,
     user_id: input.config.user_id,
     device_id: input.payload.device_id,
     envelope_id: `env_${randomUUID().replaceAll("-", "")}`,
@@ -101,7 +101,7 @@ export function encryptHealthSyncPayload(input: {
 
 export function decryptHealthSyncEnvelope(input: {
   config: RelayRuntimeConfig;
-  envelope: HealthLinkEncryptedEnvelope;
+  envelope: VitalAgentEncryptedEnvelope;
   validation?: EnvelopeValidationOptions;
 }): unknown {
   verifyEnvelope(input.config, input.envelope, input.validation);
@@ -128,10 +128,10 @@ export function decryptHealthSyncEnvelope(input: {
 
 export function verifyEnvelope(
   config: RelayRuntimeConfig,
-  envelope: HealthLinkEncryptedEnvelope,
+  envelope: VitalAgentEncryptedEnvelope,
   options: EnvelopeValidationOptions = {}
 ): void {
-  if (envelope.protocol !== HEALTHLINK_E2EE_PROTOCOL) {
+  if (envelope.protocol !== VITALMCP_E2EE_PROTOCOL) {
     throw new Error(`Unsupported Vital Agent Sync envelope protocol: ${envelope.protocol}`);
   }
   if (envelope.user_id !== config.user_id) {
@@ -144,7 +144,7 @@ export function verifyEnvelope(
   }
   validateEnvelopeMetadata(config, envelope, options);
   const signature = Buffer.from(envelope.crypto.signature, "base64url");
-  const unsignedEnvelope: HealthLinkEncryptedEnvelope = {
+  const unsignedEnvelope: VitalAgentEncryptedEnvelope = {
     ...envelope,
     crypto: {
       ...envelope.crypto,
@@ -162,7 +162,7 @@ export function verifyEnvelope(
 
 function validateEnvelopeMetadata(
   config: RelayRuntimeConfig,
-  envelope: HealthLinkEncryptedEnvelope,
+  envelope: VitalAgentEncryptedEnvelope,
   options: EnvelopeValidationOptions
 ): void {
   if (options.expectedDeviceId && envelope.device_id !== options.expectedDeviceId) {
@@ -204,7 +204,7 @@ function iterableIncludes(values: Iterable<string>, target: string): boolean {
   return false;
 }
 
-export function isEncryptedEnvelope(value: unknown): value is HealthLinkEncryptedEnvelope {
+export function isEncryptedEnvelope(value: unknown): value is VitalAgentEncryptedEnvelope {
   if (typeof value !== "object" || value === null) {
     return false;
   }
@@ -215,7 +215,7 @@ export function isEncryptedEnvelope(value: unknown): value is HealthLinkEncrypte
     ? isBase64UrlBytes(crypto?.sender_public_key_x25519, 32)
     : isBase64UrlBytes(crypto?.sender_public_key_x25519, 32) || isBoundedPemPublicKey(crypto?.sender_public_key);
   const expectedSignatureBytes = algorithm === "x25519-chacha20poly1305-ed25519" ? 64 : 32;
-  return record.protocol === HEALTHLINK_E2EE_PROTOCOL &&
+  return record.protocol === VITALMCP_E2EE_PROTOCOL &&
     isBoundedIdentifier(record.user_id) &&
     isBoundedIdentifier(record.device_id) &&
     isBoundedIdentifier(record.envelope_id) &&
@@ -236,7 +236,7 @@ export function isEncryptedEnvelope(value: unknown): value is HealthLinkEncrypte
     isBase64UrlBytes(crypto.signature, expectedSignatureBytes);
 }
 
-function signEnvelopeWithUploadSecret(config: RelayRuntimeConfig, unsignedEnvelope: HealthLinkEncryptedEnvelope): string {
+function signEnvelopeWithUploadSecret(config: RelayRuntimeConfig, unsignedEnvelope: VitalAgentEncryptedEnvelope): string {
   return createHmac("sha256", Buffer.from(config.upload_auth_secret, "base64url"))
     .update(Buffer.from(canonicalJson(unsignedEnvelope), "utf8"))
     .digest("base64url");
@@ -244,7 +244,7 @@ function signEnvelopeWithUploadSecret(config: RelayRuntimeConfig, unsignedEnvelo
 
 function verifyLegacyLocalSignature(
   config: RelayRuntimeConfig,
-  unsignedEnvelope: HealthLinkEncryptedEnvelope,
+  unsignedEnvelope: VitalAgentEncryptedEnvelope,
   signature: Buffer
 ): boolean {
   const signingPublicKey = createPublicKey(config.signing_public_key_pem);
@@ -260,7 +260,7 @@ function timingSafeEqualBase64Url(left: string, right: string): boolean {
   return timingSafeEqual(leftBuffer, rightBuffer);
 }
 
-function getSenderPublicKey(envelope: HealthLinkEncryptedEnvelope) {
+function getSenderPublicKey(envelope: VitalAgentEncryptedEnvelope) {
   if (envelope.crypto.sender_public_key_x25519) {
     return createPublicKey({
       key: rawX25519PublicKeyToSpkiDer(Buffer.from(envelope.crypto.sender_public_key_x25519, "base64url")),
@@ -323,18 +323,18 @@ export function canonicalJson(value: unknown): string {
   return JSON.stringify(sortCanonical(value));
 }
 
-function deriveSymmetricKey(sharedSecret: Buffer, algorithm: HealthLinkEncryptedEnvelope["crypto"]["alg"]): Buffer {
+function deriveSymmetricKey(sharedSecret: Buffer, algorithm: VitalAgentEncryptedEnvelope["crypto"]["alg"]): Buffer {
   if (algorithm === "x25519-hkdf-sha256-chacha20poly1305-hmac-sha256") {
     return Buffer.from(hkdfSync(
       "sha256",
       sharedSecret,
       Buffer.alloc(0),
-      Buffer.from("healthlink-e2ee-v1 envelope", "utf8"),
+      Buffer.from("vital-agent-e2ee-v1 envelope", "utf8"),
       32
     ));
   }
   return createHash("sha256")
-    .update("healthlink-e2ee-v1 envelope")
+    .update("vital-agent-e2ee-v1 envelope")
     .update(sharedSecret)
     .digest();
 }

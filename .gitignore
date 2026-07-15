@@ -20,8 +20,8 @@ DerivedData/
 !**/.env.example
 !**/.env.*.example
 
-# HealthLink local runtime
-.healthlink/
+# Vital Agent Sync local runtime
+.vital-agent-sync/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal

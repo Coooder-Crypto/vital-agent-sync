@@ -59,7 +59,7 @@ iOS app
 vitalmcp
   paired source devices
   scoped token hashes
-  ~/.healthlink/healthlink.sqlite
+  ~/.vital-agent-sync/vital-agent.sqlite
 
 Hermes or another agent
   MCP config pointing to vitalmcp mcp
@@ -167,7 +167,7 @@ Vital Agent Sync verifies a tailnet-only Tailscale Serve HTTPS route to the loop
 For agents deployed on a VPS or a user-controlled server.
 
 ```text
-iPhone -> https://agent.example.com/healthlink -> Vital Agent Sync receiver -> storage -> MCP -> Agent
+iPhone -> https://agent.example.com/vital-agent-sync -> Vital Agent Sync receiver -> storage -> MCP -> Agent
 ```
 
 Requirements:
@@ -212,7 +212,7 @@ npx -y vitalmcp setup
 `setup` should:
 
 - Check Node.js version.
-- Create `~/.healthlink/`.
+- Create `~/.vital-agent-sync/`.
 - Initialize SQLite.
 - Auto-detect a supported Agent config such as Hermes or OpenClaw.
 - Back up and write the selected Agent MCP config.
@@ -272,7 +272,7 @@ Reachable from phone:
   http://192.168.31.230:8787
 
 Database:
-  ~/.healthlink/healthlink.sqlite
+  ~/.vital-agent-sync/vital-agent.sqlite
 
 MCP:
   npx -y vitalmcp mcp
@@ -324,13 +324,13 @@ Local development config:
 ```json
 {
   "mcpServers": {
-    "healthlink": {
+    "vital-agent-sync": {
       "command": "node",
       "args": [
         "/Users/coooder/Code/Agent/personal-gateway-ios/packages/local/dist/cli.js",
         "mcp",
         "--db",
-        "/Users/coooder/.healthlink/healthlink.sqlite"
+        "/Users/coooder/.vital-agent-sync/vital-agent.sqlite"
       ]
     }
   }
@@ -342,7 +342,7 @@ Published package config:
 ```json
 {
   "mcpServers": {
-    "healthlink": {
+    "vital-agent-sync": {
       "command": "npx",
       "args": ["-y", "vitalmcp", "mcp"]
     }
@@ -408,7 +408,7 @@ These should remain additive. Non-Hermes agents should still work through generi
 Current implemented tools:
 
 ```text
-healthlink_status
+vital_agent_status
 get_personal_context
 get_daily_health_summary
 get_sleep_trend
