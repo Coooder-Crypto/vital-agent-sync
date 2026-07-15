@@ -4,10 +4,10 @@ This document defines the target installation and onboarding experience for Vita
 
 Related work:
 
-- [GitHub issue #54](https://github.com/Coooder-Crypto/health-link/issues/54) owns the shared installer and bootstrap contract.
-- [GitHub issue #57](https://github.com/Coooder-Crypto/health-link/issues/57) owns optional OpenClaw marketplace publication and smoke testing.
-- [GitHub issue #55](https://github.com/Coooder-Crypto/health-link/issues/55) owns physical-device validation of QR, deep-link, sync, pull, and MCP behavior.
-- [GitHub issue #56](https://github.com/Coooder-Crypto/health-link/issues/56) owns the real Hosted Relay production deployment.
+- [GitHub issue #54](https://github.com/Coooder-Crypto/vital-agent-sync/issues/54) owns the shared installer and bootstrap contract.
+- [GitHub issue #57](https://github.com/Coooder-Crypto/vital-agent-sync/issues/57) owns optional OpenClaw marketplace publication and smoke testing.
+- [GitHub issue #55](https://github.com/Coooder-Crypto/vital-agent-sync/issues/55) owns physical-device validation of QR, deep-link, sync, pull, and MCP behavior.
+- [GitHub issue #56](https://github.com/Coooder-Crypto/vital-agent-sync/issues/56) owns the real Hosted Relay production deployment.
 
 ## Product Decision
 
@@ -248,7 +248,7 @@ V1 rules:
 
 Target follow-up:
 
-- introduce a short-lived, single-use onboarding ticket before making in-chat QR/deep-link handoff the universal default ([issue #70](https://github.com/Coooder-Crypto/health-link/issues/70))
+- introduce a short-lived, single-use onboarding ticket before making in-chat QR/deep-link handoff the universal default ([issue #70](https://github.com/Coooder-Crypto/vital-agent-sync/issues/70))
 - bind the ticket to the intended user/source identity
 - exchange it for device credentials once, then invalidate it
 - keep long-lived relay and upload credentials out of conversation history
