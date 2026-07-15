@@ -4,14 +4,14 @@
   "description": "Local runtime for Vital Agent Sync: private Apple Health pairing, sync, storage, and MCP tools.",
   "license": "MIT",
   "type": "module",
-  "homepage": "https://github.com/Coooder-Crypto/health-link#readme",
+  "homepage": "https://github.com/Coooder-Crypto/vital-agent-sync#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Coooder-Crypto/health-link.git",
+    "url": "git+https://github.com/Coooder-Crypto/vital-agent-sync.git",
     "directory": "packages/local"
   },
   "bugs": {
-    "url": "https://github.com/Coooder-Crypto/health-link/issues"
+    "url": "https://github.com/Coooder-Crypto/vital-agent-sync/issues"
   },
   "keywords": [
     "vitalmcp",

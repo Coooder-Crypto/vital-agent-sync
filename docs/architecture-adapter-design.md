@@ -264,7 +264,7 @@ Implemented adapter behavior:
 
 The adapter does not write model-provider configuration. See the [official WorkBuddy MCP guide](https://www.codebuddy.cn/docs/workbuddy/From-Beginner-to-Expert-Guide/Function-Description/MCP-Guide).
 
-The WorkBuddy Skill package is implemented under [issue #90](https://github.com/Coooder-Crypto/health-link/issues/90) and committed at `skills/vital-agent-sync` for direct GitHub import into SkillHub. Skill installation remains WorkBuddy-owned; the Skill invokes the pinned npm runtime, requests explicit consent for persistent changes, configures the documented user-level MCP file, and opens the credential-bearing QR only in the user's local browser.
+The WorkBuddy Skill package is implemented under [issue #90](https://github.com/Coooder-Crypto/vital-agent-sync/issues/90) and committed at `skills/vital-agent-sync` for direct GitHub import into SkillHub. Skill installation remains WorkBuddy-owned; the Skill invokes the pinned npm runtime, requests explicit consent for persistent changes, configures the documented user-level MCP file, and opens the credential-bearing QR only in the user's local browser.
 
 ## Non-Hermes Skill Import
 

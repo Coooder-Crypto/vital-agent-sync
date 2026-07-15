@@ -31,7 +31,7 @@ import appIcon from "../../../Resources/Assets.xcassets/AppIcon.appiconset/AppIc
 import { usePageSnap, type SnapSection } from "./use-page-snap";
 
 const installCommand = "npx -y vitalmcp setup";
-const githubUrl = "https://github.com/Coooder-Crypto/health-link";
+const githubUrl = "https://github.com/Coooder-Crypto/vital-agent-sync";
 
 const sections: SnapSection[] = [
   { id: "overview", title: "Overview", theme: "light" },
