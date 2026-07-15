@@ -20,7 +20,7 @@ final class GatewaySettingsTests: XCTestCase {
         keychain = nil
     }
 
-    func testVitalAgentSyncBundleMetadataAndCompatibilitySchemes() throws {
+    func testVitalAgentSyncBundleMetadataAndDeepLinkScheme() throws {
         XCTAssertEqual(Bundle.main.bundleIdentifier, "com.vitalmcp.ios")
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String, "Vital Agent")
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String, "Vital Agent")
@@ -33,8 +33,7 @@ final class GatewaySettingsTests: XCTestCase {
 
         let urlTypes = try XCTUnwrap(Bundle.main.object(forInfoDictionaryKey: "CFBundleURLTypes") as? [[String: Any]])
         let schemes = Set(urlTypes.flatMap { $0["CFBundleURLSchemes"] as? [String] ?? [] })
-        XCTAssertTrue(schemes.contains(AppDeepLinkScheme.primary))
-        XCTAssertTrue(schemes.contains(AppDeepLinkScheme.legacy))
+        XCTAssertEqual(schemes, [AppDeepLinkScheme.primary])
     }
 
     @MainActor

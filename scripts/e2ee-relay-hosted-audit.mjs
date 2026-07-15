@@ -17,14 +17,14 @@ if (!args.has("--yes")) {
   );
 }
 
-const relayUrl = requireHostedRelayUrl(process.env.HEALTHLINK_HOSTED_RELAY_URL);
-const relayApiToken = requireSecret("HEALTHLINK_RELAY_API_TOKEN");
-const metricsToken = requireSecret("HEALTHLINK_RELAY_METRICS_TOKEN");
+const relayUrl = requireHostedRelayUrl(process.env.VITALMCP_HOSTED_RELAY_URL);
+const relayApiToken = requireSecret("VITALMCP_RELAY_API_TOKEN");
+const metricsToken = requireSecret("VITALMCP_RELAY_METRICS_TOKEN");
 const auditEnv = {
   ...process.env,
-  HEALTHLINK_HOSTED_RELAY_URL: relayUrl,
-  HEALTHLINK_RELAY_API_TOKEN: relayApiToken,
-  HEALTHLINK_RELAY_METRICS_TOKEN: metricsToken
+  VITALMCP_HOSTED_RELAY_URL: relayUrl,
+  VITALMCP_RELAY_API_TOKEN: relayApiToken,
+  VITALMCP_RELAY_METRICS_TOKEN: metricsToken
 };
 
 run("vitalmcp build", "npm", [
@@ -73,20 +73,20 @@ function runAudit(mode, extraArgs) {
 function requireHostedRelayUrl(value) {
   const trimmed = value?.trim();
   if (!trimmed) {
-    throw new Error("HEALTHLINK_HOSTED_RELAY_URL is required for the hosted relay audit.");
+    throw new Error("VITALMCP_HOSTED_RELAY_URL is required for the hosted relay audit.");
   }
 
   let url;
   try {
     url = new URL(trimmed);
   } catch {
-    throw new Error("HEALTHLINK_HOSTED_RELAY_URL must be a valid absolute HTTPS URL.");
+    throw new Error("VITALMCP_HOSTED_RELAY_URL must be a valid absolute HTTPS URL.");
   }
   if (url.protocol !== "https:" || !url.hostname) {
-    throw new Error("HEALTHLINK_HOSTED_RELAY_URL must use HTTPS and include a hostname.");
+    throw new Error("VITALMCP_HOSTED_RELAY_URL must use HTTPS and include a hostname.");
   }
   if (url.username || url.password || url.search || url.hash) {
-    throw new Error("HEALTHLINK_HOSTED_RELAY_URL must not contain credentials, query parameters, or a fragment.");
+    throw new Error("VITALMCP_HOSTED_RELAY_URL must not contain credentials, query parameters, or a fragment.");
   }
   return url.toString().replace(/\/$/, "");
 }

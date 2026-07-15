@@ -11,10 +11,10 @@ import {
 } from "node:crypto";
 import { chmodSync, readFileSync, writeFileSync } from "node:fs";
 import type { KeyObject } from "node:crypto";
-import type { HealthLinkDatabase } from "./database.js";
+import type { VitalAgentDatabase } from "./database.js";
 import { canonicalJson } from "./relay-crypto.js";
 
-export const DIRECT_TRANSPORT_PROTOCOL = "vitalmcp-direct-v1" as const;
+export const DIRECT_TRANSPORT_PROTOCOL = "vital-agent-direct-v1" as const;
 export const DIRECT_TRANSPORT_ALGORITHM = "x25519-hkdf-sha256-chacha20poly1305" as const;
 export const DIRECT_TRANSPORT_MAX_AGE_MS = 5 * 60 * 1000;
 export const DIRECT_TRANSPORT_MAX_FUTURE_SKEW_MS = 60 * 1000;
@@ -174,7 +174,7 @@ export function encryptDirectResponse(
 }
 
 export function claimDirectRequest(
-  database: HealthLinkDatabase,
+  database: VitalAgentDatabase,
   requestId: string,
   createdAt: string,
   now = new Date()

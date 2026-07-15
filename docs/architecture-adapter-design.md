@@ -237,8 +237,8 @@ The implemented config adapter remains conservative about writes: it only auto-w
 Implemented adapter behavior:
 
 - `detect()` checks `~/.openclaw/openclaw.json`, or a custom `--openclaw-config` path.
-- `formatMcpConfig()` returns OpenClaw-style `mcp.servers.healthlink` JSON.
-- `installMcp()` backs up and writes `mcp.servers.healthlink` when the existing config is valid JSON.
+- `formatMcpConfig()` returns OpenClaw-style `mcp.servers.vital-agent-sync` JSON.
+- `installMcp()` backs up and writes `mcp.servers.vital-agent-sync` when the existing config is valid JSON.
 - `reloadHint()` tells the user to restart OpenClaw if tools do not appear.
 
 Open questions to close before expanding implementation:
@@ -257,8 +257,8 @@ Tencent WorkBuddy documents native user-level MCP configuration at `~/.workbuddy
 Implemented adapter behavior:
 
 - `detect()` checks an explicit `--workbuddy-config` path, `<workbuddy-project>/.workbuddy/mcp.json`, or the default user-level `~/.workbuddy/mcp.json`.
-- `formatMcpConfig()` returns standard `mcpServers.healthlink` JSON.
-- `installMcp()` rejects invalid JSON, creates a timestamped backup, preserves unrelated keys and MCP servers, and merges `mcpServers.healthlink` idempotently.
+- `formatMcpConfig()` returns standard `mcpServers.vital-agent-sync` JSON.
+- `installMcp()` rejects invalid JSON, creates a timestamped backup, preserves unrelated keys and MCP servers, and merges `mcpServers.vital-agent-sync` idempotently.
 - `reloadHint()` tells the user to confirm the MCP is green and restart WorkBuddy only when tools do not appear.
 - Auto-detection treats an explicit, project-level, or documented user-level WorkBuddy config as stronger evidence than Hermes or OpenClaw config.
 
@@ -303,7 +303,7 @@ They must not change:
 
 ### Tailscale Serve HTTPS
 
-Current support requires a MagicDNS certificate name through `--tailscale-name`, `HEALTHLINK_TAILSCALE_NAME`, or best-effort `tailscale status --json` detection. The provider:
+Current support requires a MagicDNS certificate name through `--tailscale-name`, `VITALMCP_TAILSCALE_NAME`, or best-effort `tailscale status --json` detection. The provider:
 
 - configures `tailscale serve --bg --yes --https=443 http://127.0.0.1:<receiver-port>` after setup consent
 - defaults the receiver listener to loopback when the user did not explicitly pass `--host`

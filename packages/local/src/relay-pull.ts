@@ -1,9 +1,9 @@
 import { randomBytes } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { openHealthLinkDatabase, type HealthLinkDatabase } from "./database.js";
+import { openVitalAgentDatabase, type VitalAgentDatabase } from "./database.js";
 import { ingestValidatedHealthSync, type AuthenticatedDevice } from "./health-ingest.js";
-import { decryptHealthSyncEnvelope, isEncryptedEnvelope, type HealthLinkEncryptedEnvelope } from "./relay-crypto.js";
+import { decryptHealthSyncEnvelope, isEncryptedEnvelope, type VitalAgentEncryptedEnvelope } from "./relay-crypto.js";
 import {
   getDefaultStateDir,
   getRelayCursorPath,
@@ -49,9 +49,9 @@ export async function pullRelayEnvelopes(options: RelayPullOptions = {}): Promis
   const config = readRelayRuntimeConfig({ stateDir });
   const relayUrl = normalizeRelayUrlForMode(options.relayUrl ?? config.relay_url, config.relay_mode);
   const relayAccessToken = normalizeOptionalToken(options.relayAccessToken ?? config.relay_access_token);
-  const relayApiToken = normalizeOptionalToken(options.relayApiToken ?? config.relay_api_token ?? process.env.HEALTHLINK_RELAY_API_TOKEN);
+  const relayApiToken = normalizeOptionalToken(options.relayApiToken ?? config.relay_api_token ?? process.env.VITALMCP_RELAY_API_TOKEN);
   const cursor = readRelayCursor(stateDir);
-  const database = openHealthLinkDatabase({ path: options.databasePath });
+  const database = openVitalAgentDatabase({ path: options.databasePath });
   try {
     ensureRelaySourceDevice(database, config);
     let fetched = 0;
@@ -127,7 +127,7 @@ export async function pullRelayEnvelopes(options: RelayPullOptions = {}): Promis
   }
 }
 
-export function ensureRelaySourceDevice(database: HealthLinkDatabase, config: RelayRuntimeConfig): void {
+export function ensureRelaySourceDevice(database: VitalAgentDatabase, config: RelayRuntimeConfig): void {
   const existing = database.sqlite.prepare(`
     select id
     from devices
@@ -177,7 +177,7 @@ async function fetchRelayEnvelopes(
   after: number,
   relayAccessToken: string | undefined,
   relayApiToken: string | undefined
-): Promise<HealthLinkEncryptedEnvelope[]> {
+): Promise<VitalAgentEncryptedEnvelope[]> {
   const url = new URL(`${relayUrl}/v1/envelopes`);
   url.searchParams.set("user_id", userId);
   url.searchParams.set("after", String(after));
@@ -192,7 +192,7 @@ async function fetchRelayEnvelopes(
   if (!isRelayListResponse(body)) {
     throw new Error("Relay returned an invalid envelope list response.");
   }
-  const envelopes: HealthLinkEncryptedEnvelope[] = [];
+  const envelopes: VitalAgentEncryptedEnvelope[] = [];
   for (const envelope of body.envelopes) {
     if (!isEncryptedEnvelope(envelope)) {
       throw new Error("Relay returned an invalid encrypted envelope.");
@@ -274,7 +274,7 @@ function relayDataHeaders(accessToken: string | undefined, apiToken: string | un
     headers.authorization = `Bearer ${normalizedAccessToken}`;
   }
   if (normalizedApiToken) {
-    headers["x-healthlink-relay-api-key"] = normalizedApiToken;
+    headers["x-vital-agent-relay-api-key"] = normalizedApiToken;
   }
   return headers;
 }

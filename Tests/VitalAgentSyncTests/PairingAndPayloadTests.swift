@@ -5,24 +5,22 @@ import CryptoKit
 final class PairingAndPayloadTests: XCTestCase {
     private let directPublicKey = Data(repeating: 7, count: 32).base64URLEncodedString()
 
-    func testPairingLinkAcceptsVitalAgentSyncAndLegacySchemesWithPinnedTransportKey() throws {
-        for scheme in [AppDeepLinkScheme.primary, AppDeepLinkScheme.legacy] {
-            let link = try PairingLink(
-                rawValue: "\(scheme)://pair?server=http://192.168.1.25:8787&code=ab12-cd34&key=\(directPublicKey)"
-            )
+    func testPairingLinkAcceptsVitalMcpSchemeWithPinnedTransportKey() throws {
+        let link = try PairingLink(
+            rawValue: "\(AppDeepLinkScheme.primary)://pair?server=http://192.168.1.25:8787&code=ab12-cd34&key=\(directPublicKey)"
+        )
 
-            XCTAssertEqual(link.serverURL.absoluteString, "http://192.168.1.25:8787")
-            XCTAssertEqual(link.pairingCode, "AB12-CD34")
-            XCTAssertEqual(link.directTransportPublicKey, directPublicKey)
-        }
+        XCTAssertEqual(link.serverURL.absoluteString, "http://192.168.1.25:8787")
+        XCTAssertEqual(link.pairingCode, "AB12-CD34")
+        XCTAssertEqual(link.directTransportPublicKey, directPublicKey)
     }
 
     func testPairingLinkRejectsInvalidSchemeAndMissingCode() {
         XCTAssertThrowsError(try PairingLink(rawValue: "https://pair?server=http://127.0.0.1:8787&code=ABCD"))
-        XCTAssertThrowsError(try PairingLink(rawValue: "healthlink://pair?server=http://127.0.0.1:8787"))
-        XCTAssertThrowsError(try PairingLink(rawValue: "healthlink://pair?server=file:///tmp/health&code=ABCD"))
-        XCTAssertThrowsError(try PairingLink(rawValue: "healthlink://pair?server=http://127.0.0.1:8787&code=ABCD"))
-        XCTAssertThrowsError(try PairingLink(rawValue: "healthlink://pair?server=http://127.0.0.1:8787&code=ABCD&key=short"))
+        XCTAssertThrowsError(try PairingLink(rawValue: "vitalmcp://pair?server=http://127.0.0.1:8787"))
+        XCTAssertThrowsError(try PairingLink(rawValue: "vitalmcp://pair?server=file:///tmp/health&code=ABCD"))
+        XCTAssertThrowsError(try PairingLink(rawValue: "vitalmcp://pair?server=http://127.0.0.1:8787&code=ABCD"))
+        XCTAssertThrowsError(try PairingLink(rawValue: "vitalmcp://pair?server=http://127.0.0.1:8787&code=ABCD&key=short"))
     }
 
     func testDirectEnvelopeDoesNotExposePairingCodeTokenOrHealthValues() throws {
@@ -40,7 +38,7 @@ final class PairingAndPayloadTests: XCTestCase {
             purpose: .healthSync,
             payload: SensitivePayload(
                 pairing_code: "PAIR-SECRET",
-                device_token: "hl_dev_reusable-secret",
+                device_token: "va_dev_reusable-secret",
                 steps: 12_345
             ),
             receiverPublicKey: receiverPrivateKey.publicKey.rawRepresentation.base64URLEncodedString(),
@@ -52,15 +50,15 @@ final class PairingAndPayloadTests: XCTestCase {
         let wire = try XCTUnwrap(String(data: canonicalJSONData(exchange.envelope), encoding: .utf8))
 
         XCTAssertFalse(wire.contains("PAIR-SECRET"))
-        XCTAssertFalse(wire.contains("hl_dev_reusable-secret"))
+        XCTAssertFalse(wire.contains("va_dev_reusable-secret"))
         XCTAssertFalse(wire.contains("12345"))
         XCTAssertEqual(exchange.envelope.created_at, "2026-07-13T02:00:00.000Z")
         XCTAssertEqual(exchange.envelope.crypto.sender_public_key_x25519, "UKYUCbHd0DJemxa3AOcZ6XcsBwALG9d4bpB8ZT0gSV0")
         XCTAssertEqual(exchange.envelope.crypto.nonce, "AAECAwQFBgcICQoL")
-        XCTAssertEqual(exchange.envelope.crypto.tag, "SYFS19IOXi4cYHLLcHDS3A")
+        XCTAssertEqual(exchange.envelope.crypto.tag, "bStRPqJ1xMlRiTdvafV7lA")
         XCTAssertEqual(
             exchange.envelope.crypto.ciphertext,
-            "ARIf2UK1z9Y3A_ukK44V2kqjaqeApuSylJm3W80YxyUG0XLoYMIu1QTvXPN-zlElKP6whxwk_U17z2JrcxDJcr9zsfBCi5EuOV3afHokWul8K81l"
+            "WKOcgHQ4DW2Fix9lHgyCrkdAOAK8XbsmTcPUuvA6FfZJxtLR5Tu_zOSzEPG9Q-ZMmXekdw0-fu1cD8vvTAQ5JRAtpGU16An8o9uCWPQR-BQKybDl"
         )
 
         let nodeResponse = DirectEncryptedEnvelope(
@@ -72,8 +70,8 @@ final class PairingAndPayloadTests: XCTestCase {
                 alg: DirectTransportCrypto.algorithm,
                 sender_public_key_x25519: "V9tLNZ8jrl4Ubk4lEgVnBHIlBjSMFQwUdT0Mkz0E1CE",
                 nonce: "CwoJCAcGBQQDAgEA",
-                tag: "Tu64dfWyN8tooxGV0fcWsw",
-                ciphertext: "GjiG0EncUCuZbOMl22Qt_g6Sd1yw4GKseLIAuu0bSi_R48IfnTPvul9VesrnJ0VJJA"
+                tag: "Y-SS7PkCf6anP8NvMIvIZg",
+                ciphertext: "O40Mxk7GJJZC4F912YpnijYS_diE_qREX4reQxIGK1EWEgf388NoBZ6q92kHfq-ZIw"
             )
         )
         let decrypted = try DirectTransportCrypto.decryptResponse(nodeResponse, exchange: exchange, as: InteropResponse.self)
@@ -84,20 +82,18 @@ final class PairingAndPayloadTests: XCTestCase {
     func testRelayOnboardingParsesTextAndDeepLinkForms() throws {
         let payload = TestFixtures.relayOnboarding()
         let data = try JSONEncoder().encode(payload)
-        let encoded = "healthlink-e2ee-v1:\(data.base64URLEncodedString())"
+        let encoded = "vital-agent-e2ee-v1:\(data.base64URLEncodedString())"
 
         let textDecoded = try RelayOnboardingPayload(rawValue: encoded)
         XCTAssertEqual(textDecoded.source_device_id, payload.source_device_id)
         XCTAssertEqual(textDecoded.relay_url, payload.relay_url)
 
-        for scheme in [AppDeepLinkScheme.primary, AppDeepLinkScheme.legacy] {
-            var components = URLComponents()
-            components.scheme = scheme
-            components.host = "onboard"
-            components.queryItems = [URLQueryItem(name: "payload", value: encoded)]
-            let deepLinkDecoded = try RelayOnboardingPayload(rawValue: try XCTUnwrap(components.url).absoluteString)
-            XCTAssertEqual(deepLinkDecoded.user_id, payload.user_id)
-        }
+        var components = URLComponents()
+        components.scheme = AppDeepLinkScheme.primary
+        components.host = "onboard"
+        components.queryItems = [URLQueryItem(name: "payload", value: encoded)]
+        let deepLinkDecoded = try RelayOnboardingPayload(rawValue: try XCTUnwrap(components.url).absoluteString)
+        XCTAssertEqual(deepLinkDecoded.user_id, payload.user_id)
     }
 
     func testRelayOnboardingRejectsHostedHTTPURL() throws {
@@ -121,12 +117,12 @@ final class PairingAndPayloadTests: XCTestCase {
         )
         let encoded = try JSONEncoder().encode(invalid).base64URLEncodedString()
 
-        XCTAssertThrowsError(try RelayOnboardingPayload(rawValue: "healthlink-e2ee-v1:\(encoded)"))
+        XCTAssertThrowsError(try RelayOnboardingPayload(rawValue: "vital-agent-e2ee-v1:\(encoded)"))
     }
 
-    func testCallbackKeepsLegacySourceAndDropsUntrustedMetadata() throws {
+    func testCallbackKeepsProductSourceAndDropsUntrustedMetadata() throws {
         let callback = try XCTUnwrap(VitalAgentCallbackPolicy.safeCallbackURL(
-            rawCallbackURL: "openclaw://healthlink-result?secret=drop-me#drop-me-too",
+            rawCallbackURL: "openclaw://vital-agent-sync-result?secret=drop-me#drop-me-too",
             requestID: "issue55-001",
             status: "ok"
         ))
@@ -138,7 +134,7 @@ final class PairingAndPayloadTests: XCTestCase {
         XCTAssertEqual(query.count, 3)
         XCTAssertEqual(query["request_id"], "issue55-001")
         XCTAssertEqual(query["status"], "ok")
-        XCTAssertEqual(query["source"], "healthlink")
+        XCTAssertEqual(query["source"], "vital-agent-sync")
         XCTAssertNil(query["secret"])
     }
 

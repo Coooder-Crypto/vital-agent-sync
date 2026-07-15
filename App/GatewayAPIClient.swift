@@ -34,7 +34,7 @@ final class GatewayAPIClient {
         request.setValue("Bearer \(relayAccessToken)", forHTTPHeaderField: "Authorization")
         if let relayAPIToken = relayAPIToken?.trimmingCharacters(in: .whitespacesAndNewlines),
            !relayAPIToken.isEmpty {
-            request.setValue(relayAPIToken, forHTTPHeaderField: "X-HealthLink-Relay-API-Key")
+            request.setValue(relayAPIToken, forHTTPHeaderField: "X-Vital-Agent-Relay-API-Key")
         }
 
         let data: Data

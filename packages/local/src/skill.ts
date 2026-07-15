@@ -2,9 +2,9 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSyn
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
-export const HEALTHLINK_SKILL_NAME = "vitalmcp-personal-context";
+export const VITALMCP_SKILL_NAME = "vitalmcp-personal-context";
 export const WORKBUDDY_SKILL_NAME = "vital-agent-sync";
-export const HEALTHLINK_SKILL_VERSION = "0.4.1";
+export const VITALMCP_SKILL_VERSION = "0.5.0";
 
 export type SkillInstallOptions = {
   hermesHome?: string;
@@ -16,7 +16,7 @@ export type SkillInstallResult = {
   backupPath?: string;
 };
 
-export type SkillPackageOptions = HealthLinkSkillOptions & {
+export type SkillPackageOptions = VitalAgentSkillOptions & {
   outputDir: string;
 };
 
@@ -26,11 +26,11 @@ export type SkillPackageResult = {
   readmePath?: string;
 };
 
-export type HealthLinkSkillOptions = {
+export type VitalAgentSkillOptions = {
   agent?: "generic" | "hermes" | "openclaw" | "workbuddy";
 };
 
-export function buildHealthLinkSkillMarkdown(options: HealthLinkSkillOptions = {}): string {
+export function buildVitalAgentSkillMarkdown(options: VitalAgentSkillOptions = {}): string {
   const agent = options.agent ?? "generic";
   if (agent === "workbuddy") {
     return buildWorkBuddySkillMarkdown();
@@ -41,9 +41,9 @@ export function buildHealthLinkSkillMarkdown(options: HealthLinkSkillOptions = {
   const skillTitle = "Vital Agent Sync Personal Context";
   const skillDescription = "Use Vital Agent Sync MCP for personal health, recovery, and activity context.";
   return `---
-name: ${HEALTHLINK_SKILL_NAME}
+name: ${VITALMCP_SKILL_NAME}
 description: ${skillDescription}
-version: ${HEALTHLINK_SKILL_VERSION}
+version: ${VITALMCP_SKILL_VERSION}
 metadata:
   openclaw:
     requires:
@@ -51,7 +51,7 @@ metadata:
         - vitalmcp
     install:
       - kind: node
-        package: vitalmcp@${HEALTHLINK_SKILL_VERSION}
+        package: vitalmcp@${VITALMCP_SKILL_VERSION}
         bins:
           - vitalmcp
     os:
@@ -80,10 +80,10 @@ Proactively offer to initialize Vital Agent Sync. Do not wait for the user to di
 3. Run the machine-readable setup command without \`--yes\`. Summarize only the returned redacted \`plan\` entries.
 4. After explicit approval, resume with \`--yes\`.
 5. Present only the safe local onboarding URL in \`next_action.url\`. Never decode the credential payload.
-6. After the first iOS sync, resume setup and verify freshness through \`healthlink_status\`.
+6. After the first iOS sync, resume setup and verify freshness through \`vital_agent_status\`.
 7. When setup is complete, call \`get_personal_context\` and offer the first useful health answer.
 
-The Skill is an orchestration layer. Removing or upgrading it must not remove \`~/.healthlink\`, rotate runtime identity, delete local history, or break generic MCP.
+The Skill is an orchestration layer. Removing or upgrading it must not remove \`~/.vital-agent-sync\`, rotate runtime identity, delete local history, or break generic MCP.
 
 ## When to Use
 
@@ -103,12 +103,12 @@ Do not use this skill for diagnosis, prescriptions, emergency advice, or unsuppo
    - \`get_workout_load\` for workout and activity load.
    - \`get_recovery_signals\` for sleep, heart-rate, HRV, oxygen, respiratory, temperature, activity, and workout-minutes context.
    - \`get_weekly_summary\` for compact 7-day health, activity, and recovery summaries.
-   - \`healthlink_status\`, \`list_source_devices\`, and \`revoke_source_device\` for setup and troubleshooting.
+   - \`vital_agent_status\`, \`list_source_devices\`, and \`revoke_source_device\` for setup and troubleshooting.
    - \`list_devices\` and \`revoke_device\` only as legacy aliases when an older agent flow expects those names.
    - \`record_feedback\` only when the user explicitly gives feedback, a correction, or a preference that should improve future Vital Agent Sync analysis.
 3. Mention data freshness before analysis when the answer depends on recency.
 4. If the latest sync is stale or missing, say that plainly and suggest syncing Vital Agent Sync.
-5. In relay mode, call or suggest \`vitalmcp pull\` before freshness-sensitive analysis when \`healthlink_status.relay.suggested_next_action\` indicates a pull is needed.
+5. In relay mode, call or suggest \`vitalmcp pull\` before freshness-sensitive analysis when \`vital_agent_status.relay.suggested_next_action\` indicates a pull is needed.
 
 ## Agent Setup Flow
 
@@ -120,11 +120,11 @@ When the user asks ${agentSubject} to install or connect Vital Agent Sync, keep 
    \`\`\`bash
    vitalmcp --version
    \`\`\`
-   If the command is missing or outside the compatible 0.4.x range, use the pinned package fallback for this Skill version:
+   If the command is missing or outside the compatible 0.5.x range, use the pinned package fallback for this Skill version:
    \`\`\`bash
-   npx -y vitalmcp@${HEALTHLINK_SKILL_VERSION} --version
+   npx -y vitalmcp@${VITALMCP_SKILL_VERSION} --version
    \`\`\`
-   Select one runtime command for the whole flow: use \`vitalmcp\` when the installed version is compatible; otherwise prefix every local CLI invocation below with \`npx -y vitalmcp@${HEALTHLINK_SKILL_VERSION}\`. Do not switch runners midway through setup, and do not use an unpinned \`npx\` package.
+   Select one runtime command for the whole flow: use \`vitalmcp\` when the installed version is compatible; otherwise prefix every local CLI invocation below with \`npx -y vitalmcp@${VITALMCP_SKILL_VERSION}\`. Do not switch runners midway through setup, and do not use an unpinned \`npx\` package.
    Do not use \`sudo npm install -g\`.
 2. Explain that LAN requires the iPhone and receiver to share a reachable trusted network. It does not require a relay URL, VPS, domain, Vital Agent Sync account, or payment method. Request a redacted setup plan:
    \`\`\`bash
@@ -139,7 +139,7 @@ When the user asks ${agentSubject} to install or connect Vital Agent Sync, keep 
    vitalmcp pair
    \`\`\`
 5. Ask the user to scan the pairing QR in the Vital Agent app, grant Apple Health access, and run Sync Now.
-6. Resume setup to observe the first ingest, then use \`healthlink_status\` and \`get_personal_context\`:
+6. Resume setup to observe the first ingest, then use \`vital_agent_status\` and \`get_personal_context\`:
    \`\`\`bash
    vitalmcp setup --resume --yes --output json
    \`\`\`
@@ -197,13 +197,13 @@ Relay setup may install a \`relay-pull\` service. A pull schedule only moves alr
 
 ## Relay And Privacy Guardrails
 
-- Never print, request, summarize, or copy files under \`~/.healthlink/secrets\`.
+- Never print, request, summarize, or copy files under \`~/.vital-agent-sync/secrets\`.
 - Do not ask the user to paste private keys into an Agent chat.
 - Treat the complete onboarding QR, deep link, and text code as credentials. They contain \`upload_auth_secret\`, \`relay_access_token\`, and sometimes \`relay_api_token\`; show them only to the user for transfer to the intended Vital Agent Sync source device, and never paste them into Agent chat, logs, memory, tool arguments, issue trackers, or support messages.
 - Hosted and self-hosted relays should contain encrypted envelopes plus minimal hashed tenant/revocation metadata; relay operators should not be able to decrypt health payloads.
-- Treat \`~/.healthlink/config.json\`, \`~/.healthlink/healthlink.sqlite\`, generated reports, and exported summaries as sensitive local state.
+- Treat \`~/.vital-agent-sync/config.json\`, \`~/.vital-agent-sync/vital-agent.sqlite\`, generated reports, and exported summaries as sensitive local state.
 - Do not dump raw health tables or long metric histories unless the user explicitly asks for that detail.
-- If \`healthlink_status\` shows stale or missing data, suggest \`vitalmcp pull\` for relay mode or ask the user to sync from iOS. When mobile deep-link support is available, suggest \`vitalmcp://sync?source=${triggerSource}&request_id=...\`; do not put health plaintext in callback URLs.
+- If \`vital_agent_status\` shows stale or missing data, suggest \`vitalmcp pull\` for relay mode or ask the user to sync from iOS. When mobile deep-link support is available, suggest \`vitalmcp://sync?source=${triggerSource}&request_id=...\`; do not put health plaintext in callback URLs.
 - If \`vitalmcp pull\` reports a failed envelope, tell the user the envelope was not acknowledged and point them to \`vitalmcp relay status\` or \`vitalmcp doctor --agent ${agent}\`.
 
 ## Unlink, Rotation, And Reset
@@ -261,7 +261,7 @@ Do not save reports to files unless the user explicitly asks. Treat generated re
 `;
 }
 
-export function exportHealthLinkSkillPackage(options: SkillPackageOptions): SkillPackageResult {
+export function exportVitalAgentSkillPackage(options: SkillPackageOptions): SkillPackageResult {
   const packageDir = resolveHomePath(options.outputDir);
   const agent = options.agent ?? "openclaw";
   const skillPath = join(packageDir, "SKILL.md");
@@ -269,7 +269,7 @@ export function exportHealthLinkSkillPackage(options: SkillPackageOptions): Skil
   mkdirSync(packageDir, { recursive: true });
   rmSync(join(packageDir, "clawhub.json"), { force: true });
   rmSync(readmePath, { force: true });
-  writeFileSync(skillPath, buildHealthLinkSkillMarkdown({ agent }), "utf8");
+  writeFileSync(skillPath, buildVitalAgentSkillMarkdown({ agent }), "utf8");
   if (agent !== "workbuddy") {
     writeFileSync(readmePath, buildSkillPackageReadme(agent), "utf8");
   }
@@ -298,16 +298,16 @@ Vital Agent Sync 是用户控制的数据网关，不是医疗服务。不得诊
 当 Skill 刚安装，或用户要求安装、连接、显示二维码时，主动开始下面的流程。不要让用户自己寻找终端命令。
 
 1. 说明将发生的持久化改动：
-   - 将固定版本 \`vitalmcp@${HEALTHLINK_SKILL_VERSION}\` 安装到用户目录 \`~/.vitalmcp/npm-global\`；
-   - 在本机创建 \`~/.healthlink\` 私有状态和 SQLite 数据库；
-   - 将 \`healthlink\` MCP 合并到 \`~/.workbuddy/mcp.json\`；
+   - 将固定版本 \`vitalmcp@${VITALMCP_SKILL_VERSION}\` 安装到用户目录 \`~/.vitalmcp/npm-global\`；
+   - 在本机创建 \`~/.vital-agent-sync\` 私有状态和 SQLite 数据库；
+   - 将 \`vital-agent-sync\` MCP 合并到 \`~/.workbuddy/mcp.json\`；
    - 安装并启动本地接收服务；
    - 创建一个短时有效的 iPhone 配对页面。
 2. 请求用户批准安装运行时。不得使用 \`sudo\`，不得安装未固定版本。
 3. 获得批准后运行：
 
    \`\`\`bash
-   npm install --global --prefix "$HOME/.vitalmcp/npm-global" vitalmcp@${HEALTHLINK_SKILL_VERSION}
+   npm install --global --prefix "$HOME/.vitalmcp/npm-global" vitalmcp@${VITALMCP_SKILL_VERSION}
    ${runtime} --version
    \`\`\`
 
@@ -359,9 +359,9 @@ ${runtime} setup --resume --yes --output json
 ${runtime} status --output json
 \`\`\`
 
-确认 \`sync_count\` 增加且存在最新同步时间。然后让用户在 WorkBuddy 的“插件 → MCP 服务器”中确认 \`healthlink\` 为绿色；若工具还未出现，提示重启 WorkBuddy。
+确认 \`sync_count\` 增加且存在最新同步时间。然后让用户在 WorkBuddy 的“插件 → MCP 服务器”中确认 \`vital-agent-sync\` 为绿色；若工具还未出现，提示重启 WorkBuddy。
 
-MCP 可用后调用 \`healthlink_status\`。只有状态和新鲜度正常时，才调用 \`get_personal_context\` 给出第一次摘要。
+MCP 可用后调用 \`vital_agent_status\`。只有状态和新鲜度正常时，才调用 \`get_personal_context\` 给出第一次摘要。
 
 ## 首次健康数据调用前的隐私提示
 
@@ -375,7 +375,7 @@ MCP 可用后调用 \`healthlink_status\`。只有状态和新鲜度正常时，
 
 1. 宽泛问题优先调用 \`get_personal_context\`。
 2. 具体问题按需调用：
-   - \`healthlink_status\`：连接、设备数量和新鲜度；
+   - \`vital_agent_status\`：连接、设备数量和新鲜度；
    - \`get_daily_health_summary\`：某一天；
    - \`get_sleep_trend\`：睡眠趋势；
    - \`get_workout_load\`：活动和训练负荷；
@@ -397,14 +397,14 @@ ${runtime} doctor --agent workbuddy --transport lan
 ${runtime} logs --lines 100
 \`\`\`
 
-- 若 \`healthlink\` MCP 为红色，检查 \`~/.workbuddy/mcp.json\` 是否为有效 JSON，以及其中的 Node 和 CLI 绝对路径是否存在。
+- 若 \`vital-agent-sync\` MCP 为红色，检查 \`~/.workbuddy/mcp.json\` 是否为有效 JSON，以及其中的 Node 和 CLI 绝对路径是否存在。
 - 若二维码在 iPhone 上不可达，确认 Mac 与 iPhone 在同一可信局域网，且配对地址不是面向 iPhone 的 \`localhost\`。
 - 不得自动执行删除、重置、密钥轮换或设备撤销。
-- 移除或升级 Skill 不得删除 \`~/.healthlink\`、本地历史、运行时身份、服务或 MCP 配置。
+- 移除或升级 Skill 不得删除 \`~/.vital-agent-sync\`、本地历史、运行时身份、服务或 MCP 配置。
 
 ## 安全边界
 
-- 不得读取、打印、总结或复制 \`~/.healthlink/secrets\` 下的文件。
+- 不得读取、打印、总结或复制 \`~/.vital-agent-sync/secrets\` 下的文件。
 - 不得要求用户把私钥、令牌、二维码、深链或配对码粘贴到聊天中。
 - 不得把完整配对页面、SQLite、健康原始行或报告上传到模型、日志、Issue 或支持渠道。
 - 不得宣称“本地存储”等同于“本地模型推理”。
@@ -413,7 +413,7 @@ ${runtime} logs --lines 100
 `;
 }
 
-export function installHermesHealthLinkSkill(options: SkillInstallOptions = {}): SkillInstallResult {
+export function installHermesVitalAgentSkill(options: SkillInstallOptions = {}): SkillInstallResult {
   const skillPath = getHermesSkillPath(options);
   mkdirSync(dirname(skillPath), { recursive: true });
 
@@ -422,7 +422,7 @@ export function installHermesHealthLinkSkill(options: SkillInstallOptions = {}):
     copyFileSync(skillPath, backupPath);
   }
 
-  writeFileSync(skillPath, buildHealthLinkSkillMarkdown({ agent: "hermes" }), "utf8");
+  writeFileSync(skillPath, buildVitalAgentSkillMarkdown({ agent: "hermes" }), "utf8");
 
   return {
     skillPath,
@@ -431,7 +431,7 @@ export function installHermesHealthLinkSkill(options: SkillInstallOptions = {}):
 }
 
 export function getHermesSkillPath(options: SkillInstallOptions = {}): string {
-  return resolveHomePath(options.skillPath ?? join(options.hermesHome ?? process.env.HERMES_HOME ?? "~/.hermes", "skills", "health", HEALTHLINK_SKILL_NAME, "SKILL.md"));
+  return resolveHomePath(options.skillPath ?? join(options.hermesHome ?? process.env.HERMES_HOME ?? "~/.hermes", "skills", "health", VITALMCP_SKILL_NAME, "SKILL.md"));
 }
 
 function resolveHomePath(path: string): string {
@@ -475,7 +475,7 @@ export function readInstalledHermesSkill(options: SkillInstallOptions = {}): str
   return existsSync(skillPath) ? readFileSync(skillPath, "utf8") : undefined;
 }
 
-function buildSkillPackageReadme(agent: NonNullable<HealthLinkSkillOptions["agent"]>): string {
+function buildSkillPackageReadme(agent: NonNullable<VitalAgentSkillOptions["agent"]>): string {
   return `# Vital Agent Sync Personal Context Skill
 
 Target agent: ${agentDisplayName(agent)}.
@@ -490,7 +490,7 @@ Package contents:
 Before publishing, verify:
 
 - \`vitalmcp print-skill --agent openclaw\` matches \`SKILL.md\`.
-- Private files under \`~/.healthlink/secrets\` are never copied into the package.
+- Private files under \`~/.vital-agent-sync/secrets\` are never copied into the package.
 - The package contains no health data, SQLite files, relay envelopes, tokens, or local user IDs.
 - The skill still points agents to MCP tools instead of embedding health data or crypto.
 
@@ -503,9 +503,9 @@ npm i -g clawhub
 clawhub login
 clawhub whoami
 clawhub skill publish . \\
-  --slug ${HEALTHLINK_SKILL_NAME} \\
+  --slug ${VITALMCP_SKILL_NAME} \\
   --name "Vital Agent Sync Personal Context" \\
-  --version ${HEALTHLINK_SKILL_VERSION} \\
+  --version ${VITALMCP_SKILL_VERSION} \\
   --changelog "LAN-first Local Preview" \\
   --dry-run
 \`\`\`
@@ -518,7 +518,7 @@ openclaw skills install <owner-or-final-slug>
 `;
 }
 
-function agentDisplayName(agent: NonNullable<HealthLinkSkillOptions["agent"]>): string {
+function agentDisplayName(agent: NonNullable<VitalAgentSkillOptions["agent"]>): string {
   switch (agent) {
   case "hermes":
     return "Hermes";

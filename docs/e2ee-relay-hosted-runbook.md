@@ -15,13 +15,13 @@ The hosted relay must not decrypt, parse, log, or inspect health payload plainte
 Set the hosted relay base URL for local setup before publishing beta onboarding instructions:
 
 ```bash
-export HEALTHLINK_HOSTED_RELAY_URL=https://relay.example.com
+export VITALMCP_HOSTED_RELAY_URL=https://relay.example.com
 vitalmcp setup --transport relay --agent hermes
 ```
 
 Use `--agent generic` for any MCP-compatible runtime without a dedicated installer. OpenClaw and future Agent adapters use the same relay state, pull service, SQLite database, and MCP tools.
 
-`--relay-url` overrides this value for a single command. `HEALTHLINK_RELAY_URL` is a generic configured fallback for hosted or self-hosted testing. Hosted mode fails before setup when no URL is configured or when it is not HTTPS. The `http://127.0.0.1:8790` development fallback is available only in self-hosted relay mode.
+`--relay-url` overrides this value for a single command. `VITALMCP_RELAY_URL` is a generic configured fallback for hosted or self-hosted testing. Hosted mode fails before setup when no URL is configured or when it is not HTTPS. The `http://127.0.0.1:8790` development fallback is available only in self-hosted relay mode.
 
 ## Production VPS Compose
 
@@ -103,23 +103,23 @@ vitalmcp relay serve \
 The same relay serve settings can be provided through environment variables. Command-line flags take precedence over these values:
 
 ```bash
-export HEALTHLINK_RELAY_HOST=0.0.0.0
-export HEALTHLINK_RELAY_PORT=8790
-export HEALTHLINK_RELAY_DB=/data/relay.sqlite
-export HEALTHLINK_RELAY_RETENTION_DAYS=30
-export HEALTHLINK_RELAY_MAX_ENVELOPE_BYTES=524288
-export HEALTHLINK_RELAY_MAX_UPLOADS_PER_MINUTE=120
-export HEALTHLINK_RELAY_MAX_QUEUED_ENVELOPES_PER_USER=1000
-export HEALTHLINK_RELAY_MAX_DEVICES_PER_USER=5
-export HEALTHLINK_RELAY_TRUST_PROXY=false
-export HEALTHLINK_RELAY_API_TOKEN=<ios-and-local-runtime-random-token>
-export HEALTHLINK_RELAY_METRICS_TOKEN=<operator-only-random-token>
+export VITALMCP_RELAY_HOST=0.0.0.0
+export VITALMCP_RELAY_PORT=8790
+export VITALMCP_RELAY_DB=/data/relay.sqlite
+export VITALMCP_RELAY_RETENTION_DAYS=30
+export VITALMCP_RELAY_MAX_ENVELOPE_BYTES=524288
+export VITALMCP_RELAY_MAX_UPLOADS_PER_MINUTE=120
+export VITALMCP_RELAY_MAX_QUEUED_ENVELOPES_PER_USER=1000
+export VITALMCP_RELAY_MAX_DEVICES_PER_USER=5
+export VITALMCP_RELAY_TRUST_PROXY=false
+export VITALMCP_RELAY_API_TOKEN=<ios-and-local-runtime-random-token>
+export VITALMCP_RELAY_METRICS_TOKEN=<operator-only-random-token>
 vitalmcp relay serve
 ```
 
 Put this process behind managed HTTPS and infrastructure-level rate limits. The app-level controls above are a second line of defense, not a replacement for edge protection.
 
-Set `HEALTHLINK_RELAY_TRUST_PROXY=true` only when the relay port is private and every request comes through a trusted proxy that rebuilds `X-Forwarded-For`. The production Compose template satisfies that condition. Leave it false when port 8790 is directly reachable.
+Set `VITALMCP_RELAY_TRUST_PROXY=true` only when the relay port is private and every request comes through a trusted proxy that rebuilds `X-Forwarded-For`. The production Compose template satisfies that condition. Leave it false when port 8790 is directly reachable.
 
 ## Post-Deploy Audit
 
@@ -144,9 +144,9 @@ Active mode creates two random disposable tenant identities, uploads only random
 For the release gate, prefer the repository wrapper so operator tokens do not appear in shell history or process arguments:
 
 ```bash
-export HEALTHLINK_HOSTED_RELAY_URL=https://relay.example.com
-export HEALTHLINK_RELAY_API_TOKEN=<deployment-api-token>
-export HEALTHLINK_RELAY_METRICS_TOKEN=<operator-metrics-token>
+export VITALMCP_HOSTED_RELAY_URL=https://relay.example.com
+export VITALMCP_RELAY_API_TOKEN=<deployment-api-token>
+export VITALMCP_RELAY_METRICS_TOKEN=<operator-metrics-token>
 npm run audit:relay-hosted -- --yes
 ```
 
@@ -169,7 +169,7 @@ The audit does not replace infrastructure review. HTTPS, edge rate limits, backu
 ## Endpoints
 
 - `GET /v1/status`: health and aggregate queue status.
-- `GET /v1/metrics`: aggregate metrics and configured limits; must not include envelope bodies. Set `HEALTHLINK_RELAY_METRICS_TOKEN` or `--metrics-token` in hosted deployments so this endpoint requires `Authorization: Bearer <token>`.
+- `GET /v1/metrics`: aggregate metrics and configured limits; must not include envelope bodies. Set `VITALMCP_RELAY_METRICS_TOKEN` or `--metrics-token` in hosted deployments so this endpoint requires `Authorization: Bearer <token>`.
 - `POST /v1/envelopes`: upload one encrypted envelope.
 - `GET /v1/envelopes?user_id=...&after=...&limit=25`: fetch a bounded page of unacked envelopes after a sequence cursor. The server caps pages at 25 and `vitalmcp pull` drains successive pages automatically.
 - `POST /v1/envelopes/:envelope_id/ack`: acknowledge a processed envelope.
@@ -180,7 +180,7 @@ The audit does not replace infrastructure review. HTTPS, edge rate limits, backu
 
 All data and lifecycle endpoints require the per-runtime `relay_access_token` as `Authorization: Bearer <token>`. The relay stores only its SHA-256 hash and binds it to the random `user_id`. This tenant credential is generated automatically and included in onboarding.
 
-Set `HEALTHLINK_RELAY_API_TOKEN` or `--relay-api-token` in hosted deployments to add a closed-beta/edge gate through `X-HealthLink-Relay-API-Key`. This optional shared deployment key is included in onboarding for the iOS source app and local pull runtime, but it is not the tenant isolation boundary.
+Set `VITALMCP_RELAY_API_TOKEN` or `--relay-api-token` in hosted deployments to add a closed-beta/edge gate through `X-Vital-Agent-Relay-API-Key`. This optional shared deployment key is included in onboarding for the iOS source app and local pull runtime, but it is not the tenant isolation boundary.
 
 ## Operational Limits
 

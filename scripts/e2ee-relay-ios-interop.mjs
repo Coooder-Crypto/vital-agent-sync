@@ -13,7 +13,7 @@ import {
 import { healthSyncPayloadSchema } from "../packages/local/dist/schemas.js";
 
 const root = resolve(import.meta.dirname, "..");
-const tempDir = mkdtempSync(join(tmpdir(), "healthlink-ios-relay-interop-"));
+const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-ios-relay-interop-"));
 
 try {
   const stateDir = join(tempDir, "state");

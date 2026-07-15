@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import type { HealthLinkDatabase } from "./database.js";
+import type { VitalAgentDatabase } from "./database.js";
 import { healthSyncPayloadSchema, type HealthSyncPayload } from "./schemas.js";
 
 export type AuthenticatedDevice = {
@@ -46,7 +46,7 @@ type HealthStatusRow = {
   deviceCount: number;
 };
 
-export function authenticateDevice(database: HealthLinkDatabase, authorizationHeader: string | undefined): AuthenticatedDevice {
+export function authenticateDevice(database: VitalAgentDatabase, authorizationHeader: string | undefined): AuthenticatedDevice {
   if (!authorizationHeader) {
     throw new HealthIngestError("missing_authorization", "Authorization header is required.");
   }
@@ -91,7 +91,7 @@ export function parseHealthSyncPayload(payload: unknown): HealthSyncPayload {
 }
 
 export function ingestValidatedHealthSync(
-  database: HealthLinkDatabase,
+  database: VitalAgentDatabase,
   device: AuthenticatedDevice,
   payload: unknown
 ): HealthSyncResult {
@@ -99,7 +99,7 @@ export function ingestValidatedHealthSync(
 }
 
 export function ingestHealthSync(
-  database: HealthLinkDatabase,
+  database: VitalAgentDatabase,
   device: AuthenticatedDevice,
   payload: HealthSyncPayload
 ): HealthSyncResult {
@@ -170,7 +170,7 @@ export function ingestHealthSync(
   };
 }
 
-export function getHealthStatus(database: HealthLinkDatabase): {
+export function getHealthStatus(database: VitalAgentDatabase): {
   ok: true;
   service: "vitalmcp";
   status: "running";
@@ -196,7 +196,7 @@ export function getHealthStatus(database: HealthLinkDatabase): {
 }
 
 function upsertHealthDailySummary(
-  database: HealthLinkDatabase,
+  database: VitalAgentDatabase,
   payload: HealthSyncPayload,
   summary: HealthSyncPayload["health_daily_summaries"][number],
   updatedAt: string

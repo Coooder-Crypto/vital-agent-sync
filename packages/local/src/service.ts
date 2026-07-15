@@ -12,14 +12,14 @@ export const VITALMCP_RELAY_PULL_LAUNCHD_LABEL = "com.vitalmcp.local.relay-pull"
 export const VITALMCP_RELAY_PULL_SYSTEMD_UNIT = "vitalmcp-relay-pull.service";
 
 export type ServiceManagerId = "auto" | "launchd" | "systemd" | "manual";
-export type HealthLinkServiceMode = "receiver" | "relay_pull";
+export type VitalAgentServiceMode = "receiver" | "relay_pull";
 
 export type LaunchdServiceOptions = {
   homeDir?: string;
   cliCommand?: string;
   manager?: ServiceManagerId;
   platform?: NodeJS.Platform;
-  mode?: HealthLinkServiceMode;
+  mode?: VitalAgentServiceMode;
   databasePath?: string;
   stateDir?: string;
   host: string;
@@ -31,9 +31,9 @@ export type LaunchdServiceOptions = {
   pullIntervalSeconds?: number;
 };
 
-export type HealthLinkServicePaths = {
+export type VitalAgentServicePaths = {
   manager: Exclude<ServiceManagerId, "auto">;
-  mode: HealthLinkServiceMode;
+  mode: VitalAgentServiceMode;
   configPath: string;
   plistPath: string;
   logDir: string;
@@ -42,14 +42,14 @@ export type HealthLinkServicePaths = {
   databasePath: string;
 };
 
-export type HealthLinkServiceStatus = HealthLinkServicePaths & {
+export type VitalAgentServiceStatus = VitalAgentServicePaths & {
   label: string;
   installed: boolean;
   running: boolean;
   detail?: string;
 };
 
-export type HealthLinkServiceLog = {
+export type VitalAgentServiceLog = {
   path: string;
   exists: boolean;
   content: string;
@@ -73,10 +73,10 @@ export function resolveServiceManagerId(options: Pick<LaunchdServiceOptions, "ma
   return "manual";
 }
 
-export function getLaunchdServicePaths(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "mode"> = {}): HealthLinkServicePaths {
+export function getLaunchdServicePaths(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "mode"> = {}): VitalAgentServicePaths {
   const home = options.homeDir ?? homedir();
-  const healthlinkDir = join(home, ".healthlink");
-  const logDir = join(healthlinkDir, "logs");
+  const vitalAgentSyncDir = join(home, ".vital-agent-sync");
+  const logDir = join(vitalAgentSyncDir, "logs");
   const mode = options.mode ?? "receiver";
   const label = serviceLaunchdLabel(mode);
   const logPrefix = mode === "relay_pull" ? "relay-pull" : "daemon";
@@ -92,10 +92,10 @@ export function getLaunchdServicePaths(options: Pick<LaunchdServiceOptions, "hom
   };
 }
 
-export function getSystemdServicePaths(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "mode"> = {}): HealthLinkServicePaths {
+export function getSystemdServicePaths(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "mode"> = {}): VitalAgentServicePaths {
   const home = options.homeDir ?? homedir();
-  const healthlinkDir = join(home, ".healthlink");
-  const logDir = join(healthlinkDir, "logs");
+  const vitalAgentSyncDir = join(home, ".vital-agent-sync");
+  const logDir = join(vitalAgentSyncDir, "logs");
   const mode = options.mode ?? "receiver";
   const unit = serviceSystemdUnit(mode);
   const unitPath = join(home, ".config", "systemd", "user", unit);
@@ -214,7 +214,7 @@ export function buildRelayPullProgramArguments(options: LaunchdServiceOptions, d
   return args;
 }
 
-export function installLaunchdService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
+export function installLaunchdService(options: LaunchdServiceOptions): VitalAgentServiceStatus {
   assertMacOSLaunchd(options.platform);
   const paths = getLaunchdServicePaths(options);
   mkdirSync(dirname(paths.plistPath), { recursive: true });
@@ -223,7 +223,7 @@ export function installLaunchdService(options: LaunchdServiceOptions): HealthLin
   return getLaunchdServiceStatus(options);
 }
 
-export function startLaunchdService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
+export function startLaunchdService(options: LaunchdServiceOptions): VitalAgentServiceStatus {
   assertMacOSLaunchd(options.platform);
   const paths = getLaunchdServicePaths(options);
   const label = serviceLaunchdLabel(options.mode ?? "receiver");
@@ -235,13 +235,13 @@ export function startLaunchdService(options: LaunchdServiceOptions): HealthLinkS
   return getLaunchdServiceStatus(options);
 }
 
-export function stopLaunchdService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
+export function stopLaunchdService(options: LaunchdServiceOptions): VitalAgentServiceStatus {
   assertMacOSLaunchd(options.platform);
   runLaunchctl(["bootout", launchdDomain(), getLaunchdServicePaths(options).plistPath], { allowFailure: true });
   return getLaunchdServiceStatus(options);
 }
 
-export function uninstallLaunchdService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
+export function uninstallLaunchdService(options: LaunchdServiceOptions): VitalAgentServiceStatus {
   assertMacOSLaunchd(options.platform);
   const paths = getLaunchdServicePaths(options);
   stopLaunchdService(options);
@@ -251,7 +251,7 @@ export function uninstallLaunchdService(options: LaunchdServiceOptions): HealthL
   return getLaunchdServiceStatus(options);
 }
 
-export function installSystemdService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
+export function installSystemdService(options: LaunchdServiceOptions): VitalAgentServiceStatus {
   assertLinuxSystemd();
   const paths = getSystemdServicePaths(options);
   const unit = serviceSystemdUnit(options.mode ?? "receiver");
@@ -263,7 +263,7 @@ export function installSystemdService(options: LaunchdServiceOptions): HealthLin
   return getSystemdServiceStatus(options);
 }
 
-export function startSystemdService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
+export function startSystemdService(options: LaunchdServiceOptions): VitalAgentServiceStatus {
   assertLinuxSystemd();
   const paths = getSystemdServicePaths(options);
   const unit = serviceSystemdUnit(options.mode ?? "receiver");
@@ -275,13 +275,13 @@ export function startSystemdService(options: LaunchdServiceOptions): HealthLinkS
   return getSystemdServiceStatus(options);
 }
 
-export function stopSystemdService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
+export function stopSystemdService(options: LaunchdServiceOptions): VitalAgentServiceStatus {
   assertLinuxSystemd();
   runSystemctl(["--user", "stop", serviceSystemdUnit(options.mode ?? "receiver")], { allowFailure: true });
   return getSystemdServiceStatus(options);
 }
 
-export function uninstallSystemdService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
+export function uninstallSystemdService(options: LaunchdServiceOptions): VitalAgentServiceStatus {
   assertLinuxSystemd();
   const paths = getSystemdServicePaths(options);
   const unit = serviceSystemdUnit(options.mode ?? "receiver");
@@ -294,7 +294,7 @@ export function uninstallSystemdService(options: LaunchdServiceOptions): HealthL
   return getSystemdServiceStatus(options);
 }
 
-export function getLaunchdServiceStatus(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "mode"> = {}): HealthLinkServiceStatus {
+export function getLaunchdServiceStatus(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "mode"> = {}): VitalAgentServiceStatus {
   const paths = getLaunchdServicePaths(options);
   const mode = options.mode ?? "receiver";
   return {
@@ -305,7 +305,7 @@ export function getLaunchdServiceStatus(options: Pick<LaunchdServiceOptions, "ho
   };
 }
 
-export function getSystemdServiceStatus(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "mode"> = {}): HealthLinkServiceStatus {
+export function getSystemdServiceStatus(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "mode"> = {}): VitalAgentServiceStatus {
   const paths = getSystemdServicePaths(options);
   const mode = options.mode ?? "receiver";
   return {
@@ -316,10 +316,10 @@ export function getSystemdServiceStatus(options: Pick<LaunchdServiceOptions, "ho
   };
 }
 
-export function getManualServiceStatus(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "platform" | "mode"> = {}): HealthLinkServiceStatus {
+export function getManualServiceStatus(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "platform" | "mode"> = {}): VitalAgentServiceStatus {
   const home = options.homeDir ?? homedir();
-  const healthlinkDir = join(home, ".healthlink");
-  const logDir = join(healthlinkDir, "logs");
+  const vitalAgentSyncDir = join(home, ".vital-agent-sync");
+  const logDir = join(vitalAgentSyncDir, "logs");
   const mode = options.mode ?? "receiver";
   return {
     manager: "manual",
@@ -337,7 +337,7 @@ export function getManualServiceStatus(options: Pick<LaunchdServiceOptions, "hom
   };
 }
 
-export function getHealthLinkServiceStatus(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "manager" | "platform" | "mode"> = {}): HealthLinkServiceStatus {
+export function getVitalAgentServiceStatus(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "manager" | "platform" | "mode"> = {}): VitalAgentServiceStatus {
   const manager = resolveServiceManagerId(options);
   if (manager === "launchd") {
     return getLaunchdServiceStatus(options);
@@ -348,7 +348,7 @@ export function getHealthLinkServiceStatus(options: Pick<LaunchdServiceOptions, 
   return getManualServiceStatus(options);
 }
 
-export function installHealthLinkService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
+export function installVitalAgentService(options: LaunchdServiceOptions): VitalAgentServiceStatus {
   const manager = resolveServiceManagerId(options);
   if (manager === "launchd") {
     return installLaunchdService(options);
@@ -359,7 +359,7 @@ export function installHealthLinkService(options: LaunchdServiceOptions): Health
   throw new Error(manualServiceMessage(options.platform));
 }
 
-export function startHealthLinkService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
+export function startVitalAgentService(options: LaunchdServiceOptions): VitalAgentServiceStatus {
   const manager = resolveServiceManagerId(options);
   if (manager === "launchd") {
     return startLaunchdService(options);
@@ -370,7 +370,7 @@ export function startHealthLinkService(options: LaunchdServiceOptions): HealthLi
   throw new Error(manualServiceMessage(options.platform));
 }
 
-export function stopHealthLinkService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
+export function stopVitalAgentService(options: LaunchdServiceOptions): VitalAgentServiceStatus {
   const manager = resolveServiceManagerId(options);
   if (manager === "launchd") {
     return stopLaunchdService(options);
@@ -381,7 +381,7 @@ export function stopHealthLinkService(options: LaunchdServiceOptions): HealthLin
   throw new Error(manualServiceMessage(options.platform));
 }
 
-export function uninstallHealthLinkService(options: LaunchdServiceOptions): HealthLinkServiceStatus {
+export function uninstallVitalAgentService(options: LaunchdServiceOptions): VitalAgentServiceStatus {
   const manager = resolveServiceManagerId(options);
   if (manager === "launchd") {
     return uninstallLaunchdService(options);
@@ -405,7 +405,7 @@ export function readSystemdUnit(options: Pick<LaunchdServiceOptions, "homeDir" |
 export function readLaunchdServiceLog(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "mode"> & {
   stream: "stdout" | "stderr";
   lines?: number;
-}): HealthLinkServiceLog {
+}): VitalAgentServiceLog {
   const paths = getLaunchdServicePaths(options);
   const path = options.stream === "stdout" ? paths.stdoutPath : paths.stderrPath;
   if (!existsSync(path)) {
@@ -423,10 +423,10 @@ export function readLaunchdServiceLog(options: Pick<LaunchdServiceOptions, "home
   };
 }
 
-export function readHealthLinkServiceLog(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "manager" | "platform" | "mode"> & {
+export function readVitalAgentServiceLog(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "manager" | "platform" | "mode"> & {
   stream: "stdout" | "stderr";
   lines?: number;
-}): HealthLinkServiceLog {
+}): VitalAgentServiceLog {
   const manager = resolveServiceManagerId(options);
   if (manager === "launchd") {
     return readLaunchdServiceLog(options);
@@ -441,7 +441,7 @@ export function readHealthLinkServiceLog(options: Pick<LaunchdServiceOptions, "h
   };
 }
 
-function isLaunchdServiceRunning(mode: HealthLinkServiceMode): boolean {
+function isLaunchdServiceRunning(mode: VitalAgentServiceMode): boolean {
   if (process.platform !== "darwin") {
     return false;
   }
@@ -455,7 +455,7 @@ function isLaunchdServiceRunning(mode: HealthLinkServiceMode): boolean {
   }
 }
 
-function isSystemdServiceRunning(mode: HealthLinkServiceMode): boolean {
+function isSystemdServiceRunning(mode: VitalAgentServiceMode): boolean {
   if (process.platform !== "linux") {
     return false;
   }
@@ -505,7 +505,7 @@ function runSystemctl(args: string[], options: { allowFailure?: boolean } = {}):
   }
 }
 
-function readSystemdServiceLog(options: { lines?: number; mode?: HealthLinkServiceMode }): HealthLinkServiceLog {
+function readSystemdServiceLog(options: { lines?: number; mode?: VitalAgentServiceMode }): VitalAgentServiceLog {
   const unit = serviceSystemdUnit(options.mode ?? "receiver");
   const path = `journalctl --user -u ${unit}`;
   try {
@@ -527,11 +527,11 @@ function readSystemdServiceLog(options: { lines?: number; mode?: HealthLinkServi
   }
 }
 
-function serviceLaunchdLabel(mode: HealthLinkServiceMode): string {
+function serviceLaunchdLabel(mode: VitalAgentServiceMode): string {
   return mode === "relay_pull" ? VITALMCP_RELAY_PULL_LAUNCHD_LABEL : VITALMCP_LAUNCHD_LABEL;
 }
 
-function serviceSystemdUnit(mode: HealthLinkServiceMode): string {
+function serviceSystemdUnit(mode: VitalAgentServiceMode): string {
   return mode === "relay_pull" ? VITALMCP_RELAY_PULL_SYSTEMD_UNIT : VITALMCP_SYSTEMD_UNIT;
 }
 

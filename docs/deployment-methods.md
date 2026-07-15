@@ -21,9 +21,9 @@ Hosted Relay is future/experimental during Local Preview. Relay implementation a
 
 | Method | Receiver | Database | MCP | iPhone path | Support |
 | --- | --- | --- | --- | --- | --- |
-| Mac local | User's Mac | `~/.healthlink/healthlink.sqlite` on Mac | Same Mac | LAN QR URL | Supported, default path |
+| Mac local | User's Mac | `~/.vital-agent-sync/vital-agent.sqlite` on Mac | Same Mac | LAN QR URL | Supported, default path |
 | Home server / NAS / N100 | Always-on home server | Server-local SQLite | Same server or LAN host | LAN or Tailscale URL | Supported by `daemon` and Linux user-level `systemd` service |
-| Docker Compose | Docker host | Mounted `/data/healthlink.sqlite` volume | Same host or shared volume | Host LAN, Tailscale, or HTTPS URL | Template and compose printer supported |
+| Docker Compose | Docker host | Mounted `/data/vital-agent.sqlite` volume | Same host or shared volume | Host LAN, Tailscale, or HTTPS URL | Template and compose printer supported |
 | User-owned VPS / HTTPS | User's VPS | VPS-local SQLite | Same VPS or adjacent host | HTTPS URL | Power-user path; requires user-managed HTTPS |
 
 ## 1. Mac Local Mode
@@ -34,7 +34,7 @@ Best for first-time setup, local testing, and users whose Agent runs on the same
 iPhone
   -> same Wi-Fi / LAN
   -> macOS Vital Agent Sync receiver
-  -> ~/.healthlink/healthlink.sqlite
+  -> ~/.vital-agent-sync/vital-agent.sqlite
   -> local MCP stdio
   -> MCP-compatible Agent
 ```
@@ -52,7 +52,7 @@ What it does:
 - Installs the macOS `launchd` receiver.
 - Starts the receiver on `0.0.0.0:8787`.
 - Prints a 10-minute iPhone pairing QR.
-- Stores synced summaries in `~/.healthlink/healthlink.sqlite`.
+- Stores synced summaries in `~/.vital-agent-sync/vital-agent.sqlite`.
 
 If the QR expires:
 
@@ -118,7 +118,7 @@ The service runs:
 vitalmcp daemon \
   --host 0.0.0.0 \
   --port 8787 \
-  --db ~/.healthlink/healthlink.sqlite \
+  --db ~/.vital-agent-sync/vital-agent.sqlite \
   --transport lan
 ```
 
@@ -159,7 +159,7 @@ Pairing:
 Diagnostics:
 
 ```bash
-vitalmcp status --db ~/.healthlink/healthlink.sqlite
+vitalmcp status --db ~/.vital-agent-sync/vital-agent.sqlite
 vitalmcp service status --manager systemd
 vitalmcp logs --manager systemd
 vitalmcp doctor --transport lan
@@ -196,7 +196,7 @@ iPhone
   -> host LAN / Tailscale / HTTPS URL
   -> Docker host port 8787
   -> Vital Agent Sync receiver container
-  -> /data/healthlink.sqlite mounted volume
+  -> /data/vital-agent.sqlite mounted volume
   -> MCP-compatible Agent on the host or another container with the same volume
 ```
 
@@ -210,16 +210,16 @@ docker compose up --build
 Or use the repository template when building from this source tree:
 
 ```bash
-export HEALTHLINK_SERVER_URL=http://192.168.31.53:8787
+export VITALMCP_SERVER_URL=http://192.168.31.53:8787
 docker compose -f deploy/docker/docker-compose.yml up --build
 ```
 
 Both compose variants:
 
 - publish `8787:8787`
-- store SQLite in `./healthlink-data` on the Docker host
-- pass `/data/healthlink.sqlite` to `vitalmcp daemon`
-- require `HEALTHLINK_SERVER_URL`
+- store SQLite in `./vital-agent-sync-data` on the Docker host
+- pass `/data/vital-agent.sqlite` to `vitalmcp daemon`
+- require `VITALMCP_SERVER_URL`
 
 The repository template additionally:
 
@@ -234,7 +234,7 @@ Diagnostics:
 
 ```bash
 docker compose ps
-docker compose logs healthlink
+docker compose logs vital-agent-sync
 vitalmcp doctor --transport lan --server-url http://192.168.31.53:8787
 ```
 
@@ -259,9 +259,9 @@ Recommended receiver command behind a user-managed reverse proxy:
 vitalmcp daemon \
   --host 0.0.0.0 \
   --port 8787 \
-  --db ~/.healthlink/healthlink.sqlite \
+  --db ~/.vital-agent-sync/vital-agent.sqlite \
   --transport public_https \
-  --server-url https://healthlink.example.com
+  --server-url https://vital-agent-sync.example.com
 ```
 
 The reverse proxy must terminate HTTPS and forward to the receiver. Vital Agent Sync does not currently install TLS certificates, configure Nginx/Caddy, or manage DNS.
@@ -276,7 +276,7 @@ Diagnostics:
 ```bash
 vitalmcp doctor \
   --transport public_https \
-  --server-url https://healthlink.example.com
+  --server-url https://vital-agent-sync.example.com
 
 vitalmcp logs
 ```

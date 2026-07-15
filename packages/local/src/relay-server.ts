@@ -6,7 +6,7 @@ import { chmodSync, existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { z } from "zod";
-import { isEncryptedEnvelope, type HealthLinkEncryptedEnvelope } from "./relay-crypto.js";
+import { isEncryptedEnvelope, type VitalAgentEncryptedEnvelope } from "./relay-crypto.js";
 
 export type RelayServerOptions = {
   host: string;
@@ -52,7 +52,7 @@ const MAX_TRACKED_UPLOAD_CLIENTS = 10_000;
 export const MAX_RELAY_LIST_PAGE_SIZE = 25;
 
 export function getDefaultRelayDatabasePath(): string {
-  return join(homedir(), ".healthlink", "relay.sqlite");
+  return join(homedir(), ".vital-agent-sync", "relay.sqlite");
 }
 
 export function openRelayDatabase(path?: string): RelayDatabase {
@@ -160,7 +160,7 @@ export function createRelayApp(database: RelayDatabase, options: RelayAppOptions
     const row = getRelayStatusRow(database);
     return {
       ok: true,
-      service: "healthlink-relay",
+      service: "vital-agent-sync-relay",
       queued_envelopes: row.queuedCount,
       acked_envelopes: row.ackedCount,
       users: row.userCount,
@@ -181,7 +181,7 @@ export function createRelayApp(database: RelayDatabase, options: RelayAppOptions
     const row = getRelayStatusRow(database);
     return {
       ok: true,
-      service: "healthlink-relay",
+      service: "vital-agent-sync-relay",
       metrics: {
         queued_envelopes: row.queuedCount,
         acked_envelopes: row.ackedCount,
@@ -495,7 +495,7 @@ function authorizeGatewayRequest(request: FastifyRequest, expectedToken: string 
   if (!expectedToken) {
     return true;
   }
-  const header = request.headers["x-healthlink-relay-api-key"];
+  const header = request.headers["x-vital-agent-relay-api-key"];
   const providedToken = Array.isArray(header) ? header[0] : header;
   return secureTokenEqual(expectedToken, providedToken);
 }
@@ -665,7 +665,7 @@ function escapeHtml(value: string): string {
 
 export function storeRelayEnvelope(
   database: RelayDatabase,
-  envelope: HealthLinkEncryptedEnvelope
+  envelope: VitalAgentEncryptedEnvelope
 ): "stored" | "duplicate" | "conflict" {
   const envelopeJson = JSON.stringify(envelope);
   const result = database.sqlite.prepare(`
@@ -710,7 +710,7 @@ export function listRelayEnvelopes(
   userId: string,
   after: number,
   limit = MAX_RELAY_LIST_PAGE_SIZE
-): HealthLinkEncryptedEnvelope[] {
+): VitalAgentEncryptedEnvelope[] {
   const rows = database.sqlite.prepare(`
     select envelope_json as envelopeJson
     from relay_envelopes
@@ -720,7 +720,7 @@ export function listRelayEnvelopes(
     order by sequence asc
     limit ?
   `).all(userId, after, Math.min(Math.max(1, limit), MAX_RELAY_LIST_PAGE_SIZE)) as RelayEnvelopeRow[];
-  return rows.map((row) => JSON.parse(row.envelopeJson) as HealthLinkEncryptedEnvelope);
+  return rows.map((row) => JSON.parse(row.envelopeJson) as VitalAgentEncryptedEnvelope);
 }
 
 export function ackRelayEnvelope(database: RelayDatabase, envelopeId: string, userId: string): number {

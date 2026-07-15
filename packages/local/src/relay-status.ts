@@ -35,7 +35,7 @@ export function getRelayLocalStatus(options: {
   stateDir?: string;
   now?: Date;
 } = {}): RelayLocalStatus {
-  const stateDir = options.stateDir ?? process.env.HEALTHLINK_STATE_DIR ?? getDefaultStateDir();
+  const stateDir = options.stateDir ?? process.env.VITALMCP_STATE_DIR ?? getDefaultStateDir();
   if (!existsSync(getRelayConfigPath(stateDir))) {
     return {
       transport_mode: "direct",

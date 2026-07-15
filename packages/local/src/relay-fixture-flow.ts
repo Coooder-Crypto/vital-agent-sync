@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { openHealthLinkDatabase } from "./database.js";
+import { openVitalAgentDatabase } from "./database.js";
 import { getDailyHealthSummary } from "./health-query.js";
 import { buildRelayFixtureEnvelope } from "./relay-fixture.js";
 import { pullRelayEnvelopes } from "./relay-pull.js";
@@ -11,12 +11,12 @@ import { initializeRelayRuntime } from "./relay-runtime.js";
 import { createRelayApp, openRelayDatabase, type RelayDatabase } from "./relay-server.js";
 
 async function main(): Promise<void> {
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-relay-flow-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-relay-flow-"));
   let app: ReturnType<typeof createRelayApp> | undefined;
   let relayDb: RelayDatabase | undefined;
   try {
     const stateDir = join(tempDir, "state");
-    const healthDbPath = join(tempDir, "healthlink.sqlite");
+    const healthDbPath = join(tempDir, "vital-agent.sqlite");
     const relayApiToken = "fixture-flow-relay-api-token";
     relayDb = openRelayDatabase(join(tempDir, "relay.sqlite"));
     app = createRelayApp(relayDb, {
@@ -51,7 +51,7 @@ async function main(): Promise<void> {
       headers: {
         "content-type": "application/json",
         authorization: `Bearer ${config.relay_access_token}`,
-        "x-healthlink-relay-api-key": relayApiToken
+        "x-vital-agent-relay-api-key": relayApiToken
       },
       body: JSON.stringify(envelope)
     });
@@ -64,9 +64,9 @@ async function main(): Promise<void> {
       relayUrl,
       relayApiToken
     });
-    const database = openHealthLinkDatabase({ path: healthDbPath });
-    const previousStateDir = process.env.HEALTHLINK_STATE_DIR;
-    process.env.HEALTHLINK_STATE_DIR = stateDir;
+    const database = openVitalAgentDatabase({ path: healthDbPath });
+    const previousStateDir = process.env.VITALMCP_STATE_DIR;
+    process.env.VITALMCP_STATE_DIR = stateDir;
     try {
       const summary = getDailyHealthSummary(database, { date: "2026-07-08" });
       console.log(JSON.stringify({
@@ -80,9 +80,9 @@ async function main(): Promise<void> {
       }, null, 2));
     } finally {
       if (previousStateDir === undefined) {
-        delete process.env.HEALTHLINK_STATE_DIR;
+        delete process.env.VITALMCP_STATE_DIR;
       } else {
-        process.env.HEALTHLINK_STATE_DIR = previousStateDir;
+        process.env.VITALMCP_STATE_DIR = previousStateDir;
       }
       database.close();
     }

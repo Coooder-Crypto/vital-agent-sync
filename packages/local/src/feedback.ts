@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { HealthLinkDatabase } from "./database.js";
+import type { VitalAgentDatabase } from "./database.js";
 
 export type FeedbackInput = {
   source?: string;
@@ -19,7 +19,7 @@ export type FeedbackEvent = {
   created_at: string;
 };
 
-export function recordFeedback(database: HealthLinkDatabase, input: FeedbackInput): FeedbackEvent {
+export function recordFeedback(database: VitalAgentDatabase, input: FeedbackInput): FeedbackEvent {
   const category = input.category.trim();
   if (!category) {
     throw new Error("Feedback category is required.");
@@ -67,7 +67,7 @@ export function recordFeedback(database: HealthLinkDatabase, input: FeedbackInpu
   return event;
 }
 
-export function listFeedbackEvents(database: HealthLinkDatabase, limit = 20): FeedbackEvent[] {
+export function listFeedbackEvents(database: VitalAgentDatabase, limit = 20): FeedbackEvent[] {
   const rows = database.sqlite.prepare(`
     select
       id,

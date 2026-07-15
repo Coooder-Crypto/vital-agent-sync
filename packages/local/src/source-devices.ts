@@ -1,5 +1,5 @@
 import { listDevices, revokeDevice, type DeviceSummary } from "./devices.js";
-import type { HealthLinkDatabase } from "./database.js";
+import type { VitalAgentDatabase } from "./database.js";
 
 export const SOURCE_PLATFORMS = [
   "ios",
@@ -60,11 +60,11 @@ export function isSourcePlatform(value: string): value is SourcePlatform {
   return SOURCE_PLATFORMS.includes(value as SourcePlatform);
 }
 
-export function listSourceDevices(database: HealthLinkDatabase): SourceDeviceSummary[] {
+export function listSourceDevices(database: VitalAgentDatabase): SourceDeviceSummary[] {
   return listDevices(database).map(toSourceDeviceSummary);
 }
 
-export function revokeSourceDevice(database: HealthLinkDatabase, sourceDeviceId: string): SourceDeviceSummary | undefined {
+export function revokeSourceDevice(database: VitalAgentDatabase, sourceDeviceId: string): SourceDeviceSummary | undefined {
   const device = revokeDevice(database, sourceDeviceId);
   return device ? toSourceDeviceSummary(device) : undefined;
 }

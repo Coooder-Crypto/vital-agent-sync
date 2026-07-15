@@ -63,9 +63,9 @@ There is no relay queue. The receiver sees plaintext because it is the trusted l
 
 Treat these files as sensitive:
 
-- `~/.healthlink/secrets/*`
-- `~/.healthlink/healthlink.sqlite`
-- `~/.healthlink/config.json`
+- `~/.vital-agent-sync/secrets/*`
+- `~/.vital-agent-sync/vital-agent.sqlite`
+- `~/.vital-agent-sync/config.json`
 - relay onboarding QR codes, links, and text values, which include `upload_auth_secret`, `relay_access_token`, and sometimes `relay_api_token`
 - generated health reports
 - exported summaries
@@ -112,7 +112,7 @@ Use:
 
 Use:
 
-> Keep your `~/.healthlink/secrets` folder private. Vital Agent Sync and your Agent should never ask you to paste those private keys.
+> Keep your `~/.vital-agent-sync/secrets` folder private. Vital Agent Sync and your Agent should never ask you to paste those private keys.
 
 Avoid:
 

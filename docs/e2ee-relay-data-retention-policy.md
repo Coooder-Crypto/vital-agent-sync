@@ -42,8 +42,8 @@ Access-token hashes and device revocation records remain while the anonymous rel
 
 Local runtime data is not hosted relay data:
 
-- `~/.healthlink/secrets/*`
-- `~/.healthlink/healthlink.sqlite`
+- `~/.vital-agent-sync/secrets/*`
+- `~/.vital-agent-sync/vital-agent.sqlite`
 - MCP responses
 - generated reports
 

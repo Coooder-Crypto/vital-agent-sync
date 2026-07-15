@@ -1,6 +1,6 @@
 import YAML from "yaml";
 import {
-  buildHealthLinkMcpServerConfig,
+  buildVitalAgentMcpServerConfig,
   formatOpenClawMcpConfig,
   formatStandardMcpConfig,
   formatWorkBuddyMcpConfig,
@@ -16,7 +16,7 @@ import {
   type OpenClawInstallOptions,
   type WorkBuddyInstallOptions
 } from "./mcp-config.js";
-import { installHermesHealthLinkSkill, type SkillInstallOptions, type SkillInstallResult } from "./skill.js";
+import { installHermesVitalAgentSkill, type SkillInstallOptions, type SkillInstallResult } from "./skill.js";
 
 export const AGENT_ADAPTER_IDS = [
   "generic",
@@ -156,15 +156,15 @@ const genericAgentAdapter: AgentAdapter = {
   installMcp(config) {
     return {
       id: "generic",
-      server: buildHealthLinkMcpServerConfig(config),
-      message: "Generic MCP agents are configured by copying the printed mcpServers.healthlink JSON."
+      server: buildVitalAgentMcpServerConfig(config),
+      message: "Generic MCP agents are configured by copying the printed mcpServers.vital-agent-sync JSON."
     };
   },
   formatMcpConfig(config) {
     return formatStandardMcpConfig(config);
   },
   reloadHint() {
-    return "Copy the printed mcpServers.healthlink JSON into your agent MCP config and restart or reload that agent.";
+    return "Copy the printed mcpServers.vital-agent-sync JSON into your agent MCP config and restart or reload that agent.";
   }
 };
 
@@ -182,8 +182,8 @@ const hermesAgentAdapter: AgentAdapter = {
       installed: status.installed,
       configPath: status.configPath,
       detail: status.installed
-        ? `healthlink MCP is installed in ${status.configPath}`
-        : `${status.configPath} ${status.exists ? "does not include" : "does not exist for"} healthlink`
+        ? `vital-agent-sync MCP is installed in ${status.configPath}`
+        : `${status.configPath} ${status.exists ? "does not include" : "does not exist for"} vital-agent-sync`
     };
   },
   installMcp(config, options) {
@@ -197,17 +197,17 @@ const hermesAgentAdapter: AgentAdapter = {
     };
   },
   installSkill(options) {
-    return installHermesHealthLinkSkill(toHermesSkillOptions(options));
+    return installHermesVitalAgentSkill(toHermesSkillOptions(options));
   },
   formatMcpConfig(config) {
     return YAML.stringify({
       mcp_servers: {
-        healthlink: buildHealthLinkMcpServerConfig(config)
+        "vital-agent-sync": buildVitalAgentMcpServerConfig(config)
       }
     });
   },
   reloadHint() {
-    return "Restart Hermes or run /reload-mcp to load the healthlink tools.";
+    return "Restart Hermes or run /reload-mcp to load the vital-agent-sync tools.";
   }
 };
 
@@ -226,8 +226,8 @@ const openClawAgentAdapter: AgentAdapter = {
         installed: status.installed,
         configPath: status.configPath,
         detail: status.installed
-          ? `healthlink MCP is installed in ${status.configPath}`
-          : `${status.configPath} ${status.exists ? "does not include" : "does not exist for"} healthlink`
+          ? `vital-agent-sync MCP is installed in ${status.configPath}`
+          : `${status.configPath} ${status.exists ? "does not include" : "does not exist for"} vital-agent-sync`
       };
     } catch (error) {
       return {
@@ -253,7 +253,7 @@ const openClawAgentAdapter: AgentAdapter = {
     return formatOpenClawMcpConfig(config);
   },
   reloadHint() {
-    return "OpenClaw should load MCP config changes automatically; restart OpenClaw if the healthlink tools do not appear.";
+    return "OpenClaw should load MCP config changes automatically; restart OpenClaw if the vital-agent-sync tools do not appear.";
   }
 };
 
@@ -272,8 +272,8 @@ const workBuddyAgentAdapter: AgentAdapter = {
         installed: status.installed,
         configPath: status.configPath,
         detail: status.installed
-          ? `healthlink MCP is installed in ${status.configPath}`
-          : `${status.configPath} ${status.exists ? "does not include" : "does not exist for"} healthlink`
+          ? `vital-agent-sync MCP is installed in ${status.configPath}`
+          : `${status.configPath} ${status.exists ? "does not include" : "does not exist for"} vital-agent-sync`
       };
     } catch (error) {
       return {
@@ -299,7 +299,7 @@ const workBuddyAgentAdapter: AgentAdapter = {
     return formatWorkBuddyMcpConfig(config);
   },
   reloadHint() {
-    return "Open WorkBuddy MCP settings and confirm healthlink is green; restart WorkBuddy if the tools do not appear.";
+    return "Open WorkBuddy MCP settings and confirm vital-agent-sync is green; restart WorkBuddy if the tools do not appear.";
   }
 };
 

@@ -1,4 +1,4 @@
-import { encryptHealthSyncPayload, type HealthLinkEncryptedEnvelope } from "./relay-crypto.js";
+import { encryptHealthSyncPayload, type VitalAgentEncryptedEnvelope } from "./relay-crypto.js";
 import type { RelayRuntimeConfig } from "./relay-runtime.js";
 import type { HealthSyncPayload } from "./schemas.js";
 
@@ -42,7 +42,7 @@ export function buildRelayFixturePayload(
 export function buildRelayFixtureEnvelope(input: {
   config: RelayRuntimeConfig;
   options?: RelayFixtureOptions;
-}): HealthLinkEncryptedEnvelope {
+}): VitalAgentEncryptedEnvelope {
   const sequence = input.options?.sequence ?? Date.now();
   return encryptHealthSyncPayload({
     config: input.config,

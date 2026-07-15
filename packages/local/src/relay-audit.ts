@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import type { HealthLinkEncryptedEnvelope } from "./relay-crypto.js";
-import { HEALTHLINK_E2EE_PROTOCOL } from "./relay-runtime.js";
+import type { VitalAgentEncryptedEnvelope } from "./relay-crypto.js";
+import { VITALMCP_E2EE_PROTOCOL } from "./relay-runtime.js";
 import { normalizeRelayUrl } from "./relay-runtime.js";
 
 export type RelayAuditOptions = {
@@ -47,7 +47,7 @@ export async function auditRelayDeployment(options: RelayAuditOptions): Promise<
   const page = await fetchText(fetchImpl, `${relayUrl}/`);
   const anonymousData = await fetchText(
     fetchImpl,
-    `${relayUrl}/v1/envelopes?user_id=usr_healthlink_audit_probe&after=0`
+    `${relayUrl}/v1/envelopes?user_id=usr_vital-agent-sync_audit_probe&after=0`
   );
 
   checks.push(httpOkCheck("status_http", status, "/v1/status"));
@@ -404,9 +404,9 @@ async function runActiveRelayAudit(input: {
   return checks;
 }
 
-function buildOpaqueAuditEnvelope(identity: ActiveAuditIdentity, sequence: number): HealthLinkEncryptedEnvelope {
+function buildOpaqueAuditEnvelope(identity: ActiveAuditIdentity, sequence: number): VitalAgentEncryptedEnvelope {
   return {
-    protocol: HEALTHLINK_E2EE_PROTOCOL,
+    protocol: VITALMCP_E2EE_PROTOCOL,
     user_id: identity.userId,
     device_id: identity.deviceId,
     envelope_id: `env_audit_${randomUUID().replaceAll("-", "")}`,
@@ -469,11 +469,11 @@ function relayDataHeaders(accessToken: string, relayApiToken: string | undefined
   return {
     "content-type": "application/json",
     authorization: `Bearer ${accessToken}`,
-    ...(relayApiToken?.trim() ? { "x-healthlink-relay-api-key": relayApiToken.trim() } : {})
+    ...(relayApiToken?.trim() ? { "x-vital-agent-relay-api-key": relayApiToken.trim() } : {})
   };
 }
 
-function responseContainsOnlyEnvelope(body: Record<string, unknown>, envelope: HealthLinkEncryptedEnvelope): boolean {
+function responseContainsOnlyEnvelope(body: Record<string, unknown>, envelope: VitalAgentEncryptedEnvelope): boolean {
   if (!Array.isArray(body.envelopes) || body.envelopes.length !== 1) {
     return false;
   }

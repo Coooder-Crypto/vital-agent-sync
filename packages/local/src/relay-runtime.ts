@@ -4,16 +4,16 @@ import { homedir } from "node:os";
 import { dirname, join, resolve, sep } from "node:path";
 import { renderTerminalQr } from "./terminal-qr.js";
 
-export const HEALTHLINK_E2EE_PROTOCOL = "healthlink-e2ee-v1" as const;
-export const HEALTHLINK_ONBOARDING_TEXT_PREFIX = `${HEALTHLINK_E2EE_PROTOCOL}:`;
+export const VITALMCP_E2EE_PROTOCOL = "vital-agent-e2ee-v1" as const;
+export const VITALMCP_ONBOARDING_TEXT_PREFIX = `${VITALMCP_E2EE_PROTOCOL}:`;
 export const DEFAULT_RELAY_URL = "http://127.0.0.1:8790";
-export const HEALTHLINK_HOSTED_RELAY_URL_ENV = "HEALTHLINK_HOSTED_RELAY_URL";
-export const HEALTHLINK_SELF_HOSTED_RELAY_URL_ENV = "HEALTHLINK_SELF_HOSTED_RELAY_URL";
-export const HEALTHLINK_RELAY_URL_ENV = "HEALTHLINK_RELAY_URL";
-export const HEALTHLINK_RELAY_API_TOKEN_ENV = "HEALTHLINK_RELAY_API_TOKEN";
+export const VITALMCP_HOSTED_RELAY_URL_ENV = "VITALMCP_HOSTED_RELAY_URL";
+export const VITALMCP_SELF_HOSTED_RELAY_URL_ENV = "VITALMCP_SELF_HOSTED_RELAY_URL";
+export const VITALMCP_RELAY_URL_ENV = "VITALMCP_RELAY_URL";
+export const VITALMCP_RELAY_API_TOKEN_ENV = "VITALMCP_RELAY_API_TOKEN";
 
 export type RelayRuntimeConfig = {
-  protocol: typeof HEALTHLINK_E2EE_PROTOCOL;
+  protocol: typeof VITALMCP_E2EE_PROTOCOL;
   user_id: string;
   source_device_id: string;
   agent_name: string;
@@ -33,7 +33,7 @@ export type RelayRuntimeConfig = {
 };
 
 export type RelayOnboardingPayload = {
-  protocol: typeof HEALTHLINK_E2EE_PROTOCOL;
+  protocol: typeof VITALMCP_E2EE_PROTOCOL;
   mode: "hosted_relay" | "self_hosted_relay";
   relay_url: string;
   user_id: string;
@@ -66,7 +66,7 @@ export type RelayRuntimeReplacement = {
 };
 
 export function getDefaultStateDir(): string {
-  return join(homedir(), ".healthlink");
+  return join(homedir(), ".vital-agent-sync");
 }
 
 export function initializeRelayRuntime(options: RelayRuntimeOptions = {}): RelayRuntimeConfig {
@@ -94,7 +94,7 @@ export function initializeRelayRuntime(options: RelayRuntimeOptions = {}): Relay
   writeSecretFile(signingPrivateKeyPath, signing.privateKey);
 
   const config: RelayRuntimeConfig = {
-    protocol: HEALTHLINK_E2EE_PROTOCOL,
+    protocol: VITALMCP_E2EE_PROTOCOL,
     user_id: `usr_${randomUUID().replaceAll("-", "")}`,
     source_device_id: `dev_${randomUUID().replaceAll("-", "")}`,
     agent_name: options.agentName ?? "Local Agent",
@@ -107,7 +107,7 @@ export function initializeRelayRuntime(options: RelayRuntimeOptions = {}): Relay
     signing_public_key_pem: signing.publicKey,
     upload_auth_secret: randomBytes(32).toString("base64url"),
     relay_access_token: randomBytes(32).toString("base64url"),
-    relay_api_token: normalizeOptionalToken(options.relayApiToken ?? process.env[HEALTHLINK_RELAY_API_TOKEN_ENV]),
+    relay_api_token: normalizeOptionalToken(options.relayApiToken ?? process.env[VITALMCP_RELAY_API_TOKEN_ENV]),
     encryption_private_key_path: encryptionPrivateKeyPath,
     signing_private_key_path: signingPrivateKeyPath
   };
@@ -143,7 +143,7 @@ export function buildRelayOnboardingPayload(
   const mode = options.mode ?? config.relay_mode;
   const relayUrl = normalizeRelayUrlForMode(config.relay_url, mode);
   return {
-    protocol: HEALTHLINK_E2EE_PROTOCOL,
+    protocol: VITALMCP_E2EE_PROTOCOL,
     mode,
     relay_url: relayUrl,
     user_id: config.user_id,
@@ -194,7 +194,7 @@ export function formatRelayOnboarding(config: RelayRuntimeConfig, options: Pick<
 }
 
 export function encodeRelayOnboardingPayload(payload: RelayOnboardingPayload): string {
-  return `${HEALTHLINK_ONBOARDING_TEXT_PREFIX}${Buffer.from(JSON.stringify(payload), "utf8").toString("base64url")}`;
+  return `${VITALMCP_ONBOARDING_TEXT_PREFIX}${Buffer.from(JSON.stringify(payload), "utf8").toString("base64url")}`;
 }
 
 export function buildRelayOnboardingDeepLink(payload: RelayOnboardingPayload): string {
@@ -315,12 +315,12 @@ export function markRelaySourceDeviceUnlinked(
 export function resolveDefaultRelayUrl(options: Pick<RelayRuntimeOptions, "mode" | "relayUrl"> = {}): string {
   const mode = options.mode ?? "hosted_relay";
   const modeSpecific = mode === "self_hosted_relay"
-    ? process.env[HEALTHLINK_SELF_HOSTED_RELAY_URL_ENV]
-    : process.env[HEALTHLINK_HOSTED_RELAY_URL_ENV];
-  const configured = options.relayUrl ?? modeSpecific ?? process.env[HEALTHLINK_RELAY_URL_ENV];
+    ? process.env[VITALMCP_SELF_HOSTED_RELAY_URL_ENV]
+    : process.env[VITALMCP_HOSTED_RELAY_URL_ENV];
+  const configured = options.relayUrl ?? modeSpecific ?? process.env[VITALMCP_RELAY_URL_ENV];
   if (!configured && mode === "hosted_relay") {
     throw new Error(
-      `Hosted Vital Agent Sync relay URL is not configured. Pass --relay-url https://... or set ${HEALTHLINK_HOSTED_RELAY_URL_ENV}.`
+      `Hosted Vital Agent Sync relay URL is not configured. Pass --relay-url https://... or set ${VITALMCP_HOSTED_RELAY_URL_ENV}.`
     );
   }
   return normalizeRelayUrlForMode(configured ?? DEFAULT_RELAY_URL, mode);
@@ -408,7 +408,7 @@ function isRelayRuntimeConfig(value: unknown): value is RelayRuntimeConfig {
     return false;
   }
   const record = value as Record<string, unknown>;
-  return record.protocol === HEALTHLINK_E2EE_PROTOCOL &&
+  return record.protocol === VITALMCP_E2EE_PROTOCOL &&
     typeof record.user_id === "string" &&
     typeof record.source_device_id === "string" &&
     typeof record.agent_name === "string" &&
@@ -437,7 +437,7 @@ function migrateRelayRuntimeConfig(value: unknown): unknown {
     return value;
   }
   const record = value as Partial<RelayRuntimeConfig>;
-  if (record.protocol !== HEALTHLINK_E2EE_PROTOCOL || typeof record.encryption_public_key_pem !== "string") {
+  if (record.protocol !== VITALMCP_E2EE_PROTOCOL || typeof record.encryption_public_key_pem !== "string") {
     return value;
   }
   let changed = false;

@@ -55,8 +55,8 @@ for (const relativePath of listReleaseFiles()) {
         findings.push({ rule: rule.id, path: normalizedPath, line: index + 1 });
       }
     }
-    if (containsLiteralHealthLinkSecret(line)) {
-      findings.push({ rule: "healthlink-secret-literal", path: normalizedPath, line: index + 1 });
+    if (containsLiteralVitalAgentSecret(line)) {
+      findings.push({ rule: "vital-agent-sync-secret-literal", path: normalizedPath, line: index + 1 });
     }
   }
 }
@@ -119,13 +119,13 @@ function classifySensitivePath(path) {
   if (/\.(?:sqlite|sqlite-shm|sqlite-wal|pem|key|p8|p12|mobileprovision|ipa)$/i.test(path)) {
     return "sensitive-artifact-file";
   }
-  if (lower.includes("/.healthlink/") || lower.startsWith(".healthlink/") || lower.includes("/secrets/")) {
+  if (lower.includes("/.vital-agent-sync/") || lower.startsWith(".vital-agent-sync/") || lower.includes("/secrets/")) {
     return "sensitive-runtime-path";
   }
   return undefined;
 }
 
-function containsLiteralHealthLinkSecret(line) {
+function containsLiteralVitalAgentSecret(line) {
   const match = /(?:upload_auth_secret|relay_access_token|relay_api_token|relay_metrics_token|encryption_private_key)\s*[=:]\s*["']([^"']+)["']/i.exec(line);
   if (!match) {
     return false;
@@ -159,15 +159,15 @@ function runSelfTest() {
   }
 
   const literal = ["relay_access_token=\"", "AbCdEfGhIjKlMnOpQrStUvWxYz_123456", "\""].join("");
-  if (!containsLiteralHealthLinkSecret(literal)) {
+  if (!containsLiteralVitalAgentSecret(literal)) {
     throw new Error("Secret scan self-test failed for a Vital Agent Sync secret literal.");
   }
-  if (containsLiteralHealthLinkSecret("relay_access_token=\"replace-with-a-random-32-byte-value\"")) {
+  if (containsLiteralVitalAgentSecret("relay_access_token=\"replace-with-a-random-32-byte-value\"")) {
     throw new Error("Secret scan self-test incorrectly rejected a documented placeholder.");
   }
   if (classifySensitivePath("deploy/relay/.env.production") !== "unignored-env-file" ||
       classifySensitivePath("tmp/health.sqlite") !== "sensitive-artifact-file" ||
-      classifySensitivePath(".healthlink/secrets/private.key") !== "sensitive-artifact-file") {
+      classifySensitivePath(".vital-agent-sync/secrets/private.key") !== "sensitive-artifact-file") {
     throw new Error("Secret scan self-test failed for sensitive file paths.");
   }
 }

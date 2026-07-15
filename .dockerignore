@@ -14,20 +14,20 @@ coverage
 .env.*
 **/.env
 **/.env.*
-.healthlink
-**/.healthlink
+.vital-agent-sync
+**/.vital-agent-sync
 *.sqlite
 *.sqlite-*
 **/*.sqlite
 **/*.sqlite-*
-**/healthlink-data
-**/healthlink-relay-data
+**/vital-agent-sync-data
+**/vital-agent-sync-relay-data
 
 App
 Resources
-HealthLink.xcodeproj
+VitalAgentSync.xcodeproj
 apps
 docs
 scripts
 packages/local/tests
-healthlink-openclaw-skill
+vital-agent-sync-openclaw-skill

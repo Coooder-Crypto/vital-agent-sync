@@ -22,10 +22,10 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production
-ENV HEALTHLINK_HOST=0.0.0.0
-ENV HEALTHLINK_PORT=8787
-ENV HEALTHLINK_DB=/data/healthlink.sqlite
-ENV HEALTHLINK_TRANSPORT=lan
+ENV VITALMCP_HOST=0.0.0.0
+ENV VITALMCP_PORT=8787
+ENV VITALMCP_DB=/data/vital-agent.sqlite
+ENV VITALMCP_TRANSPORT=lan
 
 COPY package*.json ./
 COPY packages/local/package*.json packages/local/
@@ -36,4 +36,4 @@ COPY --from=build /app/packages/local/dist packages/local/dist
 
 EXPOSE 8787
 
-CMD ["sh", "-c", "node packages/local/dist/cli.js daemon --host ${HEALTHLINK_HOST:-0.0.0.0} --port ${HEALTHLINK_PORT:-8787} --db ${HEALTHLINK_DB:-/data/healthlink.sqlite} --transport ${HEALTHLINK_TRANSPORT:-lan} --server-url ${HEALTHLINK_SERVER_URL:?Set HEALTHLINK_SERVER_URL to an iPhone-reachable URL, for example http://192.168.31.53:8787}"]
+CMD ["sh", "-c", "node packages/local/dist/cli.js daemon --host ${VITALMCP_HOST:-0.0.0.0} --port ${VITALMCP_PORT:-8787} --db ${VITALMCP_DB:-/data/vital-agent.sqlite} --transport ${VITALMCP_TRANSPORT:-lan} --server-url ${VITALMCP_SERVER_URL:?Set VITALMCP_SERVER_URL to an iPhone-reachable URL, for example http://192.168.31.53:8787}"]

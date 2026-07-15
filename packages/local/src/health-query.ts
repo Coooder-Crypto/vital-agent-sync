@@ -1,4 +1,4 @@
-import type { HealthLinkDatabase } from "./database.js";
+import type { VitalAgentDatabase } from "./database.js";
 import { getHealthStatus } from "./health-ingest.js";
 import { getRelayLocalStatus, type RelayLocalStatus } from "./relay-status.js";
 
@@ -56,14 +56,14 @@ type SourceCoverageRow = {
   sync_count: number;
 };
 
-export function getAgentHealthStatus(database: HealthLinkDatabase): unknown {
+export function getAgentHealthStatus(database: VitalAgentDatabase): unknown {
   return {
     ...getHealthStatus(database),
     relay: getRelayLocalStatus()
   };
 }
 
-export function getPersonalContext(database: HealthLinkDatabase, options: QueryOptions = {}): unknown {
+export function getPersonalContext(database: VitalAgentDatabase, options: QueryOptions = {}): unknown {
   const days = clampDays(options.days);
 
   return {
@@ -78,7 +78,7 @@ export function getPersonalContext(database: HealthLinkDatabase, options: QueryO
   };
 }
 
-export function getDailyHealthSummary(database: HealthLinkDatabase, options: QueryOptions = {}): unknown {
+export function getDailyHealthSummary(database: VitalAgentDatabase, options: QueryOptions = {}): unknown {
   const health = findHealthDaily(database, options.date);
   if (!health) {
     return {
@@ -139,7 +139,7 @@ export function getDailyHealthSummary(database: HealthLinkDatabase, options: Que
   };
 }
 
-export function getSleepTrend(database: HealthLinkDatabase, options: QueryOptions = {}): unknown {
+export function getSleepTrend(database: VitalAgentDatabase, options: QueryOptions = {}): unknown {
   const days = clampDays(options.days);
   const rows = database.sqlite.prepare(`
     select
@@ -184,7 +184,7 @@ export function getSleepTrend(database: HealthLinkDatabase, options: QueryOption
   };
 }
 
-export function getWorkoutLoad(database: HealthLinkDatabase, options: QueryOptions = {}): unknown {
+export function getWorkoutLoad(database: VitalAgentDatabase, options: QueryOptions = {}): unknown {
   const days = clampDays(options.days);
   const daily = database.sqlite.prepare(`
     select
@@ -247,7 +247,7 @@ export function getWorkoutLoad(database: HealthLinkDatabase, options: QueryOptio
   };
 }
 
-export function getRecoverySignals(database: HealthLinkDatabase, options: QueryOptions = {}): unknown {
+export function getRecoverySignals(database: VitalAgentDatabase, options: QueryOptions = {}): unknown {
   const days = clampDays(options.days);
   const rows = database.sqlite.prepare(`
     select
@@ -302,7 +302,7 @@ export function getRecoverySignals(database: HealthLinkDatabase, options: QueryO
   };
 }
 
-export function getWeeklySummary(database: HealthLinkDatabase, options: QueryOptions = {}): unknown {
+export function getWeeklySummary(database: VitalAgentDatabase, options: QueryOptions = {}): unknown {
   const days = Math.max(1, Math.min(options.days ?? 7, 14));
   const healthRows = latestHealthRows(database, days);
 
@@ -364,7 +364,7 @@ export function getWeeklySummary(database: HealthLinkDatabase, options: QueryOpt
   };
 }
 
-export function buildQueryMetadata(database: HealthLinkDatabase): {
+export function buildQueryMetadata(database: VitalAgentDatabase): {
   freshness: {
     latest_sync_at: string | null;
     latest_health_updated_at: string | null;
@@ -415,7 +415,7 @@ export function buildQueryMetadata(database: HealthLinkDatabase): {
   };
 }
 
-function findHealthDaily(database: HealthLinkDatabase, date?: string): HealthDailyRow | undefined {
+function findHealthDaily(database: VitalAgentDatabase, date?: string): HealthDailyRow | undefined {
   if (date) {
     return database.sqlite.prepare(`
       select *
@@ -434,7 +434,7 @@ function findHealthDaily(database: HealthLinkDatabase, date?: string): HealthDai
   `).get() as HealthDailyRow | undefined;
 }
 
-function latestHealthRows(database: HealthLinkDatabase, days: number): HealthDailyRow[] {
+function latestHealthRows(database: VitalAgentDatabase, days: number): HealthDailyRow[] {
   const rows = database.sqlite.prepare(`
     select *
     from (
@@ -454,7 +454,7 @@ function latestHealthRows(database: HealthLinkDatabase, days: number): HealthDai
   return rows.reverse();
 }
 
-function countRows(database: HealthLinkDatabase, table: string): number {
+function countRows(database: VitalAgentDatabase, table: string): number {
   const row = database.sqlite.prepare(`select count(*) as value from ${table}`).get() as { value: number };
   return row.value;
 }

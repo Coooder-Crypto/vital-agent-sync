@@ -5,21 +5,21 @@ import { resolve } from "node:path";
 const root = process.cwd();
 const composePath = resolve(root, "deploy", "relay", "docker-compose.production.yml");
 const caddyfilePath = resolve(root, "deploy", "relay", "Caddyfile");
-const domain = requireDomain(process.env.HEALTHLINK_RELAY_DOMAIN);
-const relayApiToken = requireToken("HEALTHLINK_RELAY_API_TOKEN");
-const metricsToken = requireToken("HEALTHLINK_RELAY_METRICS_TOKEN");
-const image = requirePinnedImage(process.env.HEALTHLINK_RELAY_IMAGE ?? "healthlink-relay:0.4.1");
+const domain = requireDomain(process.env.VITALMCP_RELAY_DOMAIN);
+const relayApiToken = requireToken("VITALMCP_RELAY_API_TOKEN");
+const metricsToken = requireToken("VITALMCP_RELAY_METRICS_TOKEN");
+const image = requirePinnedImage(process.env.VITALMCP_RELAY_IMAGE ?? "vital-agent-sync-relay:0.5.0");
 
 if (relayApiToken === metricsToken) {
-  throw new Error("HEALTHLINK_RELAY_API_TOKEN and HEALTHLINK_RELAY_METRICS_TOKEN must be different values.");
+  throw new Error("VITALMCP_RELAY_API_TOKEN and VITALMCP_RELAY_METRICS_TOKEN must be different values.");
 }
 
 const composeEnv = {
   ...process.env,
-  HEALTHLINK_RELAY_DOMAIN: domain,
-  HEALTHLINK_RELAY_API_TOKEN: relayApiToken,
-  HEALTHLINK_RELAY_METRICS_TOKEN: metricsToken,
-  HEALTHLINK_RELAY_IMAGE: image
+  VITALMCP_RELAY_DOMAIN: domain,
+  VITALMCP_RELAY_API_TOKEN: relayApiToken,
+  VITALMCP_RELAY_METRICS_TOKEN: metricsToken,
+  VITALMCP_RELAY_IMAGE: image
 };
 const compose = JSON.parse(capture("docker", [
   "compose",
@@ -30,7 +30,7 @@ const compose = JSON.parse(capture("docker", [
   "json"
 ], { env: composeEnv }));
 
-const relay = requireService(compose, "healthlink-relay");
+const relay = requireService(compose, "vital-agent-sync-relay");
 const caddy = requireService(compose, "caddy");
 verifyRelayService(relay);
 verifyCaddyService(caddy);
@@ -43,11 +43,11 @@ console.log(JSON.stringify({
   image,
   relay_public_ports: 0,
   caddy_public_ports: ["80/tcp", "443/tcp", "443/udp"],
-  retention_days: Number(relay.environment.HEALTHLINK_RELAY_RETENTION_DAYS),
-  max_envelope_bytes: Number(relay.environment.HEALTHLINK_RELAY_MAX_ENVELOPE_BYTES),
-  max_uploads_per_minute: Number(relay.environment.HEALTHLINK_RELAY_MAX_UPLOADS_PER_MINUTE),
-  max_queued_envelopes_per_user: Number(relay.environment.HEALTHLINK_RELAY_MAX_QUEUED_ENVELOPES_PER_USER),
-  max_devices_per_user: Number(relay.environment.HEALTHLINK_RELAY_MAX_DEVICES_PER_USER),
+  retention_days: Number(relay.environment.VITALMCP_RELAY_RETENTION_DAYS),
+  max_envelope_bytes: Number(relay.environment.VITALMCP_RELAY_MAX_ENVELOPE_BYTES),
+  max_uploads_per_minute: Number(relay.environment.VITALMCP_RELAY_MAX_UPLOADS_PER_MINUTE),
+  max_queued_envelopes_per_user: Number(relay.environment.VITALMCP_RELAY_MAX_QUEUED_ENVELOPES_PER_USER),
+  max_devices_per_user: Number(relay.environment.VITALMCP_RELAY_MAX_DEVICES_PER_USER),
   api_token_bytes: Buffer.byteLength(relayApiToken),
   metrics_token_bytes: Buffer.byteLength(metricsToken),
   secrets_printed: false
@@ -70,15 +70,15 @@ function verifyRelayService(service) {
     "Production relay must persist /data in a named volume."
   );
   assert(service.healthcheck?.test?.length > 0, "Production relay must define a healthcheck.");
-  assert(service.environment?.HEALTHLINK_RELAY_TRUST_PROXY === "true", "Production relay must trust only its private proxy path.");
-  assert(service.environment?.HEALTHLINK_RELAY_API_TOKEN === relayApiToken, "Compose lost the deployment API token.");
-  assert(service.environment?.HEALTHLINK_RELAY_METRICS_TOKEN === metricsToken, "Compose lost the metrics token.");
+  assert(service.environment?.VITALMCP_RELAY_TRUST_PROXY === "true", "Production relay must trust only its private proxy path.");
+  assert(service.environment?.VITALMCP_RELAY_API_TOKEN === relayApiToken, "Compose lost the deployment API token.");
+  assert(service.environment?.VITALMCP_RELAY_METRICS_TOKEN === metricsToken, "Compose lost the metrics token.");
   for (const [name, expected] of Object.entries({
-    HEALTHLINK_RELAY_RETENTION_DAYS: "30",
-    HEALTHLINK_RELAY_MAX_ENVELOPE_BYTES: "524288",
-    HEALTHLINK_RELAY_MAX_UPLOADS_PER_MINUTE: "120",
-    HEALTHLINK_RELAY_MAX_QUEUED_ENVELOPES_PER_USER: "1000",
-    HEALTHLINK_RELAY_MAX_DEVICES_PER_USER: "5"
+    VITALMCP_RELAY_RETENTION_DAYS: "30",
+    VITALMCP_RELAY_MAX_ENVELOPE_BYTES: "524288",
+    VITALMCP_RELAY_MAX_UPLOADS_PER_MINUTE: "120",
+    VITALMCP_RELAY_MAX_QUEUED_ENVELOPES_PER_USER: "1000",
+    VITALMCP_RELAY_MAX_DEVICES_PER_USER: "5"
   })) {
     assert(service.environment?.[name] === expected, `Production relay has an unexpected ${name} value.`);
   }
@@ -91,7 +91,7 @@ function verifyCaddyService(service) {
     arrayIncludes(service.security_opt, "no-new-privileges:true"),
     "Production Caddy must enable no-new-privileges."
   );
-  assert(service.environment?.HEALTHLINK_RELAY_DOMAIN === domain, "Compose lost the relay domain.");
+  assert(service.environment?.VITALMCP_RELAY_DOMAIN === domain, "Compose lost the relay domain.");
   assert(
     Array.isArray(service.volumes) && service.volumes.some((volume) => volume.target === "/etc/caddy/Caddyfile" && volume.read_only === true),
     "Production Caddy must mount Caddyfile read-only."
@@ -107,13 +107,13 @@ function verifyCaddyService(service) {
 function verifyCaddyfile() {
   const value = readFileSync(caddyfilePath, "utf8");
   for (const expected of [
-    "{$HEALTHLINK_RELAY_DOMAIN}",
+    "{$VITALMCP_RELAY_DOMAIN}",
     "max_size 512KiB",
     "Strict-Transport-Security",
     "X-Content-Type-Options \"nosniff\"",
     "Referrer-Policy \"no-referrer\"",
     "Cache-Control \"no-store\"",
-    "reverse_proxy healthlink-relay:8790"
+    "reverse_proxy vital-agent-sync-relay:8790"
   ]) {
     assert(value.includes(expected), `Production Caddyfile is missing: ${expected}`);
   }
@@ -131,11 +131,11 @@ function requireService(config, name) {
 function requireDomain(value) {
   const domainValue = value?.trim().toLowerCase();
   if (!domainValue || domainValue.length > 253 || !/^[a-z0-9.-]+$/.test(domainValue)) {
-    throw new Error("HEALTHLINK_RELAY_DOMAIN must be a DNS hostname without a scheme, port, path, or wildcard.");
+    throw new Error("VITALMCP_RELAY_DOMAIN must be a DNS hostname without a scheme, port, path, or wildcard.");
   }
   const labels = domainValue.split(".");
   if (labels.length < 2 || labels.some((label) => !label || label.length > 63 || label.startsWith("-") || label.endsWith("-"))) {
-    throw new Error("HEALTHLINK_RELAY_DOMAIN must be a valid multi-label DNS hostname.");
+    throw new Error("VITALMCP_RELAY_DOMAIN must be a valid multi-label DNS hostname.");
   }
   return domainValue;
 }
@@ -152,7 +152,7 @@ function requireToken(name) {
 function requirePinnedImage(value) {
   const imageValue = value.trim();
   if (!imageValue || imageValue.endsWith(":latest") || (!/:[^/]+$/.test(imageValue) && !/@sha256:[a-f0-9]{64}$/i.test(imageValue))) {
-    throw new Error("HEALTHLINK_RELAY_IMAGE must use an explicit non-latest tag or sha256 digest.");
+    throw new Error("VITALMCP_RELAY_IMAGE must use an explicit non-latest tag or sha256 digest.");
   }
   return imageValue;
 }

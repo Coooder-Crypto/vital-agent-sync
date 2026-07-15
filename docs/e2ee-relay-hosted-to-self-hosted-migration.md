@@ -33,7 +33,7 @@ vitalmcp relay status
 Back up local state before changing transport settings:
 
 ```bash
-cp -R ~/.healthlink ~/.healthlink.backup.$(date +%Y%m%d%H%M%S)
+cp -R ~/.vital-agent-sync ~/.vital-agent-sync.backup.$(date +%Y%m%d%H%M%S)
 ```
 
 The backup contains sensitive local data and secrets. Store it privately.
@@ -57,7 +57,7 @@ For iOS, replace `127.0.0.1` with an iPhone-reachable URL, such as a LAN IP, Tai
 
 ```text
 http://192.168.31.53:8790
-https://healthlink-relay.example.com
+https://vital-agent-sync-relay.example.com
 ```
 
 ## Migrate The Relay Identity
@@ -73,10 +73,10 @@ vitalmcp relay migrate --yes \
 If the target relay uses a deployment API key, provide it through the environment so it is not left in shell history:
 
 ```bash
-export HEALTHLINK_RELAY_API_TOKEN=<target-deployment-key>
+export VITALMCP_RELAY_API_TOKEN=<target-deployment-key>
 vitalmcp relay migrate --yes \
   --transport self-hosted-relay \
-  --relay-url https://healthlink-relay.example.com
+  --relay-url https://vital-agent-sync-relay.example.com
 ```
 
 The command authenticates to the old relay using the current config, revokes and purges the old identity, creates new user/device IDs and cryptographic material, resets the relay cursor, and writes the target URL. It does not replace or delete the local health SQLite database.
@@ -109,7 +109,7 @@ Latest sequence: greater than 0
 
 ## Validate With MCP
 
-Ask the agent for `healthlink_status` or run:
+Ask the agent for `vital_agent_status` or run:
 
 ```bash
 vitalmcp doctor --agent openclaw
@@ -140,8 +140,8 @@ If self-hosted relay fails:
 4. If needed, restore the previous local state backup:
 
 ```bash
-mv ~/.healthlink ~/.healthlink.failed.$(date +%Y%m%d%H%M%S)
-mv ~/.healthlink.backup.<timestamp> ~/.healthlink
+mv ~/.vital-agent-sync ~/.vital-agent-sync.failed.$(date +%Y%m%d%H%M%S)
+mv ~/.vital-agent-sync.backup.<timestamp> ~/.vital-agent-sync
 ```
 
 Do not delete the failed state until you have copied any logs needed for debugging.

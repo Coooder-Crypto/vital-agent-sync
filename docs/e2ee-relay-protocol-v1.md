@@ -1,6 +1,6 @@
 # Vital Agent Sync E2EE Relay Protocol v1
 
-This document is the implementation contract for `healthlink-e2ee-v1`. It covers the mobile source, relay mailbox, and `vitalmcp` runtime. Hosted and self-hosted relays use the same protocol.
+This document is the implementation contract for `vital-agent-e2ee-v1`. It covers the mobile source, relay mailbox, and `vitalmcp` runtime. Hosted and self-hosted relays use the same protocol.
 
 ## Trust Boundary
 
@@ -22,7 +22,7 @@ The local runtime creates one payload with:
 
 ```json
 {
-  "protocol": "healthlink-e2ee-v1",
+  "protocol": "vital-agent-e2ee-v1",
   "mode": "hosted_relay",
   "relay_url": "https://relay.example.com",
   "user_id": "usr_...",
@@ -44,8 +44,8 @@ Supported handoff forms:
 
 ```text
 raw JSON
-healthlink-e2ee-v1:<base64url(JSON)>
-vitalmcp://onboard?payload=healthlink-e2ee-v1:<base64url(JSON)>
+vital-agent-e2ee-v1:<base64url(JSON)>
+vitalmcp://onboard?payload=vital-agent-e2ee-v1:<base64url(JSON)>
 ```
 
 The QR contains the deep link. Vital Agent iOS app accepts all three forms.
@@ -71,7 +71,7 @@ Encryption steps:
 ```text
 IKM  = X25519 shared secret
 salt = empty byte string
-info = UTF-8("healthlink-e2ee-v1 envelope")
+info = UTF-8("vital-agent-e2ee-v1 envelope")
 L    = 32
 ```
 
@@ -90,7 +90,7 @@ The legacy development identifiers `x25519-chacha20poly1305-hmac-sha256` and `x2
 
 ```json
 {
-  "protocol": "healthlink-e2ee-v1",
+  "protocol": "vital-agent-e2ee-v1",
   "user_id": "usr_...",
   "device_id": "dev_...",
   "envelope_id": "env_...",
@@ -132,7 +132,7 @@ Authorization: Bearer <relay_access_token>
 A deployment can additionally require a gateway key:
 
 ```http
-X-HealthLink-Relay-API-Key: <relay_api_token>
+X-Vital-Agent-Relay-API-Key: <relay_api_token>
 ```
 
 This optional shared key is an edge/closed-beta control, not a tenant boundary. Metrics use a separate operator-only Bearer token. Status and metrics never return credential values or hashes.

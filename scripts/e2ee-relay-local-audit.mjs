@@ -47,7 +47,7 @@ const checks = [
     command: "swiftc",
     args: [
       "-module-cache-path",
-      join(tmpdir(), "healthlink-ios-swift-module-cache"),
+      join(tmpdir(), "vital-agent-sync-ios-swift-module-cache"),
       "-target",
       "arm64-apple-ios17.0",
       "-sdk",
@@ -61,7 +61,7 @@ const checks = [
     command: "swiftc",
     args: [
       "-module-cache-path",
-      join(tmpdir(), "healthlink-swift-module-cache"),
+      join(tmpdir(), "vital-agent-sync-swift-module-cache"),
       "-typecheck",
       "App/Models.swift",
       "App/GatewayAPIClient.swift"
@@ -116,11 +116,11 @@ function resolveIOSSDKPath() {
 
 function runHostedSetupFailClosedCheck() {
   console.log("\n==> compiled hosted setup fail-closed");
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-hosted-setup-audit-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-hosted-setup-audit-"));
   const stateDir = join(tempDir, "state");
   const env = { ...process.env };
-  delete env.HEALTHLINK_HOSTED_RELAY_URL;
-  delete env.HEALTHLINK_RELAY_URL;
+  delete env.VITALMCP_HOSTED_RELAY_URL;
+  delete env.VITALMCP_RELAY_URL;
   try {
     const result = spawnSync("node", [
       "packages/local/dist/cli.js",
@@ -204,9 +204,9 @@ function runCliArgumentValidationCheck() {
 
 function runSavedRelayModeCheck() {
   console.log("\n==> compiled onboarding saved-mode inheritance");
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-onboarding-mode-audit-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-onboarding-mode-audit-"));
   const stateDir = join(tempDir, "state");
-  const databasePath = join(tempDir, "healthlink.sqlite");
+  const databasePath = join(tempDir, "vital-agent.sqlite");
   try {
     const plan = spawnSync("node", [
       "packages/local/dist/cli.js",
@@ -280,7 +280,7 @@ function runSavedRelayModeCheck() {
 async function runCompiledRelayAudit() {
   console.log("\n==> compiled relay audit");
   const port = await findAvailablePort();
-  const tempDir = mkdtempSync(join(tmpdir(), "healthlink-relay-audit-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-relay-audit-"));
   const relay = spawn("node", [
     "packages/local/dist/cli.js",
     "relay",
@@ -289,16 +289,16 @@ async function runCompiledRelayAudit() {
     cwd: root,
     env: {
       ...process.env,
-      HEALTHLINK_RELAY_HOST: "127.0.0.1",
-      HEALTHLINK_RELAY_PORT: String(port),
-      HEALTHLINK_RELAY_DB: join(tempDir, "relay.sqlite"),
-      HEALTHLINK_RELAY_RETENTION_DAYS: "30",
-      HEALTHLINK_RELAY_MAX_ENVELOPE_BYTES: "524288",
-      HEALTHLINK_RELAY_MAX_UPLOADS_PER_MINUTE: "120",
-      HEALTHLINK_RELAY_MAX_QUEUED_ENVELOPES_PER_USER: "1000",
-      HEALTHLINK_RELAY_MAX_DEVICES_PER_USER: "5",
-      HEALTHLINK_RELAY_API_TOKEN: "local-audit-relay-api-token",
-      HEALTHLINK_RELAY_METRICS_TOKEN: "local-audit-metrics-token"
+      VITALMCP_RELAY_HOST: "127.0.0.1",
+      VITALMCP_RELAY_PORT: String(port),
+      VITALMCP_RELAY_DB: join(tempDir, "relay.sqlite"),
+      VITALMCP_RELAY_RETENTION_DAYS: "30",
+      VITALMCP_RELAY_MAX_ENVELOPE_BYTES: "524288",
+      VITALMCP_RELAY_MAX_UPLOADS_PER_MINUTE: "120",
+      VITALMCP_RELAY_MAX_QUEUED_ENVELOPES_PER_USER: "1000",
+      VITALMCP_RELAY_MAX_DEVICES_PER_USER: "5",
+      VITALMCP_RELAY_API_TOKEN: "local-audit-relay-api-token",
+      VITALMCP_RELAY_METRICS_TOKEN: "local-audit-metrics-token"
     },
     stdio: ["ignore", "pipe", "pipe"]
   });

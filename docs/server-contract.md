@@ -10,7 +10,7 @@ Direct mode:
 
 ```text
 iOS
-  -> encrypt device token + HealthSyncPayload into vitalmcp-direct-v1
+  -> encrypt device token + HealthSyncPayload into vital-agent-direct-v1
   -> POST /v1/direct
   -> decrypt and authenticate at the local receiver
   -> ingestValidatedHealthSync
@@ -21,7 +21,7 @@ Relay mode:
 
 ```text
 iOS
-  -> encrypt HealthSyncPayload into HealthLinkEncryptedEnvelope
+  -> encrypt HealthSyncPayload into VitalAgentEncryptedEnvelope
   -> POST /v1/envelopes to relay
   -> vitalmcp pull
   -> decrypt envelope locally
@@ -39,7 +39,7 @@ POST /v1/direct
 Content-Type: application/json
 ```
 
-The outer body is a `vitalmcp-direct-v1` X25519/HKDF/ChaCha20-Poly1305 envelope. Its authenticated purpose is one of `pair.status`, `pair.confirm`, `health.sync`, or `device.revoke`. For `health.sync`, the decrypted object contains `{ "device_token": "...", "payload": HealthSyncPayload }`. The token authenticates the paired source device and provides write scopes, but it is never an HTTP authorization header or plaintext body field. A payload with daily summaries requires `health.daily_summary.write`.
+The outer body is a `vital-agent-direct-v1` X25519/HKDF/ChaCha20-Poly1305 envelope. Its authenticated purpose is one of `pair.status`, `pair.confirm`, `health.sync`, or `device.revoke`. For `health.sync`, the decrypted object contains `{ "device_token": "...", "payload": HealthSyncPayload }`. The token authenticates the paired source device and provides write scopes, but it is never an HTTP authorization header or plaintext body field. A payload with daily summaries requires `health.daily_summary.write`.
 
 The old plaintext `/pair/status/:pairing_code`, `/pair/confirm`, `/health/sync`, and device-revoke routes return HTTP 426. See [direct-lan-security.md](direct-lan-security.md) for the protocol and LAN/Tailscale/relay trust boundaries.
 

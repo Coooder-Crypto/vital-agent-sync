@@ -1,4 +1,4 @@
-{$HEALTHLINK_RELAY_DOMAIN} {
+{$VITALMCP_RELAY_DOMAIN} {
 	request_body {
 		max_size 512KiB
 	}
@@ -10,7 +10,7 @@
 		Cache-Control "no-store"
 	}
 
-	reverse_proxy healthlink-relay:8790 {
+	reverse_proxy vital-agent-sync-relay:8790 {
 		health_uri /v1/status
 		health_interval 30s
 		health_timeout 3s

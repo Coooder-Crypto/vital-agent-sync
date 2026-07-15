@@ -1,4 +1,4 @@
-import type { HealthLinkDatabase } from "./database.js";
+import type { VitalAgentDatabase } from "./database.js";
 
 export type DeviceSummary = {
   device_id: string;
@@ -22,7 +22,7 @@ type DeviceRow = {
   syncCount: number;
 };
 
-export function listDevices(database: HealthLinkDatabase): DeviceSummary[] {
+export function listDevices(database: VitalAgentDatabase): DeviceSummary[] {
   const rows = database.sqlite.prepare(`
     select
       devices.id as deviceId,
@@ -51,7 +51,7 @@ export function listDevices(database: HealthLinkDatabase): DeviceSummary[] {
   }));
 }
 
-export function revokeDevice(database: HealthLinkDatabase, deviceId: string): DeviceSummary | undefined {
+export function revokeDevice(database: VitalAgentDatabase, deviceId: string): DeviceSummary | undefined {
   const now = new Date().toISOString();
   database.sqlite.prepare(`
     update devices
@@ -62,7 +62,7 @@ export function revokeDevice(database: HealthLinkDatabase, deviceId: string): De
   return getDevice(database, deviceId);
 }
 
-export function getDevice(database: HealthLinkDatabase, deviceId: string): DeviceSummary | undefined {
+export function getDevice(database: VitalAgentDatabase, deviceId: string): DeviceSummary | undefined {
   return listDevices(database).find((device) => device.device_id === deviceId);
 }
 

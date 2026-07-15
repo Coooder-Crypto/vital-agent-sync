@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { sanitizeAgentOutput } from "../src/bootstrap.js";
-import { openHealthLinkDatabase } from "../src/database.js";
+import { openVitalAgentDatabase } from "../src/database.js";
 import {
   DirectTransportError,
   claimDirectRequest,
@@ -32,7 +32,7 @@ test("agent diagnostics redact direct pairing and credential fields", () => {
   assert.deepEqual(sanitizeAgentOutput({
     pairing_code: "ABCD-EFGH",
     pairing_url: "vitalmcp://pair?server=http%3A%2F%2F192.168.1.20%3A8787&code=ABCD-EFGH",
-    device_token: "hl_dev_secret",
+    device_token: "va_dev_secret",
     status: "waiting"
   }), {
     pairing_code: "[REDACTED]",
@@ -47,7 +47,7 @@ test("direct transport interoperates without exposing pairing, token, or health 
   const sender = fixedPrivateKey(5);
   const sensitive = {
     pairing_code: "PAIR-SECRET",
-    device_token: "hl_dev_reusable-secret",
+    device_token: "va_dev_reusable-secret",
     steps: 12_345
   };
   const request = createDirectRequestForTest({
@@ -66,10 +66,10 @@ test("direct transport interoperates without exposing pairing, token, or health 
   assert.equal(wire.includes(String(sensitive.steps)), false);
   assert.equal(request.envelope.crypto.nonce, "AAECAwQFBgcICQoL");
   assert.equal(request.envelope.crypto.sender_public_key_x25519, "UKYUCbHd0DJemxa3AOcZ6XcsBwALG9d4bpB8ZT0gSV0");
-  assert.equal(request.envelope.crypto.tag, "SYFS19IOXi4cYHLLcHDS3A");
+  assert.equal(request.envelope.crypto.tag, "bStRPqJ1xMlRiTdvafV7lA");
   assert.equal(
     request.envelope.crypto.ciphertext,
-    "ARIf2UK1z9Y3A_ukK44V2kqjaqeApuSylJm3W80YxyUG0XLoYMIu1QTvXPN-zlElKP6whxwk_U17z2JrcxDJcr9zsfBCi5EuOV3afHokWul8K81l"
+    "WKOcgHQ4DW2Fix9lHgyCrkdAOAK8XbsmTcPUuvA6FfZJxtLR5Tu_zOSzEPG9Q-ZMmXekdw0-fu1cD8vvTAQ5JRAtpGU16An8o9uCWPQR-BQKybDl"
   );
 
   const decrypted = decryptDirectRequest({
@@ -97,7 +97,7 @@ test("direct transport interoperates without exposing pairing, token, or health 
 
 test("encrypted pairing and one sync preserve the local SQLite and MCP data path", () => {
   const tempDir = mkdtempSync(join(tmpdir(), "vitalmcp-direct-flow-"));
-  const database = openHealthLinkDatabase({ path: join(tempDir, "health.sqlite") });
+  const database = openVitalAgentDatabase({ path: join(tempDir, "health.sqlite") });
   try {
     const receiver = fixedKey(31);
     const pairings = new PairingStore(database, receiver.publicKeyRaw);
@@ -160,7 +160,7 @@ test("encrypted pairing and one sync preserve the local SQLite and MCP data path
 
 test("direct transport rejects replay, stale, tampered, and rotated-key requests", () => {
   const tempDir = mkdtempSync(join(tmpdir(), "vitalmcp-direct-negative-"));
-  const database = openHealthLinkDatabase({ path: join(tempDir, "health.sqlite") });
+  const database = openVitalAgentDatabase({ path: join(tempDir, "health.sqlite") });
   try {
     const receiver = fixedKey(21);
     const request = createDirectRequestForTest({
@@ -214,7 +214,7 @@ test("direct receiver key persists securely and a replacement requires re-pairin
     const rotated = loadOrCreateDirectTransportKey(databasePath);
     assert.notEqual(rotated.publicKeyRaw, first.publicKeyRaw);
 
-    const pairingsDatabase = openHealthLinkDatabase({ path: databasePath });
+    const pairingsDatabase = openVitalAgentDatabase({ path: databasePath });
     try {
       const session = new PairingStore(pairingsDatabase, rotated.publicKeyRaw).createSession({
         serverUrl: "http://192.168.1.20:8787",

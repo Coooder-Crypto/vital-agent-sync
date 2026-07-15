@@ -1,6 +1,6 @@
 # Secure direct LAN transport
 
-Vital Agent Sync direct mode uses the `vitalmcp-direct-v1` application-layer envelope for pairing, sync, and device revocation. An `http://` LAN or Tailscale URL identifies how to reach the receiver; it does not mean that credentials or health summaries are sent as plaintext HTTP bodies.
+Vital Agent Sync direct mode uses the `vital-agent-direct-v1` application-layer envelope for pairing, sync, and device revocation. An `http://` LAN or Tailscale URL identifies how to reach the receiver; it does not mean that credentials or health summaries are sent as plaintext HTTP bodies.
 
 ## Trust boundaries
 

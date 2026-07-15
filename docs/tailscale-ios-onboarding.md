@@ -8,7 +8,7 @@ Vital Agent iOS app
   -> https://<device>.<tailnet>.ts.net
   -> Tailscale Serve terminates trusted TLS
   -> http://127.0.0.1:8787
-  -> healthlink-local receiver
+  -> vitalmcp receiver
 ```
 
 This route stays inside the tailnet. Vital Agent Sync does not use Tailscale Funnel and refuses to replace a conflicting Serve root handler or advertise a port where Funnel is enabled.
@@ -28,8 +28,8 @@ See [Tailscale Serve](https://tailscale.com/docs/features/tailscale-serve) and t
 Run setup on the receiver host:
 
 ```bash
-healthlink-local setup --transport tailscale --agent generic
-healthlink-local setup --resume --yes
+vitalmcp setup --transport tailscale --agent generic
+vitalmcp setup --resume --yes
 ```
 
 After setup consent, Vital Agent Sync detects the host's MagicDNS name, defaults the receiver bind address to `127.0.0.1`, and configures and verifies:
@@ -41,7 +41,7 @@ tailscale serve --bg --yes --https=443 http://127.0.0.1:8787
 If automatic hostname discovery is unavailable, provide the exact device name:
 
 ```bash
-healthlink-local setup \
+vitalmcp setup \
   --transport tailscale \
   --tailscale-name receiver.example-tailnet.ts.net \
   --agent generic
@@ -50,7 +50,7 @@ healthlink-local setup \
 The QR advertises `https://receiver.example-tailnet.ts.net`, not the backend port and not a `100.x` address. An explicit override is accepted only when it is HTTPS:
 
 ```bash
-healthlink-local setup \
+vitalmcp setup \
   --transport tailscale \
   --server-url https://receiver.example-tailnet.ts.net \
   --agent generic
@@ -63,7 +63,7 @@ Plain `http://<device>.<tailnet>.ts.net` is not a supported iOS route. A `.ts.ne
 ```bash
 tailscale status --json
 tailscale serve status --json
-healthlink-local doctor \
+vitalmcp doctor \
   --transport tailscale \
   --tailscale-name receiver.example-tailnet.ts.net
 ```
@@ -76,7 +76,7 @@ Common failures:
 - **Serve requests approval:** open the Tailscale consent URL shown by the command, enable HTTPS for the tailnet, then rerun setup.
 - **Existing root handler:** Vital Agent Sync will not overwrite it. Move that handler, use another node, or pass another private HTTPS `--server-url`.
 - **Funnel enabled on 443:** disable Funnel before setup. Vital Agent Sync does not publish the receiver to the public internet.
-- **Safari cannot connect:** confirm both devices are on the same tailnet, check ACLs/grants, then run `healthlink-local service status` and `healthlink-local logs`.
+- **Safari cannot connect:** confirm both devices are on the same tailnet, check ACLs/grants, then run `vitalmcp service status` and `vitalmcp logs`.
 - **Certificate or ATS failure:** confirm the QR contains `https://` and the exact `.ts.net` MagicDNS name. Do not replace it with HTTP, a raw `100.x` URL, or a self-signed certificate.
 
 ## Physical-Device Validation
@@ -85,8 +85,8 @@ Simulator and unit tests cannot prove Network Extension routing, tailnet policy,
 
 1. Connect the receiver and iPhone to the same tailnet and verify the HTTPS health URL in iPhone Safari.
 2. Put the iPhone on a different network from the receiver, such as cellular with Wi-Fi disabled.
-3. Run `healthlink-local pair`, scan the QR, and confirm the app displays the HTTPS `.ts.net` receiver.
+3. Run `vitalmcp pair`, scan the QR, and confirm the app displays the HTTPS `.ts.net` receiver.
 4. Approve pairing and perform a Health sync.
-5. Confirm `healthlink-local status` records the source device and sync across the two networks.
+5. Confirm `vitalmcp status` records the source device and sync across the two networks.
 6. Disconnect Tailscale on the iPhone and confirm sync fails safely, then reconnect and confirm retry succeeds without re-pairing.
 7. Reboot or restart Tailscale on the receiver and confirm the `--bg` Serve route and receiver service recover.

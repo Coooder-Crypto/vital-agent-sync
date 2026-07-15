@@ -35,7 +35,7 @@ For the canonical Agent-first install and onboarding flow, see [agent-first-onbo
 ## System Components
 
 ```text
-healthlink-ios
+vital-agent-sync-ios
   iOS app
   HealthKit collection
   pairing UI
@@ -50,13 +50,13 @@ vitalmcp
   local MCP server
   optional reverse tunnel
 
-@healthlink/mcp
+@vital-agent-sync/mcp
   MCP server adapter for agents
   local or remote endpoint support
   pairing flow tools
   context query tools
 
-@healthlink/sdk
+@vital-agent-sync/sdk
   TypeScript client
   schemas
   webhook verifier
@@ -79,7 +79,7 @@ Best for first-time setup, local MCP-compatible agents, and developer machines.
 iPhone
   -> same Wi-Fi / LAN
   -> macOS Vital Agent Sync receiver
-  -> ~/.healthlink/healthlink.sqlite
+  -> ~/.vital-agent-sync/vital-agent.sqlite
   -> MCP stdio
   -> MCP-compatible Agent
 ```
@@ -130,7 +130,7 @@ iPhone
   -> host LAN / Tailscale / HTTPS URL
   -> Docker host port 8787
   -> Vital Agent Sync receiver container
-  -> /data/healthlink.sqlite mounted volume
+  -> /data/vital-agent.sqlite mounted volume
   -> MCP-compatible Agent on the host or shared volume
 ```
 
@@ -162,7 +162,7 @@ vitalmcp daemon \
   --host 0.0.0.0 \
   --port 8787 \
   --transport public_https \
-  --server-url https://healthlink.example.com
+  --server-url https://vital-agent-sync.example.com
 ```
 
 This mode requires the user to provide HTTPS, DNS, persistence, and server hardening. Health summaries leave the phone and home network, but remain on infrastructure controlled by the user.
@@ -226,7 +226,7 @@ Auto-sync should be user-controlled and throttled. It should not promise strict 
 The MCP server should expose a small, stable tool surface:
 
 ```text
-healthlink_status
+vital_agent_status
 get_personal_context
 get_daily_health_summary
 get_sleep_trend
@@ -238,7 +238,7 @@ revoke_device
 
 Tool behavior:
 
-- `healthlink_status` returns device count, sync count, and latest sync time.
+- `vital_agent_status` returns device count, sync count, and latest sync time.
 - `get_personal_context` returns the preferred combined context for broad questions about today, energy, recovery, and activity.
 - `get_daily_health_summary` returns daily health summary only.
 - Trend and load tools return compact multi-day signals.
@@ -439,7 +439,7 @@ Exit criteria:
 
 ### Milestone 5: SDK And Packaging
 
-- `@healthlink/sdk`
+- `@vital-agent-sync/sdk`
 - TypeScript types
 - Zod schemas
 - webhook verifier

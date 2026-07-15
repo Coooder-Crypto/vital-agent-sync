@@ -125,8 +125,8 @@ Goal: let `vitalmcp` initialize relay-mode local state without contacting a prod
 
 Work:
 
-- Add runtime config file under `~/.healthlink/config.json`.
-- Add secrets directory under `~/.healthlink/secrets`.
+- Add runtime config file under `~/.vital-agent-sync/config.json`.
+- Add secrets directory under `~/.vital-agent-sync/secrets`.
 - Add key generation command:
 
 ```bash
@@ -134,7 +134,7 @@ vitalmcp setup --transport relay --agent hermes
 vitalmcp print-onboarding
 ```
 
-Hosted mode requires an operator-provided HTTPS URL through `--relay-url` or `HEALTHLINK_HOSTED_RELAY_URL`. The localhost fallback is self-hosted-only.
+Hosted mode requires an operator-provided HTTPS URL through `--relay-url` or `VITALMCP_HOSTED_RELAY_URL`. The localhost fallback is self-hosted-only.
 
 - Add onboarding payload generation with:
   - protocol version
@@ -175,9 +175,9 @@ Work:
 - Add envelope types:
 
 ```text
-HealthLinkEncryptedEnvelope
-HealthLinkOnboardingPayload
-HealthLinkRelayCursor
+VitalAgentEncryptedEnvelope
+VitalAgentOnboardingPayload
+VitalAgentRelayCursor
 ```
 
 - Add encrypt/decrypt helpers.
@@ -294,7 +294,7 @@ Acceptance:
 
 ## Milestone 6: iOS Relay Onboarding And Encrypted Sync
 
-Status: raw JSON/deep-link/text-code onboarding, Keychain-backed mobile credentials, relay pairing state, a persisted monotonic envelope sequence, UI confirmation copy, `healthlink://onboard` / `healthlink://sync` / status-only allowlisted callback handling, CryptoKit HKDF envelope encryption, tenant/deployment HTTP authentication, and relay upload are implemented in iOS. Swift typecheck and a CryptoKit-to-Node decrypt/schema/sequence interop gate pass locally; full Xcode/device workflow validation is user-owned on macOS 27 beta with the matching Xcode Beta and the paired iOS 26.5 device.
+Status: raw JSON/deep-link/text-code onboarding, Keychain-backed mobile credentials, relay pairing state, a persisted monotonic envelope sequence, UI confirmation copy, `vitalmcp://onboard` / `vitalmcp://sync` / status-only allowlisted callback handling, CryptoKit HKDF envelope encryption, tenant/deployment HTTP authentication, and relay upload are implemented in iOS. Swift typecheck and a CryptoKit-to-Node decrypt/schema/sequence interop gate pass locally; full Xcode/device workflow validation is user-owned on macOS 27 beta with the matching Xcode Beta and the paired iOS 26.5 device.
 
 Goal: add relay mode to the iOS app while preserving direct mode.
 
@@ -309,9 +309,9 @@ Work:
   - scopes
   - plaintext boundary
   - sync status
-- Keep direct `healthlink://pair?...` flow working.
-- Add `healthlink://onboard?payload=...`.
-- Add `healthlink://sync?source=<agent>&request_id=...`.
+- Keep direct `vitalmcp://pair?...` flow working.
+- Add `vitalmcp://onboard?payload=...`.
+- Add `vitalmcp://sync?source=<agent>&request_id=...`.
 - [x] Add safe callback status support with scheme allowlisting, bounded request IDs, and complete original query/fragment stripping.
 
 Acceptance:
@@ -409,7 +409,7 @@ Work:
 
 ```text
 Open Vital Agent Sync on your iPhone to sync now:
-healthlink://sync?source=<agent>&request_id=...
+vitalmcp://sync?source=<agent>&request_id=...
 ```
 
 Acceptance:
@@ -499,7 +499,7 @@ Sprint goal: make relay mode possible without iOS changes by using fixture envel
 Tasks:
 
 1. [x] Reuse existing validated ingest path for decrypted payloads.
-2. [x] Add local runtime config skeleton under `~/.healthlink`.
+2. [x] Add local runtime config skeleton under `~/.vital-agent-sync`.
 3. [x] Add crypto envelope types and a positive-path fixture.
 4. [x] Add a fake/self-host relay server that stores opaque envelopes.
 5. [x] Add `vitalmcp pull`.
@@ -585,9 +585,9 @@ This sprint avoids iOS, hosted infra, and OpenClaw packaging until the core rela
 ## Immediate Next Actions
 
 1. [x] Run `npm run audit:relay-local` from [e2ee-relay-release-audit.md](e2ee-relay-release-audit.md).
-2. [x] Run `npm run audit:agent-adapters`; generic MCP calls `healthlink_status` and Hermes v0.17.0 discovers all 12 tools.
+2. [x] Run `npm run audit:agent-adapters`; generic MCP calls `vital_agent_status` and Hermes v0.17.0 discovers all 12 tools.
 3. [ ] User device gate: validate the iOS relay path with the matching Xcode Beta on macOS 27 beta and the paired iOS 26.5 iPhone.
 4. [ ] Deploy a hosted relay beta environment, export its URL/API/metrics credentials, and run `npm run audit:relay-hosted -- --yes`; the wrapper performs passive and active audits without putting tokens in process arguments.
-5. [x] Commit/review the release worktree, run the authenticated `release:npm-preflight`, publish the historical `healthlink-local@0.2.0` release, confirm registry metadata, and smoke test an isolated global install plus encrypted fixture generation.
+5. [x] Commit/review the release worktree, run the authenticated `release:npm-preflight`, publish the historical `vitalmcp@0.2.0` release, confirm registry metadata, and smoke test an isolated global install plus encrypted fixture generation.
 6. [ ] Complete the hosted environment gate: HTTPS, edge rate limits, log redaction, backups, metrics access control, purge, retention cleanup, and distributed privacy docs. Website work remains out of scope for this execution.
 7. [ ] Optional adapter release: publish the generated OpenClaw package on ClawHub and smoke test installation from the listing when OpenClaw validation resumes.
