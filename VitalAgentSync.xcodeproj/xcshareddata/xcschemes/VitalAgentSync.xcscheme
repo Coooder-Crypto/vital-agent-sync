@@ -15,10 +15,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "CC253E6BE18A77DF054490D7"
-               BuildableName = "HealthLink.app"
-               BlueprintName = "HealthLink"
-               ReferencedContainer = "container:HealthLink.xcodeproj">
+               BlueprintIdentifier = "498AFB73209F99F9DE6CE523"
+               BuildableName = "VitalAgentSync.app"
+               BlueprintName = "VitalAgentSync"
+               ReferencedContainer = "container:VitalAgentSync.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -32,10 +32,10 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "CC253E6BE18A77DF054490D7"
-            BuildableName = "HealthLink.app"
-            BlueprintName = "HealthLink"
-            ReferencedContainer = "container:HealthLink.xcodeproj">
+            BlueprintIdentifier = "498AFB73209F99F9DE6CE523"
+            BuildableName = "VitalAgentSync.app"
+            BlueprintName = "VitalAgentSync"
+            ReferencedContainer = "container:VitalAgentSync.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
@@ -43,10 +43,10 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "08A71FCC7376DA18CE0EDC91"
-               BuildableName = "HealthLinkTests.xctest"
-               BlueprintName = "HealthLinkTests"
-               ReferencedContainer = "container:HealthLink.xcodeproj">
+               BlueprintIdentifier = "96749EC2F636F901CCB316F2"
+               BuildableName = "VitalAgentSyncTests.xctest"
+               BlueprintName = "VitalAgentSyncTests"
+               ReferencedContainer = "container:VitalAgentSync.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -67,10 +67,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "CC253E6BE18A77DF054490D7"
-            BuildableName = "HealthLink.app"
-            BlueprintName = "HealthLink"
-            ReferencedContainer = "container:HealthLink.xcodeproj">
+            BlueprintIdentifier = "498AFB73209F99F9DE6CE523"
+            BuildableName = "VitalAgentSync.app"
+            BlueprintName = "VitalAgentSync"
+            ReferencedContainer = "container:VitalAgentSync.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <CommandLineArguments>
@@ -86,10 +86,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "CC253E6BE18A77DF054490D7"
-            BuildableName = "HealthLink.app"
-            BlueprintName = "HealthLink"
-            ReferencedContainer = "container:HealthLink.xcodeproj">
+            BlueprintIdentifier = "498AFB73209F99F9DE6CE523"
+            BuildableName = "VitalAgentSync.app"
+            BlueprintName = "VitalAgentSync"
+            ReferencedContainer = "container:VitalAgentSync.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <CommandLineArguments>

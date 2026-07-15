@@ -1,6 +1,6 @@
 import XCTest
 import CryptoKit
-@testable import HealthLink
+@testable import VitalAgentSync
 
 final class PairingAndPayloadTests: XCTestCase {
     private let directPublicKey = Data(repeating: 7, count: 32).base64URLEncodedString()
@@ -125,7 +125,7 @@ final class PairingAndPayloadTests: XCTestCase {
     }
 
     func testCallbackKeepsLegacySourceAndDropsUntrustedMetadata() throws {
-        let callback = try XCTUnwrap(HealthLinkCallbackPolicy.safeCallbackURL(
+        let callback = try XCTUnwrap(VitalAgentCallbackPolicy.safeCallbackURL(
             rawCallbackURL: "openclaw://healthlink-result?secret=drop-me#drop-me-too",
             requestID: "issue55-001",
             status: "ok"

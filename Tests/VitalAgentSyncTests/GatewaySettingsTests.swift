@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-@testable import HealthLink
+@testable import VitalAgentSync
 
 final class GatewaySettingsTests: XCTestCase {
     private var suiteName = ""

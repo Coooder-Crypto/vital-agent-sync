@@ -26,7 +26,7 @@ The following non-npm identifiers remain unchanged because they are persisted pa
 - MCP server key and tool compatibility identifiers using `healthlink`
 - relay header: `X-HealthLink-Relay-API-Key`
 - callback metadata source: `healthlink`
-- Xcode project, target, Swift module, and unit-test target names
+- legacy Relay protocol, state, and MCP identifiers until the runtime identifier migration
 
 The Vital Agent iOS app registers and accepts both `vitalmcp://` and `healthlink://`. The current `vitalmcp` runtime generates the primary scheme; legacy links remain accepted at the protocol boundary.
 

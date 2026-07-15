@@ -1,7 +1,7 @@
 import Foundation
 
 @main
-struct HealthLinkIOSRelayCryptoFixture {
+struct VitalAgentIOSRelayCryptoFixture {
     static func main() throws {
         guard CommandLine.arguments.count == 3 else {
             throw FixtureError.usage
@@ -42,7 +42,7 @@ struct HealthLinkIOSRelayCryptoFixture {
             onboarding: onboarding,
             sequence: 1_750_000_000_001
         )
-        guard let callback = HealthLinkCallbackPolicy.safeCallbackURL(
+        guard let callback = VitalAgentCallbackPolicy.safeCallbackURL(
             rawCallbackURL: "openclaw://healthlink/callback?token=must-not-survive#secret-fragment",
             requestID: "req_123.valid",
             status: "ok"
@@ -51,7 +51,7 @@ struct HealthLinkIOSRelayCryptoFixture {
               callbackComponents.fragment == nil,
               callbackComponents.queryItems?.map(\.name) == ["request_id", "status", "source"],
               callbackComponents.queryItems?.first(where: { $0.name == "request_id" })?.value == "req_123.valid",
-              HealthLinkCallbackPolicy.safeCallbackURL(
+              VitalAgentCallbackPolicy.safeCallbackURL(
                   rawCallbackURL: "https://example.com/callback",
                   requestID: "req_123",
                   status: "ok"
