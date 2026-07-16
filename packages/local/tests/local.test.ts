@@ -3083,6 +3083,10 @@ test("root package exposes repeatable relay release audit gates", () => {
     "node scripts/release-secret-scan.mjs"
   );
   assert.equal(
+    manifest.scripts?.["audit:oss"],
+    "node scripts/release-secret-scan.mjs --scope repository --history"
+  );
+  assert.equal(
     manifest.scripts?.["audit:relay-hosted"],
     "node scripts/e2ee-relay-hosted-audit.mjs"
   );
@@ -3172,10 +3176,12 @@ test("root package exposes repeatable relay release audit gates", () => {
   assert.match(npmReleasePreflightScript, /\\bE404\\b/);
   assert.match(npmReleasePreflightScript, /:\(exclude\)docs\/website-media-plan\.md/);
   assert.match(npmReleasePreflightScript, /npm", \["run", "audit:secrets"\]/);
+  assert.match(releaseSecretScanScript, /scope !== "release" && scope !== "repository"/);
+  assert.match(releaseSecretScanScript, /scanHistoryPatches\(\)/);
   assert.match(npmReleasePreflightScript, /npm", \["whoami"\]/);
   assert.match(npmReleasePreflightScript, /npm", \["view", value\.name, "version"\]/);
   assert.doesNotMatch(npmReleasePreflightScript, /npm", \["publish"/);
-  assert.match(releaseSecretScanScript, /git", \[\s*"ls-files"/);
+  assert.match(releaseSecretScanScript, /const args = \[\s*"ls-files"/);
   assert.match(releaseSecretScanScript, /private-key-pem/);
   assert.match(releaseSecretScanScript, /vital-agent-sync-secret-literal/);
   assert.match(releaseSecretScanScript, /sensitive_values_printed: false/);
