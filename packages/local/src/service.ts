@@ -230,8 +230,8 @@ export function startLaunchdService(options: LaunchdServiceOptions): VitalAgentS
   if (!existsSync(paths.plistPath)) {
     throw new Error(`Vital Agent Sync launchd service is not installed: ${paths.plistPath}`);
   }
-  runLaunchctl(["bootstrap", launchdDomain(), paths.plistPath], { allowFailure: true });
-  runLaunchctl(["kickstart", "-k", `${launchdDomain()}/${label}`], { allowFailure: true });
+  runLaunchctl(["bootstrap", launchdDomain(), paths.plistPath]);
+  runLaunchctl(["kickstart", "-k", `${launchdDomain()}/${label}`]);
   return getLaunchdServiceStatus(options);
 }
 
@@ -488,9 +488,17 @@ function runLaunchctl(args: string[], options: { allowFailure?: boolean } = {}):
     });
   } catch (error) {
     if (!options.allowFailure) {
-      throw error;
+      throw processManagerError("launchctl", args, error);
     }
   }
+}
+
+function processManagerError(command: string, args: string[], error: unknown): Error {
+  const stderr = typeof error === "object" && error !== null && "stderr" in error
+    ? String((error as { stderr?: unknown }).stderr ?? "").trim()
+    : "";
+  const detail = stderr || (error instanceof Error ? error.message : String(error));
+  return new Error(`${command} ${args[0] ?? "command"} failed${detail ? `: ${detail}` : "."}`);
 }
 
 function runSystemctl(args: string[], options: { allowFailure?: boolean } = {}): void {

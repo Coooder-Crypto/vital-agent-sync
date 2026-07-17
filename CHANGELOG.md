@@ -2,7 +2,7 @@
 
 All notable user-visible changes to Vital Agent Sync are documented here.
 
-The project uses a shared preview version for the iOS app, `vitalmcp` runtime, and public Skill release while the product is pre-1.0.
+The project coordinates preview releases across the iOS app, `vitalmcp` runtime, and public Skill; patch releases may update the runtime and Skill without requiring an iOS binary change.
 
 ## [Unreleased]
 
@@ -14,7 +14,15 @@ The project uses a shared preview version for the iOS app, `vitalmcp` runtime, a
 ### Changed
 
 - Public documentation now leads with the WorkBuddy, LAN, and Tailscale onboarding paths.
-- Product version metadata is aligned with the `0.5.0` npm and SkillHub release.
+- Public documentation leads with the current pinned npm and SkillHub release.
+
+## [0.5.1] - 2026-07-18
+
+### Fixed
+
+- Reject legacy or unknown receivers before setup writes by verifying a loopback-only runtime, protocol, and database identity.
+- Surface macOS `launchctl` failures instead of silently falling back to an unverified background process.
+- Prevent the WorkBuddy Skill from migrating legacy databases, modifying shell profiles, bypassing MCP, or reading health data before privacy consent.
 
 ## [0.5.0] - 2026-07-16
 

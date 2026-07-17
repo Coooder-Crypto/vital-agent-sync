@@ -14,7 +14,7 @@ The product name is Vital Agent Sync. The iOS project/module is `VitalAgentSync`
 
 ## Current release
 
-Version `0.5.0` is a Local Preview:
+Version `0.5.1` is a Local Preview:
 
 - LAN is the default onboarding path.
 - Tailscale Serve HTTPS is the optional private remote path.
@@ -36,7 +36,7 @@ The Skill reviews a redacted setup plan, asks before persistent changes, install
 ### Manual runtime setup
 
 ```bash
-npx -y vitalmcp@0.5.0 setup --agent auto --transport lan
+npx -y vitalmcp@0.5.1 setup --agent auto --transport lan
 ```
 
 The setup command installs the background receiver, preserves and backs up existing Agent configuration, and prints a short-lived iPhone pairing QR. After the first sync:
