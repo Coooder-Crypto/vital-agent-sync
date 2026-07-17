@@ -2,35 +2,9 @@ name: Relay CI
 
 on:
   pull_request:
-    paths:
-      - .github/workflows/relay-ci.yml
-      - apps/ios/**
-      - deploy/relay/**
-      - packages/local/**
-      - scripts/agent-adapter-audit.mjs
-      - scripts/e2ee-relay-*.mjs
-      - scripts/ios-relay-crypto-fixture.swift
-      - scripts/ios-unit-tests.mjs
-      - scripts/npm-release-preflight.mjs
-      - scripts/release-secret-scan.mjs
-      - package.json
-      - tsconfig.base.json
   push:
     branches:
       - main
-    paths:
-      - .github/workflows/relay-ci.yml
-      - apps/ios/**
-      - deploy/relay/**
-      - packages/local/**
-      - scripts/agent-adapter-audit.mjs
-      - scripts/e2ee-relay-*.mjs
-      - scripts/ios-relay-crypto-fixture.swift
-      - scripts/ios-unit-tests.mjs
-      - scripts/npm-release-preflight.mjs
-      - scripts/release-secret-scan.mjs
-      - package.json
-      - tsconfig.base.json
   workflow_dispatch:
 
 permissions:
@@ -45,8 +19,58 @@ env:
   NEXT_TELEMETRY_DISABLED: "1"
 
 jobs:
+  changes:
+    name: Detect protected-path changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      relay: ${{ steps.filter.outputs.relay }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect relay, local runtime, and iOS changes
+        id: filter
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "relay=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            base_sha="$PR_BASE_SHA"
+          else
+            base_sha="$PUSH_BEFORE_SHA"
+          fi
+
+          if [[ -z "$base_sha" ]] || ! git cat-file -e "${base_sha}^{commit}"; then
+            echo "relay=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          relay=false
+          while IFS= read -r path; do
+            case "$path" in
+              .github/workflows/relay-ci.yml|apps/ios/*|deploy/relay/*|packages/local/*|scripts/agent-adapter-audit.mjs|scripts/e2ee-relay-*.mjs|scripts/ios-relay-crypto-fixture.swift|scripts/ios-unit-tests.mjs|scripts/npm-release-preflight.mjs|scripts/release-secret-scan.mjs|package.json|package-lock.json|tsconfig.base.json)
+                relay=true
+                break
+                ;;
+            esac
+          done < <(git diff --name-only "$base_sha" "$GITHUB_SHA")
+
+          echo "relay=$relay" >> "$GITHUB_OUTPUT"
+
   package-audit:
     name: Isolated package audit
+    needs: changes
+    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.relay == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -69,6 +93,8 @@ jobs:
 
   container-audit:
     name: Hardened container audit
+    needs: changes
+    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.relay == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -96,6 +122,8 @@ jobs:
 
   ios-interop:
     name: iOS source and crypto interoperability
+    needs: changes
+    if: ${{ always() && (needs.changes.result != 'success' || needs.changes.outputs.relay == 'true') }}
     runs-on: macos-15
     timeout-minutes: 20
 
