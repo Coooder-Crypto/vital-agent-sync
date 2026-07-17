@@ -23,9 +23,6 @@ coverage
 **/vital-agent-sync-data
 **/vital-agent-sync-relay-data
 
-App
-Resources
-VitalAgentSync.xcodeproj
 apps
 docs
 scripts

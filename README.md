@@ -1,12 +1,90 @@
 # Vital Agent Sync
 
-Vital Agent Sync is a private iOS data gateway for agent systems. The MVP reads user-authorized Apple Health summaries, uploads compact daily context to the user's Agent-side receiver, stores it locally, and exposes it to agents through MCP tools.
+[简体中文](README.zh-CN.md)
 
-The pre-release product is branded Vital Agent Sync. The iOS project/module is `VitalAgentSync`, the npm package and CLI are `vitalmcp`, runtime state lives under `~/.vital-agent-sync`, and the app accepts the technical `vitalmcp://` deep-link scheme. See [docs/brand-identity.md](docs/brand-identity.md).
+[![CI](https://github.com/Coooder-Crypto/vital-agent-sync/actions/workflows/ci.yml/badge.svg)](https://github.com/Coooder-Crypto/vital-agent-sync/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/vitalmcp)](https://www.npmjs.com/package/vitalmcp)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-It is intentionally not an agent. It is a user-controlled data connector.
+Vital Agent Sync is a local-first Apple Health connector for WorkBuddy and other MCP-compatible Agents. The iPhone app reads only user-authorized HealthKit data, sends compact summaries to a receiver the user controls, stores them in local SQLite, and exposes scoped context through MCP tools.
 
-For the broader product plan covering local daemon, MCP, pairing, scopes, and packaging, see [docs/product-plan.md](docs/product-plan.md). For common deployment methods, see [docs/deployment-methods.md](docs/deployment-methods.md). For the target "install, scan QR, sync, agent reads data" UX, see [docs/agent-connection.md](docs/agent-connection.md). For the multi-source, multi-agent, multi-transport upgrade TODO, see [docs/architecture-upgrade-todo.md](docs/architecture-upgrade-todo.md). For the E2EE relay, self-hosted relay, OpenClaw skill, mobile deep-link route, and beta release gate, see [docs/e2ee-relay-technical-route.md](docs/e2ee-relay-technical-route.md), [docs/e2ee-relay-protocol-v1.md](docs/e2ee-relay-protocol-v1.md), [docs/e2ee-relay-implementation-plan.md](docs/e2ee-relay-implementation-plan.md), [docs/e2ee-relay-threat-model.md](docs/e2ee-relay-threat-model.md), [docs/e2ee-relay-privacy-boundary.md](docs/e2ee-relay-privacy-boundary.md), [docs/e2ee-relay-data-retention-policy.md](docs/e2ee-relay-data-retention-policy.md), [docs/e2ee-relay-hosted-runbook.md](docs/e2ee-relay-hosted-runbook.md), [docs/e2ee-relay-release-audit.md](docs/e2ee-relay-release-audit.md), [docs/e2ee-relay-hosted-to-self-hosted-migration.md](docs/e2ee-relay-hosted-to-self-hosted-migration.md), and [docs/e2ee-relay-mode-comparison.md](docs/e2ee-relay-mode-comparison.md).
+It is intentionally not an Agent, hosted health cloud, medical device, or source of medical advice. It is a user-controlled data connector.
+
+The product name is Vital Agent Sync. The iOS project/module is `VitalAgentSync`, the npm package and CLI are `vitalmcp`, runtime state lives under `~/.vital-agent-sync`, and the app accepts the technical `vitalmcp://` deep-link scheme.
+
+## Current release
+
+Version `0.5.0` is a Local Preview:
+
+- LAN is the default onboarding path.
+- Tailscale Serve HTTPS is the optional private remote path.
+- WorkBuddy, Hermes, OpenClaw, and generic MCP clients share the same runtime and database.
+- Docker and self-hosted relay are advanced user-operated paths.
+- Hosted relay is experimental and is not required or recommended for first-time setup.
+- The iOS app is currently distributed as source. There is no App Store build yet.
+
+## Quick start
+
+### WorkBuddy and SkillHub
+
+Install the `Vital Agent Sync` Skill from SkillHub, then tell WorkBuddy:
+
+> 安装 Vital Agent Sync，并在本机显示 iPhone 配对二维码。
+
+The Skill reviews a redacted setup plan, asks before persistent changes, installs the pinned `vitalmcp` runtime, configures MCP, and opens the credential-bearing QR only in the user's local browser.
+
+### Manual runtime setup
+
+```bash
+npx -y vitalmcp@0.5.0 setup --agent auto --transport lan
+```
+
+The setup command installs the background receiver, preserves and backs up existing Agent configuration, and prints a short-lived iPhone pairing QR. After the first sync:
+
+```bash
+vitalmcp status --output json
+vitalmcp doctor --transport lan
+```
+
+### iPhone app
+
+HealthKit requires a real iPhone. Generate the project with XcodeGen, select your own Apple Developer Team and unique bundle identifier, keep the HealthKit capability enabled, then run the app on the device:
+
+```bash
+cd apps/ios
+xcodegen generate
+open VitalAgentSync.xcodeproj
+```
+
+Scan the QR, review the requested scopes and receiver address, grant the selected Health permissions, and sync once.
+
+## Data path
+
+```text
+iPhone HealthKit
+  -> encrypted direct sync over trusted LAN or the user's Tailscale network
+  -> user-owned vitalmcp receiver
+  -> local SQLite
+  -> scoped MCP tools
+  -> the user's Agent and selected model provider
+```
+
+The default route has no Vital Agent Sync account, VPS, domain, payment method, or hosted service. An Agent or model provider may receive the scoped context returned by MCP; local storage does not imply local model inference. Never paste pairing QR codes, onboarding links, keys, tokens, databases, or real health exports into Agent chats or public issues.
+
+## Repository layout
+
+| Path | Purpose |
+| --- | --- |
+| `apps/ios/` | SwiftUI HealthKit app, XcodeGen project, resources, and focused iOS tests |
+| `packages/local/` | `vitalmcp` runtime, receiver, SQLite, MCP, Agent adapters, and transports |
+| `skills/vital-agent-sync/` | Source Skill used for Agent packaging and release checks |
+| `deploy/` | Docker and self-hosted relay deployment templates |
+| `apps/www/` | Public product website source |
+| `docs/` | Architecture, deployment, privacy, threat-model, and protocol documentation |
+
+The independently publishable WorkBuddy package lives at [`Coooder-Crypto/vital-agent-sync-skill`](https://github.com/Coooder-Crypto/vital-agent-sync-skill). The complete public/private boundary is documented in [Open-source scope](docs/open-source-scope.md).
+
+For the broader product plan covering local daemon, MCP, pairing, scopes, and packaging, see [docs/product-plan.md](docs/product-plan.md). For common deployment methods, see [docs/deployment-methods.md](docs/deployment-methods.md). For the target "install, scan QR, sync, agent reads data" UX, see [docs/agent-connection.md](docs/agent-connection.md). For security, start with [direct LAN security](docs/direct-lan-security.md), the [relay threat model](docs/e2ee-relay-threat-model.md), and the [privacy boundary](docs/e2ee-relay-privacy-boundary.md).
 
 ## Scope
 
@@ -41,9 +119,12 @@ For the broader product plan covering local daemon, MCP, pairing, scopes, and pa
 This repo uses XcodeGen so the generated `.xcodeproj` does not need to be hand-maintained.
 
 ```bash
+cd apps/ios
 xcodegen generate
 open VitalAgentSync.xcodeproj
 ```
+
+See [apps/ios/README.md](apps/ios/README.md) for signing, simulator, and physical-device notes.
 
 ## Agent-Side Local Package
 
@@ -93,12 +174,7 @@ npx -y vitalmcp setup
 
 Supported Agents can use the Skill-first flow instead: the generated Vital Agent Sync Skill requests a redacted setup plan, asks for consent, resumes the shared `vitalmcp` bootstrap, presents one private local onboarding page, and verifies the first sync through MCP. The Skill never owns keys, relay crypto, SQLite, or a separate health query path. See [docs/agent-first-onboarding.md](docs/agent-first-onboarding.md).
 
-Portable no-sudo installer fallback:
-
-```bash
-curl -fsSL https://<vital-agent-sync-domain>/install.sh | sh
-vitalmcp setup
-```
+The repository includes a portable no-sudo `install.sh`, but no public installer domain is currently advertised. Prefer the pinned npm command above until an official HTTPS endpoint and checksum policy are published.
 
 Agent-safe setup commands:
 
@@ -190,6 +266,7 @@ npm run audit:relay-local
 npm run audit:agent-adapters
 npm run audit:dependencies
 npm run audit:secrets
+npm run audit:oss
 npm run release:npm-preflight -- --local
 npm run pack:check --workspace vitalmcp
 ```
@@ -205,7 +282,7 @@ lsof -nP -iTCP:8787 -sTCP:LISTEN
 
 ## Device Setup
 
-HealthKit requires a real iPhone for meaningful testing. In Xcode:
+HealthKit requires a real iPhone for meaningful testing. The public source does not include signing credentials or provisioning profiles. In Xcode:
 
 1. Select the `VitalAgentSync` target.
 2. Set your Apple Developer Team.
@@ -287,13 +364,12 @@ Canonical plaintext payload after local receiver decryption:
 }
 ```
 
-## Next Steps
+## Contributing and support
 
-- Add foreground auto sync after pairing, app launch, and app foregrounding with throttling.
-- Add `HKAnchoredObjectQuery` for incremental sample sync.
-- Add `HKObserverQuery`, `BGAppRefreshTask`, and background delivery as best-effort triggers.
-- Add an optional bundled Vital Agent Sync Skill installer for Hermes.
-- Add automated iOS UI coverage after real-device workflow stabilizes.
-- Add tunnel and public HTTPS transports.
-- Add Reminders summaries.
-- Add a Watch app for quick feedback and training controls.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Use synthetic data in tests and remove private health information, pairing artifacts, credentials, databases, and unredacted logs from all public reports. Security vulnerabilities must follow [SECURITY.md](SECURITY.md); general setup guidance is in [SUPPORT.md](SUPPORT.md).
+
+User-visible releases are tracked in [CHANGELOG.md](CHANGELOG.md). Design and implementation work remains visible in GitHub Issues and the architecture TODO, but an unchecked planning item is not a product promise.
+
+## License
+
+Vital Agent Sync is available under the [MIT License](LICENSE). The name and visual identity are project identifiers; the software license does not grant rights to impersonate the project or misrepresent the origin of modified builds.

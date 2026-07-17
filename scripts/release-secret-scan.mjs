@@ -1,9 +1,10 @@
 import { spawnSync } from "node:child_process";
-import { lstatSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = process.cwd();
 const maxTextFileBytes = 2 * 1024 * 1024;
+const options = parseOptions(process.argv.slice(2));
 const findings = [];
 let scannedFiles = 0;
 let skippedBinaryFiles = 0;
@@ -22,15 +23,17 @@ const tokenRules = [
 
 runSelfTest();
 
-for (const relativePath of listReleaseFiles()) {
+for (const relativePath of listFiles()) {
   const normalizedPath = relativePath.replaceAll("\\", "/");
+  const absolutePath = resolve(root, relativePath);
+  if (!existsSync(absolutePath)) {
+    continue;
+  }
   const sensitivePathRule = classifySensitivePath(normalizedPath);
   if (sensitivePathRule) {
     findings.push({ rule: sensitivePathRule, path: normalizedPath, line: null });
     continue;
   }
-
-  const absolutePath = resolve(root, relativePath);
   const stat = lstatSync(absolutePath);
   if (!stat.isFile()) {
     continue;
@@ -61,6 +64,11 @@ for (const relativePath of listReleaseFiles()) {
   }
 }
 
+if (options.history) {
+  scanHistoryPaths();
+  scanHistoryPatches();
+}
+
 if (findings.length > 0) {
   console.error(`Vital Agent Sync release secret scan failed with ${findings.length} finding(s).`);
   for (const finding of findings) {
@@ -77,22 +85,26 @@ if (findings.length > 0) {
     findings: 0,
     self_test: true,
     sensitive_values_printed: false,
-    excluded_scope: ["apps/www", "docs/website-media-plan.md"]
+    scope: options.scope,
+    history_scanned: options.history,
+    excluded_scope: options.scope === "release" ? ["apps/www", "docs/website-media-plan.md"] : []
   }, null, 2));
 }
 
-function listReleaseFiles() {
-  const result = spawnSync("git", [
+function listFiles() {
+  const args = [
     "ls-files",
     "-z",
     "--cached",
     "--others",
     "--exclude-standard",
     "--",
-    ".",
-    ":(exclude)apps/www",
-    ":(exclude)docs/website-media-plan.md"
-  ], {
+    "."
+  ];
+  if (options.scope === "release") {
+    args.push(":(exclude)apps/www", ":(exclude)docs/website-media-plan.md");
+  }
+  const result = spawnSync("git", args, {
     cwd: root,
     encoding: "buffer",
     maxBuffer: 64 * 1024 * 1024
@@ -108,6 +120,101 @@ function listReleaseFiles() {
     .toString("utf8")
     .split("\0")
     .filter(Boolean);
+}
+
+function scanHistoryPaths() {
+  const result = runGit(["log", "--all", "--format=commit:%H", "--name-only", "--", "."]);
+  let commit = "unknown";
+  for (const line of result.split(/\r?\n/)) {
+    if (line.startsWith("commit:")) {
+      commit = line.slice("commit:".length);
+      continue;
+    }
+    const path = line.trim();
+    if (!path) {
+      continue;
+    }
+    const rule = classifySensitivePath(path);
+    if (rule) {
+      findings.push({ rule: `history-${rule}`, path: `${commit}:${path}`, line: null });
+    }
+  }
+}
+
+function scanHistoryPatches() {
+  const result = runGit([
+    "log",
+    "--all",
+    "--format=commit:%H",
+    "--no-ext-diff",
+    "--no-textconv",
+    "-p",
+    "--",
+    "."
+  ]);
+  let commit = "unknown";
+  let path = "unknown";
+  let lineNumber = 0;
+  for (const line of result.split(/\r?\n/)) {
+    lineNumber += 1;
+    if (line.startsWith("commit:")) {
+      commit = line.slice("commit:".length);
+      path = "unknown";
+      continue;
+    }
+    if (line.startsWith("+++ b/")) {
+      path = line.slice("+++ b/".length);
+      continue;
+    }
+    if (!line.startsWith("+") || line.startsWith("+++")) {
+      continue;
+    }
+    const addedLine = line.slice(1);
+    for (const rule of tokenRules) {
+      if (rule.pattern.test(addedLine)) {
+        findings.push({ rule: `history-${rule.id}`, path: `${commit}:${path}`, line: lineNumber });
+      }
+    }
+    if (containsLiteralVitalAgentSecret(addedLine)) {
+      findings.push({ rule: "history-vital-agent-sync-secret-literal", path: `${commit}:${path}`, line: lineNumber });
+    }
+  }
+}
+
+function runGit(args) {
+  const result = spawnSync("git", args, {
+    cwd: root,
+    encoding: "buffer",
+    maxBuffer: 512 * 1024 * 1024
+  });
+  if (result.error) {
+    throw result.error;
+  }
+  if (result.status !== 0) {
+    process.stderr.write(result.stderr.toString("utf8"));
+    throw new Error(`git ${args[0]} exited with status ${result.status ?? "unknown"}.`);
+  }
+  return result.stdout.toString("utf8");
+}
+
+function parseOptions(args) {
+  let scope = "release";
+  let history = false;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--scope") {
+      scope = args[index + 1] ?? "";
+      index += 1;
+    } else if (arg === "--history") {
+      history = true;
+    } else {
+      throw new Error(`Unknown option: ${arg}`);
+    }
+  }
+  if (scope !== "release" && scope !== "repository") {
+    throw new Error("Expected --scope to be release or repository.");
+  }
+  return { scope, history };
 }
 
 function classifySensitivePath(path) {

@@ -54,11 +54,17 @@ This gives a complete end-to-end product path before adding background sync, rem
 
 The current repository contains the iOS app and the first Agent-side Node package.
 
-Recommended early structure:
+Current monorepo structure:
 
 ```text
-Vital Agent iOS app repo
-  App/
+Vital Agent Sync repo
+  apps/
+    ios/
+      App/
+      Resources/
+      Tests/
+      project.yml
+    www/
   docs/
   packages/
     local/

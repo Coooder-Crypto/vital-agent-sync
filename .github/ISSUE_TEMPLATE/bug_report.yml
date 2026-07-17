@@ -1,0 +1,59 @@
+name: Bug report
+description: Report reproducible Vital Agent Sync behavior without sharing private health data or credentials.
+title: "[bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not attach Apple Health exports, pairing QR codes, onboarding links, tokens, private keys, SQLite databases, or unredacted logs.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - iOS app
+        - vitalmcp runtime
+        - WorkBuddy / SkillHub
+        - MCP client
+        - LAN
+        - Tailscale
+        - Docker / self-hosted relay
+        - Hosted relay experiment
+        - Documentation
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: "0.5.0"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the observed and expected behavior using synthetic or redacted values.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Redacted diagnostics
+      description: Share only redacted `vitalmcp status` or `vitalmcp doctor` output.
+      render: shell
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: I removed all health data, pairing artifacts, credentials, database contents, and private logs.
+          required: true

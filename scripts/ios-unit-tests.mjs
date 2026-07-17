@@ -5,6 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const iosProjectRoot = resolve(repositoryRoot, "apps", "ios");
 const devicesResult = spawnSync("xcrun", ["simctl", "list", "devices", "available", "--json"], {
   cwd: repositoryRoot,
   encoding: "utf8"
@@ -40,7 +41,7 @@ const testResult = spawnSync("xcodebuild", [
   "-derivedDataPath", derivedDataPath,
   "CODE_SIGNING_ALLOWED=NO"
 ], {
-  cwd: repositoryRoot,
+  cwd: iosProjectRoot,
   env: {
     ...process.env,
     NSUnbufferedIO: "YES"

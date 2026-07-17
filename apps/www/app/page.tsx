@@ -27,7 +27,7 @@ import {
   Zap,
 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import appIcon from "../../../Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png";
+import appIcon from "../../ios/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png";
 import { usePageSnap, type SnapSection } from "./use-page-snap";
 
 const installCommand = "npx -y vitalmcp setup";

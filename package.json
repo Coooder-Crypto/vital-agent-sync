@@ -1,8 +1,17 @@
 {
   "name": "vital-agent-sync",
-  "version": "0.1.0",
+  "version": "0.5.0",
   "private": true,
-  "description": "Private HealthKit bridge between the Vital Agent iOS app and a user's local Agent runtime.",
+  "description": "Local-first Apple Health bridge for WorkBuddy and other MCP-compatible Agents.",
+  "license": "MIT",
+  "homepage": "https://github.com/Coooder-Crypto/vital-agent-sync#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Coooder-Crypto/vital-agent-sync.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Coooder-Crypto/vital-agent-sync/issues"
+  },
   "workspaces": [
     "packages/*",
     "apps/*"
@@ -23,6 +32,7 @@
     "audit:dependencies": "npm audit --omit=dev --workspace vitalmcp",
     "audit:www-dependencies": "npm audit --omit=dev --workspace vital-agent-sync-www",
     "audit:secrets": "node scripts/release-secret-scan.mjs",
+    "audit:oss": "node scripts/release-secret-scan.mjs --scope repository --history",
     "audit:relay-hosted": "node scripts/e2ee-relay-hosted-audit.mjs",
     "preflight:relay-production": "node scripts/e2ee-relay-production-preflight.mjs",
     "release:npm-preflight": "node scripts/npm-release-preflight.mjs",
