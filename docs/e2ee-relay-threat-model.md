@@ -99,7 +99,7 @@ Implemented in the local package:
 - OpenClaw skill export with privacy and freshness guardrails: `packages/local/src/skill.ts`.
 - Repository release secret scan with built-in rule self-tests and value-redacted findings: `scripts/release-secret-scan.mjs`.
 - MCP/query freshness metadata and stale-pull next actions: `packages/local/src/health-query.ts`.
-- iOS relay onboarding, encrypted upload, and status-only callback code paths: `App/VitalAgentSyncApp.swift`, `App/GatewayAPIClient.swift`, `App/SyncCoordinator.swift`, and related app files.
+- iOS relay onboarding, encrypted upload, and status-only callback code paths: `apps/ios/App/VitalAgentSyncApp.swift`, `apps/ios/App/GatewayAPIClient.swift`, `apps/ios/App/SyncCoordinator.swift`, and related app files.
 - Positive and negative relay tests, deployment audit tests, and fixture-flow coverage: `packages/local/tests/local.test.ts`.
 - CryptoKit-to-Node envelope compatibility gate: `scripts/e2ee-relay-ios-interop.mjs` and `scripts/ios-relay-crypto-fixture.swift`.
 - Private local relay directories, config/cursor/key files, health and relay SQLite files, a sensitive-context Docker build ignore policy, and a non-root/Caddy production deployment template: `packages/local/src/database.ts`, `packages/local/src/relay-runtime.ts`, `packages/local/src/relay-pull.ts`, `packages/local/src/relay-server.ts`, `.dockerignore`, and `deploy/relay`.

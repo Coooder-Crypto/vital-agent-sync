@@ -49,7 +49,7 @@ try {
   run("swiftc", [
     "-module-cache-path",
     moduleCachePath,
-    join(root, "App", "Models.swift"),
+    join(root, "apps", "ios", "App", "Models.swift"),
     join(root, "scripts", "ios-relay-crypto-fixture.swift"),
     "-o",
     executablePath

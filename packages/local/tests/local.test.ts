@@ -2437,8 +2437,9 @@ test("Tailscale Serve inspection refuses conflicting or public routes", () => {
 });
 
 test("iOS ATS remains narrow while Tailscale onboarding uses trusted HTTPS", () => {
-  const infoPlist = readFileSync(resolve(packageRoot, "..", "..", "App", "Info.plist"), "utf8");
-  const projectYaml = readFileSync(resolve(packageRoot, "..", "..", "project.yml"), "utf8");
+  const iosRoot = resolve(packageRoot, "..", "..", "apps", "ios");
+  const infoPlist = readFileSync(resolve(iosRoot, "App", "Info.plist"), "utf8");
+  const projectYaml = readFileSync(resolve(iosRoot, "project.yml"), "utf8");
   for (const source of [infoPlist, projectYaml]) {
     assert.match(source, /NSAllowsLocalNetworking/);
     assert.doesNotMatch(source, /NSAllowsArbitraryLoads/);
@@ -3098,6 +3099,7 @@ test("root package exposes repeatable relay release audit gates", () => {
     manifest.scripts?.["release:npm-preflight"],
     "node scripts/npm-release-preflight.mjs"
   );
+  assert.match(releaseSecretScanScript, /existsSync\(absolutePath\)/);
   assert.match(auditScript, /vitalmcp typecheck/);
   assert.match(auditScript, /compiled relay fixture flow/);
   assert.match(auditScript, /compiled CLI version/);
@@ -3105,7 +3107,7 @@ test("root package exposes repeatable relay release audit gates", () => {
   assert.match(auditScript, /iOS SDK full source typecheck/);
   assert.match(auditScript, /Swift relay crypto typecheck/);
   assert.match(auditScript, /e2ee-relay-ios-interop\.mjs/);
-  assert.match(auditScript, /readdirSync\(join\(root, "App"\)\)/);
+  assert.match(auditScript, /join\("apps", "ios", "App"\)/);
   assert.match(auditScript, /relay audit CLI/);
   assert.match(auditScript, /VITALMCP_RELAY_PORT/);
   assert.match(auditScript, /VITALMCP_RELAY_DB/);

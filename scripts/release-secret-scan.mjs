@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { lstatSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = process.cwd();
@@ -25,13 +25,15 @@ runSelfTest();
 
 for (const relativePath of listFiles()) {
   const normalizedPath = relativePath.replaceAll("\\", "/");
+  const absolutePath = resolve(root, relativePath);
+  if (!existsSync(absolutePath)) {
+    continue;
+  }
   const sensitivePathRule = classifySensitivePath(normalizedPath);
   if (sensitivePathRule) {
     findings.push({ rule: sensitivePathRule, path: normalizedPath, line: null });
     continue;
   }
-
-  const absolutePath = resolve(root, relativePath);
   const stat = lstatSync(absolutePath);
   if (!stat.isFile()) {
     continue;

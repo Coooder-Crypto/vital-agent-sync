@@ -30,9 +30,13 @@ npm run audit:oss
 For iOS changes:
 
 ```bash
+cd apps/ios
 xcodegen generate
+cd ../..
 npm run test:ios
 ```
+
+Additional signing and device notes live in [`apps/ios/README.md`](apps/ios/README.md).
 
 Use synthetic fixtures in automated tests. Never copy personal Apple Health values into the repository.
 

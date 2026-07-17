@@ -5,10 +5,11 @@ import { join } from "node:path";
 import { createServer } from "node:net";
 
 const root = process.cwd();
-const swiftSources = readdirSync(join(root, "App"))
+const iosAppPath = join("apps", "ios", "App");
+const swiftSources = readdirSync(join(root, iosAppPath))
   .filter((file) => file.endsWith(".swift"))
   .sort()
-  .map((file) => join("App", file));
+  .map((file) => join(iosAppPath, file));
 const iosSdkPath = resolveIOSSDKPath();
 
 const checks = [
@@ -63,8 +64,8 @@ const checks = [
       "-module-cache-path",
       join(tmpdir(), "vital-agent-sync-swift-module-cache"),
       "-typecheck",
-      "App/Models.swift",
-      "App/GatewayAPIClient.swift"
+      "apps/ios/App/Models.swift",
+      "apps/ios/App/GatewayAPIClient.swift"
     ]
   },
   {

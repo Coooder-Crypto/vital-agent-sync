@@ -4,9 +4,7 @@ on:
   pull_request:
     paths:
       - .github/workflows/relay-ci.yml
-      - App/**
-      - VitalAgentSync.xcodeproj/**
-      - Tests/**
+      - apps/ios/**
       - deploy/relay/**
       - packages/local/**
       - scripts/agent-adapter-audit.mjs
@@ -16,16 +14,13 @@ on:
       - scripts/npm-release-preflight.mjs
       - scripts/release-secret-scan.mjs
       - package.json
-      - project.yml
       - tsconfig.base.json
   push:
     branches:
       - main
     paths:
       - .github/workflows/relay-ci.yml
-      - App/**
-      - VitalAgentSync.xcodeproj/**
-      - Tests/**
+      - apps/ios/**
       - deploy/relay/**
       - packages/local/**
       - scripts/agent-adapter-audit.mjs
@@ -35,7 +30,6 @@ on:
       - scripts/npm-release-preflight.mjs
       - scripts/release-secret-scan.mjs
       - package.json
-      - project.yml
       - tsconfig.base.json
   workflow_dispatch:
 

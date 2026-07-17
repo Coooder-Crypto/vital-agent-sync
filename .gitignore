@@ -4,8 +4,8 @@ dist/
 build/
 DerivedData/
 *.xcuserdata/
-*.xcodeproj/project.xcworkspace/xcuserdata/
-*.xcodeproj/xcuserdata/
+**/*.xcodeproj/project.xcworkspace/xcuserdata/
+**/*.xcodeproj/xcuserdata/
 *.xcodeproj/xcshareddata/swiftpm/Package.resolved
 *.ipa
 *.dSYM.zip

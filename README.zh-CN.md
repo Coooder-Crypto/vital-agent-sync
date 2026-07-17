@@ -45,6 +45,7 @@ vitalmcp doctor --transport lan
 HealthKit 的有效测试需要真机。在 macOS 上安装 Xcode 和 XcodeGen，然后：
 
 ```bash
+cd apps/ios
 xcodegen generate
 open VitalAgentSync.xcodeproj
 ```
@@ -72,7 +73,7 @@ iPhone HealthKit
 
 | 路径 | 内容 |
 | --- | --- |
-| `App/`、`Resources/`、`Tests/` | SwiftUI HealthKit App 和 iOS 测试 |
+| `apps/ios/` | SwiftUI HealthKit App、XcodeGen 工程、资源和 iOS 测试 |
 | `packages/local/` | `vitalmcp`、接收端、SQLite、MCP、Agent 适配和传输层 |
 | `skills/vital-agent-sync/` | Agent Skill 源文件和发布检查 |
 | `deploy/` | Docker 与自托管 relay 模板 |

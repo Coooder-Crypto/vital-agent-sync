@@ -25,7 +25,7 @@ Latest repository evidence, 2026-07-11:
 - `audit:agent-adapters` passes with Hermes Agent v0.17.0: a generic MCP client discovers 12 tools and calls `vital_agent_status`, then Hermes loads an isolated Vital Agent Sync config, connects, and discovers the same 12 tools. A separate test against the user's configured Hermes instance also connects in 186 ms and discovers all 12 tools.
 - `audit:dependencies` reports zero known production dependency vulnerabilities across all severities for the current lockfile (336 audited dependency nodes on 2026-07-11).
 - `audit:secrets` passes its built-in positive/negative rule self-test and scans the non-website release scope for private keys, common provider tokens, literal Vital Agent Sync credentials, real environment files, SQLite/Keychain export artifacts, and runtime secret paths without printing matched values. The current scan covers 100 text files, skips 18 binary files, and reports zero findings.
-- `audit:relay-container` passes: development and production Relay Compose files validate, the relay image builds successfully, Caddy 2.11.4 reports `Valid configuration`, and all uniquely named temporary containers/networks/volumes are removed. `App/Info.plist` plus non-website `git diff --check` also pass.
+- `audit:relay-container` passes: development and production Relay Compose files validate, the relay image builds successfully, Caddy 2.11.4 reports `Valid configuration`, and all uniquely named temporary containers/networks/volumes are removed. `apps/ios/App/Info.plist` plus non-website `git diff --check` also pass.
 - The built runtime image reports Node 22.23.1 and UID 1000, loads the native `better-sqlite3` binding, contains no Python/make/g++ toolchain or empty API/metrics-token ENV defaults, and runs successfully with a read-only root filesystem, `cap_drop: ALL`, and `no-new-privileges`.
 - A hardened temporary container passes the full active relay audit. Its logs contain startup metadata only; the final relay database contains zero envelopes, zero active audit identities, and two revoked disposable identities.
 - Docker Hub authentication was unreachable from this verification host, so matching Docker Official Node/Caddy images were fetched through AWS ECR Public's `docker/library` mirror and tagged locally. Repository image references remain the standard Docker Official names.
@@ -49,9 +49,9 @@ npm run typecheck --workspace vitalmcp
 npm test --workspace vitalmcp
 npm run build --workspace vitalmcp
 node packages/local/dist/relay-fixture-flow.js
-swiftc -parse App/*.swift
-swiftc -target arm64-apple-ios17.0 -sdk <installed-iphoneos-sdk> -typecheck App/*.swift
-swiftc -module-cache-path <temporary-cache> -typecheck App/Models.swift App/GatewayAPIClient.swift
+swiftc -parse apps/ios/App/*.swift
+swiftc -target arm64-apple-ios17.0 -sdk <installed-iphoneos-sdk> -typecheck apps/ios/App/*.swift
+swiftc -module-cache-path <temporary-cache> -typecheck apps/ios/App/Models.swift apps/ios/App/GatewayAPIClient.swift
 node scripts/e2ee-relay-ios-interop.mjs
 node packages/local/dist/cli.js setup --transport relay --agent generic --state-dir <temporary-state> # expected fail without hosted URL
 node packages/local/dist/cli.js relay audit --relay-url http://127.0.0.1:<temporary-port> --metrics-token <temporary-token> --relay-api-token <temporary-api-token> --active --yes
@@ -68,7 +68,7 @@ Expected coverage:
 - MCP health tools expose freshness metadata and can read fixture data after relay pull.
 - Generic MCP and Hermes expose the same 12-tool surface; Agent adapters only install config/skills and do not fork crypto, ingest, SQLite, or tool logic.
 - Portable skill output is Agent-parameterized. Optional OpenClaw export includes setup, onboarding credential handling, pull/Cron guidance, freshness, reporting, lifecycle confirmation, and privacy guardrails.
-- `swiftc -parse` and full iPhoneOS SDK typecheck confirm every current App source parses and typechecks for the iOS 17 arm64 target; they do not replace Xcode/device workflow validation.
+- `swiftc -parse` and full iPhoneOS SDK typecheck confirm every current iOS App source parses and typechecks for the iOS 17 arm64 target; they do not replace Xcode/device workflow validation.
 - Swift typecheck plus the CryptoKit-to-Node fixture prove the current mobile envelope implementation agrees with Node on X25519, HKDF, ChaCha20-Poly1305, HMAC, canonical JSON, the explicit monotonic sequence field, and core schema validation; the same fixture verifies callback query/fragment stripping and scheme allowlisting.
 - Relay runtime config, private keys, cursor files, health SQLite, relay SQLite, and existing WAL/SHM sidecars are permission-hardened; config/cursor replacement is atomic, SQLite foreign keys are enabled, and default state/secrets/database directories are private on POSIX filesystems.
 - Hosted setup rejects a missing or non-HTTPS relay URL before writing runtime config or installing local integration state. Pull, status, and lifecycle operations reject HTTP overrides before sending tenant credentials; self-hosted mode retains its local HTTP fallback.

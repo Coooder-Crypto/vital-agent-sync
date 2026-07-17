@@ -51,6 +51,7 @@ vitalmcp doctor --transport lan
 HealthKit requires a real iPhone. Generate the project with XcodeGen, select your own Apple Developer Team and unique bundle identifier, keep the HealthKit capability enabled, then run the app on the device:
 
 ```bash
+cd apps/ios
 xcodegen generate
 open VitalAgentSync.xcodeproj
 ```
@@ -74,7 +75,7 @@ The default route has no Vital Agent Sync account, VPS, domain, payment method, 
 
 | Path | Purpose |
 | --- | --- |
-| `App/`, `Resources/`, `Tests/` | SwiftUI HealthKit app and focused iOS tests |
+| `apps/ios/` | SwiftUI HealthKit app, XcodeGen project, resources, and focused iOS tests |
 | `packages/local/` | `vitalmcp` runtime, receiver, SQLite, MCP, Agent adapters, and transports |
 | `skills/vital-agent-sync/` | Source Skill used for Agent packaging and release checks |
 | `deploy/` | Docker and self-hosted relay deployment templates |
@@ -118,9 +119,12 @@ For the broader product plan covering local daemon, MCP, pairing, scopes, and pa
 This repo uses XcodeGen so the generated `.xcodeproj` does not need to be hand-maintained.
 
 ```bash
+cd apps/ios
 xcodegen generate
 open VitalAgentSync.xcodeproj
 ```
+
+See [apps/ios/README.md](apps/ios/README.md) for signing, simulator, and physical-device notes.
 
 ## Agent-Side Local Package
 
