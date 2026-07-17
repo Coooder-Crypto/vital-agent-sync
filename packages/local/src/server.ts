@@ -17,6 +17,7 @@ import {
   ingestValidatedHealthSync
 } from "./health-ingest.js";
 import { PairingError, PairingStore } from "./pairing.js";
+import { getReceiverRuntimeStatus } from "./runtime-status.js";
 import { SOURCE_PLATFORMS, listSourceDevices } from "./source-devices.js";
 import { type TerminalQrRenderResult, renderTerminalQr } from "./terminal-qr.js";
 import { createTransportProvider, TRANSPORT_PROVIDER_IDS, type TransportProviderId } from "./transports.js";
@@ -58,6 +59,13 @@ export async function startLocalServer(options: LocalServerOptions): Promise<voi
   });
 
   app.get("/health/status", async () => getHealthStatus(database));
+
+  app.get("/runtime/status", async (request, reply) => {
+    if (!isLoopbackAddress(request.ip)) {
+      return reply.code(403).send(errorResponse("local_status_only", "Runtime identity is only available from the receiver host."));
+    }
+    return getReceiverRuntimeStatus(database);
+  });
 
   app.get("/devices", async () => ({
     ok: true,

@@ -24,7 +24,7 @@ import {
   type BootstrapOutput,
   type BootstrapState
 } from "./bootstrap.js";
-import { openVitalAgentDatabase } from "./database.js";
+import { getDatabaseId, openVitalAgentDatabase, readExistingDatabaseId } from "./database.js";
 import { buildDockerComposeYaml, buildRelayDockerComposeYaml } from "./docker-compose.js";
 import { getHealthStatus } from "./health-ingest.js";
 import { startLocalServer } from "./server.js";
@@ -65,6 +65,11 @@ import { buildVitalAgentSkillMarkdown, exportVitalAgentSkillPackage } from "./sk
 import { listSourceDevices } from "./source-devices.js";
 import { renderTerminalQr } from "./terminal-qr.js";
 import { writeRelayOnboardingArtifact } from "./onboarding-artifact.js";
+import {
+  parseCompatibleReceiverRuntimeStatus,
+  VITALMCP_RUNTIME_VERSION,
+  type ReceiverRuntimeStatus
+} from "./runtime-status.js";
 import { createTransportProvider, getServerUrlDiagnostics, isContainerRuntime, isTransportProviderId, type TransportProviderId } from "./transports.js";
 
 type CliOptions = {
@@ -502,7 +507,7 @@ async function main(): Promise<void> {
   }
 
   if (options.command === "version") {
-    console.log("vitalmcp 0.5.0");
+    console.log(`vitalmcp ${VITALMCP_RUNTIME_VERSION}`);
     return;
   }
 
@@ -717,7 +722,7 @@ async function main(): Promise<void> {
 }
 
 function buildCliHelp(): string {
-  return `Vital Agent Sync runtime 0.5.0
+  return `Vital Agent Sync runtime ${VITALMCP_RUNTIME_VERSION}
 
 Usage:
   vitalmcp <command> [options]
@@ -995,16 +1000,17 @@ async function executeBootstrapSetup(state: BootstrapState, options: CliOptions)
   let effectiveOptions = options;
   let relayConfig: ReturnType<typeof initializeRelayRuntime> | undefined;
   const agent = getAgentAdapter(options.agentId);
-  if (state.initial_sync_count === undefined) {
-    const database = openVitalAgentDatabase({ path: options.databasePath });
-    try {
+  const database = openVitalAgentDatabase({ path: options.databasePath });
+  const expectedDatabaseId = getDatabaseId(database);
+  try {
+    if (state.initial_sync_count === undefined) {
       state = writeBootstrapState({
         ...state,
         initial_sync_count: getHealthStatus(database).sync_count
       }, { stateDir: options.stateDir });
-    } finally {
-      database.close();
     }
+  } finally {
+    database.close();
   }
   return runBootstrapWorkflow(state, {
     runtime_initialized: async () => {
@@ -1065,7 +1071,7 @@ async function executeBootstrapSetup(state: BootstrapState, options: CliOptions)
         startVitalAgentService(serviceOptions);
       }
       if (!relayMode) {
-        await waitForLocalReceiver(effectiveOptions);
+        await waitForLocalReceiver(effectiveOptions, expectedDatabaseId);
       }
     },
     onboarding_created: async () => {
@@ -1081,7 +1087,10 @@ async function executeBootstrapSetup(state: BootstrapState, options: CliOptions)
       }
       return { onboarding_url: `http://127.0.0.1:${effectiveOptions.port}/pair` };
     },
-    first_sync_observed: () => {
+    first_sync_observed: async () => {
+      if (!relayMode) {
+        await requireCompatibleLocalReceiver(effectiveOptions, expectedDatabaseId);
+      }
       const database = openVitalAgentDatabase({ path: effectiveOptions.databasePath });
       try {
         return getHealthStatus(database).sync_count > (state.initial_sync_count ?? 0);
@@ -1169,6 +1178,9 @@ function printJson(value: unknown): void {
 async function runEnsure(options: CliOptions): Promise<void> {
   const ensureOptions = await resolveAutoServicePort(options);
   const serviceOptions = toServiceOptions(ensureOptions);
+  const database = openVitalAgentDatabase({ path: ensureOptions.databasePath });
+  const expectedDatabaseId = getDatabaseId(database);
+  database.close();
   let lastStatus: VitalAgentServiceStatus | undefined;
   console.log("Ensuring Vital Agent Sync receiver service");
   await runServiceEnsureWorkflow({
@@ -1190,7 +1202,7 @@ async function runEnsure(options: CliOptions): Promise<void> {
       console.log("Service not running; starting...");
       lastStatus = startVitalAgentService(serviceOptions);
     },
-    waitForReady: () => waitForLocalReceiver(ensureOptions),
+    waitForReady: () => waitForLocalReceiver(ensureOptions, expectedDatabaseId),
     printStatus: async () => {
       const status = getVitalAgentServiceStatus(serviceOptions);
       console.log("Vital Agent Sync receiver is ready.");
@@ -1200,13 +1212,16 @@ async function runEnsure(options: CliOptions): Promise<void> {
 }
 
 async function resolveAutoServicePort(options: CliOptions): Promise<CliOptions> {
-  if (options.portProvided || options.serverUrl) {
-    return options;
-  }
-
   const existingReceiver = await probeLocalReceiver(options);
   if (existingReceiver.reachable) {
-    return options;
+    if (existingReceiver.compatible) {
+      const expectedDatabaseId = readExistingDatabaseId(options.databasePath);
+      if (!expectedDatabaseId || existingReceiver.status?.database_id !== expectedDatabaseId) {
+        throw receiverIdentityConflict(options.port, "a compatible runtime is using a different local database");
+      }
+      return options;
+    }
+    throw receiverIdentityConflict(options.port, existingReceiver.detail);
   }
 
   const selected = await findAvailableTcpPort({
@@ -1219,6 +1234,11 @@ async function resolveAutoServicePort(options: CliOptions): Promise<CliOptions> 
   }
 
   const listener = describePortListeners(options.port);
+  if (options.portProvided) {
+    throw receiverIdentityConflict(options.port, listener
+      ? `the requested port is occupied by ${listener}`
+      : "the requested port is occupied by another process");
+  }
   if (options.outputFormat === "text") {
     console.log(`Port ${options.port} is already in use; using ${selected.port} for Vital Agent Sync.`);
     if (listener) {
@@ -1290,6 +1310,12 @@ async function createPairingSession(options: CliOptions): Promise<{
   pairing_url: string;
   expires_in_seconds: number;
 }> {
+  const database = openVitalAgentDatabase({ path: options.databasePath });
+  try {
+    await requireCompatibleLocalReceiver(options, getDatabaseId(database));
+  } finally {
+    database.close();
+  }
   return requestPairingSession({
     port: options.port,
     agentName: options.agentName ?? defaultAgentName(options.agentId),
@@ -1298,13 +1324,16 @@ async function createPairingSession(options: CliOptions): Promise<{
   });
 }
 
-async function waitForLocalReceiver(options: CliOptions): Promise<void> {
+async function waitForLocalReceiver(options: CliOptions, expectedDatabaseId?: string): Promise<void> {
   const deadline = Date.now() + 5000;
   let lastError = "";
   while (Date.now() < deadline) {
-    const probe = await probeLocalReceiver(options);
-    if (probe.reachable) {
+    const probe = await probeLocalReceiver(options, { expectedDatabaseId });
+    if (probe.compatible) {
       return;
+    }
+    if (probe.reachable) {
+      throw receiverIdentityConflict(options.port, probe.detail);
     }
     lastError = probe.detail;
     await new Promise((resolve) => setTimeout(resolve, 250));
@@ -1332,13 +1361,13 @@ async function printServiceStatusDetails(status: VitalAgentServiceStatus, option
   const database = openVitalAgentDatabase({ path: options.databasePath });
   try {
     const health = getHealthStatus(database);
-    const receiver = await probeLocalReceiver(options);
+    const receiver = await probeLocalReceiver(options, { expectedDatabaseId: getDatabaseId(database) });
     console.log("Vital Agent Sync service");
     console.log(`Manager:   ${status.manager}`);
     console.log(`Label:     ${status.label}`);
     console.log(`Installed: ${status.installed ? "yes" : "no"}`);
     console.log(`Running:   ${status.running ? "yes" : "no"}`);
-    console.log(`Receiver:  ${receiver.reachable ? "reachable" : "not reachable"} (${receiver.detail})`);
+    console.log(`Receiver:  ${receiver.compatible ? "verified" : receiver.reachable ? "identity mismatch" : "not reachable"} (${receiver.detail})`);
     console.log(`Config:    ${status.configPath}`);
     console.log(`Local API: http://127.0.0.1:${options.port}`);
     console.log(`Database:  ${database.path}`);
@@ -1350,7 +1379,7 @@ async function printServiceStatusDetails(status: VitalAgentServiceStatus, option
       console.log("Next: run vitalmcp setup to install and start the receiver.");
     } else if (!status.running) {
       console.log("Next: run vitalmcp service start, then vitalmcp pair.");
-    } else if (!receiver.reachable) {
+    } else if (!receiver.compatible) {
       console.log(`Next: check vitalmcp logs and confirm port ${options.port} is not occupied by another process.`);
     } else {
       console.log("Next: run vitalmcp pair to print a new QR, or scan the browser QR at the Local API /pair page.");
@@ -1910,7 +1939,7 @@ async function checkLocalReceiver(options: CliOptions): Promise<{
 }> {
   const probe = await probeLocalReceiver(options);
   return {
-    status: probe.reachable ? "OK" : "WARN",
+    status: probe.compatible ? "OK" : probe.reachable ? "FAIL" : "WARN",
     label: "Local receiver",
     detail: probe.detail
   };
@@ -1918,10 +1947,15 @@ async function checkLocalReceiver(options: CliOptions): Promise<{
 
 type ReceiverProbeResult = {
   reachable: boolean;
+  compatible: boolean;
   detail: string;
+  status?: ReceiverRuntimeStatus;
 };
 
-async function probeLocalReceiver(options: CliOptions): Promise<ReceiverProbeResult> {
+async function probeLocalReceiver(
+  options: CliOptions,
+  validation: { expectedDatabaseId?: string } = {}
+): Promise<ReceiverProbeResult> {
   const endpoint = localReceiverStatusEndpoint(options);
   try {
     const response = await fetch(endpoint, {
@@ -1929,46 +1963,60 @@ async function probeLocalReceiver(options: CliOptions): Promise<ReceiverProbeRes
     });
     if (!response.ok) {
       return {
-        reachable: false,
-        detail: `${endpoint} returned HTTP ${response.status}`
+        reachable: true,
+        compatible: false,
+        detail: `${endpoint} returned HTTP ${response.status}; the listener is not a compatible Vital Agent Sync ${VITALMCP_RUNTIME_VERSION} receiver`
       };
     }
     const body = await response.json() as unknown;
-    if (!isReceiverHealthStatus(body)) {
+    const status = parseCompatibleReceiverRuntimeStatus(body, validation);
+    if (!status) {
       return {
-        reachable: false,
-        detail: `${endpoint} responded, but it does not look like a Vital Agent Sync receiver`
+        reachable: true,
+        compatible: false,
+        detail: `${endpoint} responded, but its product, runtime, protocol, or database identity does not match this installation`
       };
     }
     return {
       reachable: true,
-      detail: `${endpoint} reachable (${String(body.device_count ?? 0)} source devices, ${String(body.sync_count ?? 0)} syncs, last sync ${String(body.last_sync_at ?? "never")})`
+      compatible: true,
+      status,
+      detail: `${endpoint} verified (${status.device_count} source devices, ${status.sync_count} syncs, last sync ${status.last_sync_at ?? "never"})`
     };
   } catch (error) {
     const listener = describePortListeners(options.port);
     const listenerDetail = listener ? ` Listener on port ${options.port}: ${listener}.` : "";
     return {
-      reachable: false,
+      reachable: listener !== undefined,
+      compatible: false,
       detail: `${endpoint} is not reachable. Run vitalmcp service start or vitalmcp setup.${listenerDetail} ${error instanceof Error ? error.message : String(error)}`
     };
   }
 }
 
 function localReceiverStatusEndpoint(options: Pick<CliOptions, "port">): string {
-  return `http://127.0.0.1:${options.port}/health/status`;
+  return `http://127.0.0.1:${options.port}/runtime/status`;
 }
 
-function isReceiverHealthStatus(value: unknown): value is {
-  device_count?: unknown;
-  sync_count?: unknown;
-  last_sync_at?: unknown;
-} {
-  return typeof value === "object" && value !== null && (
-    "device_count" in value ||
-    "sync_count" in value ||
-    "last_sync_at" in value ||
-    "status" in value
-  );
+async function requireCompatibleLocalReceiver(options: CliOptions, expectedDatabaseId?: string): Promise<ReceiverRuntimeStatus> {
+  const probe = await probeLocalReceiver(options, { expectedDatabaseId });
+  if (!probe.compatible || !probe.status) {
+    if (probe.reachable) {
+      throw receiverIdentityConflict(options.port, probe.detail);
+    }
+    throw new Error(probe.detail);
+  }
+  return probe.status;
+}
+
+function receiverIdentityConflict(port: number, detail: string): Error {
+  return new Error([
+    `Receiver identity conflict on port ${port}: ${detail}.`,
+    "Vital Agent Sync will not stop another service, migrate a legacy database, or reuse an unverified receiver automatically.",
+    `Inspect the listener with: lsof -nP -iTCP:${port} -sTCP:LISTEN`,
+    "If it is a legacy HealthLink installation, back it up and choose an explicit migration or removal path before retrying.",
+    "To keep the existing service, rerun setup with --port <free-port> and pair the iPhone with the new receiver."
+  ].join(" "));
 }
 
 main().catch((error: unknown) => {

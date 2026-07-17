@@ -370,6 +370,8 @@ export function classifyBootstrapError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   if (/another vital-agent-sync setup/i.test(message)) return "setup_locked";
   if (/consent|--yes/i.test(message)) return "consent_required";
+  if (/receiver identity conflict|legacy.*installation|database identity/i.test(message)) return "receiver_identity_conflict";
+  if (/launchctl|systemctl|service manager/i.test(message)) return "service_manager_failed";
   if (/relay.*url|https/i.test(message)) return "relay_url_invalid";
   if (/service.*ready|not reachable|connection/i.test(message)) return "service_unreachable";
   if (/agent|mcp|config/i.test(message)) return "agent_configuration_failed";

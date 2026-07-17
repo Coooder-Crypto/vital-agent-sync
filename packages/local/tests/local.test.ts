@@ -27,6 +27,7 @@ import { detectPreferredAgentAdapter, getAgentAdapter } from "../src/agents.js";
 import {
   bootstrapStageComplete,
   buildBootstrapPlan,
+  classifyBootstrapError,
   createBootstrapState,
   markBootstrapStage,
   readBootstrapState,
@@ -35,7 +36,7 @@ import {
   withBootstrapLock,
   writeBootstrapState
 } from "../src/bootstrap.js";
-import { openVitalAgentDatabase } from "../src/database.js";
+import { getDatabaseId, openVitalAgentDatabase, readExistingDatabaseId } from "../src/database.js";
 import { listDevices, revokeDevice } from "../src/devices.js";
 import { buildDockerComposeYaml, buildRelayDockerComposeYaml } from "../src/docker-compose.js";
 import { listFeedbackEvents, recordFeedback } from "../src/feedback.js";
@@ -104,6 +105,11 @@ import {
 } from "../src/skill.js";
 import { renderTerminalQr } from "../src/terminal-qr.js";
 import {
+  getReceiverRuntimeStatus,
+  parseCompatibleReceiverRuntimeStatus,
+  VITALMCP_RUNTIME_VERSION
+} from "../src/runtime-status.js";
+import {
   createTransportProvider,
   getServerUrlDiagnostics,
   inspectTailscaleServeConfig,
@@ -162,6 +168,44 @@ test("health and relay SQLite files use private POSIX permissions", () => {
   } finally {
     health.close();
     relay.close();
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("receiver runtime identity is stable per database and rejects legacy or mismatched services", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-runtime-identity-test-"));
+  try {
+    const firstPath = join(tempDir, "first.sqlite");
+    const secondPath = join(tempDir, "second.sqlite");
+    const first = openVitalAgentDatabase({ path: firstPath });
+    const firstId = getDatabaseId(first);
+    const status = getReceiverRuntimeStatus(first);
+    first.close();
+    assert.equal(readExistingDatabaseId(firstPath), firstId);
+
+    const reopened = openVitalAgentDatabase({ path: firstPath });
+    assert.equal(getDatabaseId(reopened), firstId);
+    reopened.close();
+
+    const second = openVitalAgentDatabase({ path: secondPath });
+    const secondId = getDatabaseId(second);
+    second.close();
+
+    assert.notEqual(secondId, firstId);
+    assert.equal(status.product, "vital-agent-sync");
+    assert.equal(status.runtime_version, VITALMCP_RUNTIME_VERSION);
+    assert.equal(parseCompatibleReceiverRuntimeStatus(status)?.database_id, firstId);
+    assert.equal(parseCompatibleReceiverRuntimeStatus(status, { expectedDatabaseId: firstId })?.database_id, firstId);
+    assert.equal(parseCompatibleReceiverRuntimeStatus(status, { expectedDatabaseId: secondId }), undefined);
+    assert.equal(parseCompatibleReceiverRuntimeStatus({
+      ok: true,
+      service: "vitalmcp",
+      status: "running",
+      device_count: 1,
+      sync_count: 4,
+      last_sync_at: "2026-07-17T15:38:00.000Z"
+    }), undefined);
+  } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
@@ -2144,8 +2188,8 @@ test("Vital Agent Sync skill can be printed and installed for Hermes", () => {
     assert.match(openclawMarkdown, /Hosted Relay is not available, recommended, or required in the Local Preview flow/);
     assert.match(openclawMarkdown, /vitalmcp setup --transport relay --relay-url https:\/\/HOSTED-RELAY --agent openclaw/);
     assert.match(openclawMarkdown, /Never invent a relay domain/);
-    assert.match(openclawMarkdown, /npx -y vitalmcp@0\.5\.0 --version/);
-    assert.match(openclawMarkdown, /prefix every local CLI invocation below with `npx -y vitalmcp@0\.5\.0`/);
+    assert.match(openclawMarkdown, /npx -y vitalmcp@0\.5\.1 --version/);
+    assert.match(openclawMarkdown, /prefix every local CLI invocation below with `npx -y vitalmcp@0\.5\.1`/);
     assert.match(openclawMarkdown, /Do not switch runners midway through setup/);
     assert.match(openclawMarkdown, /setup --resume --yes --output json/);
     assert.match(openclawMarkdown, /next_action\.url/);
@@ -2170,12 +2214,17 @@ test("Vital Agent Sync skill can be printed and installed for Hermes", () => {
     assert.match(workbuddyMarkdown, /# Vital Agent Sync for WorkBuddy/);
     assert.match(workbuddyMarkdown, /name: vital-agent-sync/);
     assert.match(workbuddyMarkdown, /npm install --global --prefix/);
-    assert.match(workbuddyMarkdown, /vitalmcp@0\.5\.0/);
+    assert.match(workbuddyMarkdown, /vitalmcp@0\.5\.1/);
     assert.match(workbuddyMarkdown, /~\/\.workbuddy\/mcp\.json/);
     assert.match(workbuddyMarkdown, /setup --transport lan --agent workbuddy --output json/);
     assert.match(workbuddyMarkdown, /open <next_action\.url>/);
     assert.match(workbuddyMarkdown, /可能会发送给你在 WorkBuddy 中选择的模型提供商/);
     assert.match(workbuddyMarkdown, /不得读取、截图、上传或转述页面里的二维码/);
+    assert.match(workbuddyMarkdown, /receiver_identity_conflict/);
+    assert.match(workbuddyMarkdown, /不得直接读取 SQLite/);
+    assert.match(workbuddyMarkdown, /不得修改 `\.zprofile`、`\.zshrc`/);
+    assert.match(workbuddyMarkdown, /不得使用 `nohup`、`screen`、Python `Popen`/);
+    assert.match(workbuddyMarkdown, /等待用户确认后才能继续/);
     assert.doesNotMatch(workbuddyMarkdown, /^metadata:/m);
 
     const planIndex = openclawMarkdown.indexOf("setup --transport lan");
@@ -2233,12 +2282,12 @@ test("Vital Agent Sync skill can be exported as an OpenClaw package", () => {
     assert.equal(result.packageDir, packageDir);
     assert.deepEqual(readdirSync(packageDir).sort(), ["README.md", "SKILL.md"]);
     assert.equal(frontmatter.name, "vitalmcp-personal-context");
-    assert.equal(frontmatter.version, "0.5.0");
+    assert.equal(frontmatter.version, "0.5.1");
     assert.equal(frontmatter.license, undefined);
     assert.deepEqual(frontmatter.metadata.openclaw.requires.bins, ["vitalmcp"]);
     assert.deepEqual(frontmatter.metadata.openclaw.install, [{
       kind: "node",
-      package: "vitalmcp@0.5.0",
+      package: "vitalmcp@0.5.1",
       bins: ["vitalmcp"]
     }]);
     assert.deepEqual(frontmatter.metadata.openclaw.os, ["macos", "linux", "windows"]);
@@ -2277,7 +2326,7 @@ test("Vital Agent Sync skill can be exported as a WorkBuddy and SkillHub package
     assert.deepEqual(Object.keys(frontmatter).sort(), ["description", "name"]);
     assert.equal(frontmatter.name, "vital-agent-sync");
     assert.match(String(frontmatter.description), /WorkBuddy/);
-    assert.match(skill, /vitalmcp@0\.5\.0/);
+    assert.match(skill, /vitalmcp@0\.5\.1/);
     assert.match(skill, /~\/\.workbuddy\/mcp\.json/);
     assert.match(skill, /next_action\.url/);
     assert.doesNotMatch(skill, /BEGIN PRIVATE KEY|relay_access_token|upload_auth_secret/);
@@ -3016,7 +3065,7 @@ test("local package manifest is ready for public npm packing", () => {
   };
 
   assert.equal(manifest.name, "vitalmcp");
-  assert.equal(manifest.version, "0.5.0");
+  assert.equal(manifest.version, "0.5.1");
   assert.equal(manifest.private, undefined);
   assert.equal(manifest.license, "MIT");
   assert.equal(manifest.bin?.["vitalmcp"], "./dist/cli.js");
@@ -3262,7 +3311,7 @@ test("portable installer uses a user prefix and manages its PATH block idempoten
 
     let lastStdout = "";
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      const result = spawnSync("sh", [installScript, "--version", "0.5.0"], { env, encoding: "utf8" });
+      const result = spawnSync("sh", [installScript, "--version", "0.5.1"], { env, encoding: "utf8" });
       assert.equal(result.status, 0, result.stderr);
       lastStdout = result.stdout;
     }
@@ -3270,7 +3319,7 @@ test("portable installer uses a user prefix and manages its PATH block idempoten
     const installedProfile = readFileSync(profile, "utf8");
     assert.equal((installedProfile.match(/# >>> vitalmcp >>>/g) ?? []).length, 1);
     assert.match(installedProfile, new RegExp(escapeRegExp(`export PATH="${prefix}/bin:$PATH"`)));
-    assert.match(readFileSync(npmLog, "utf8"), /install --global --prefix .*vitalmcp@0\.5\.0/);
+    assert.match(readFileSync(npmLog, "utf8"), /install --global --prefix .*vitalmcp@0\.5\.1/);
     assert.equal(readFileSync(websiteInstallScript, "utf8"), readFileSync(installScript, "utf8"));
 
     const uninstall = spawnSync("sh", [installScript, "--uninstall"], { env, encoding: "utf8" });
@@ -3333,9 +3382,10 @@ test("portable installer selects macOS, Linux, and WSL shell profiles without a 
   }
 });
 
-test("CLI doctor reports the verified iOS-compatible Tailscale HTTPS endpoint", () => {
+test("CLI doctor reports the verified iOS-compatible Tailscale HTTPS endpoint", async () => {
   const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-cli-tailscale-doctor-"));
   try {
+    const port = (await findAvailableTcpPort({ preferredPort: 27887, host: "127.0.0.1" })).port;
     const fakeBin = join(tempDir, "bin");
     mkdirSync(fakeBin, { recursive: true });
     const tailscale = join(fakeBin, "tailscale");
@@ -3345,7 +3395,7 @@ if [ "$1" = "status" ]; then
   exit 0
 fi
 if [ "$1" = "serve" ] && [ "$2" = "status" ]; then
-  printf '%s\\n' '{"TCP":{"443":{"HTTPS":true}},"Web":{"vital-agent-sync.tailnet.ts.net:443":{"Handlers":{"/":{"Proxy":"http://127.0.0.1:8787"}}}}}'
+  printf '%s\\n' '{"TCP":{"443":{"HTTPS":true}},"Web":{"vital-agent-sync.tailnet.ts.net:443":{"Handlers":{"/":{"Proxy":"http://127.0.0.1:${port}"}}}}}'
   exit 0
 fi
 exit 1
@@ -3357,6 +3407,7 @@ exit 1
       "doctor",
       "--transport", "tailscale",
       "--tailscale-name", "vital-agent-sync.tailnet.ts.net",
+      "--port", String(port),
       "--manager", "manual",
       "--db", join(tempDir, "vital-agent.sqlite"),
       "--output", "json"
@@ -3448,9 +3499,10 @@ test("CLI setup emits one redacted JSON document for plan and resumable failure"
   }
 });
 
-test("CLI setup persists the WorkBuddy project path before consent", () => {
+test("CLI setup persists the WorkBuddy project path before consent", async () => {
   const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-cli-workbuddy-"));
   try {
+    const port = (await findAvailableTcpPort({ preferredPort: 28887, host: "127.0.0.1" })).port;
     const cliPath = join(packageRoot, "src", "cli.ts");
     const stateDir = join(tempDir, "state");
     const projectPath = join(tempDir, "workbuddy-project");
@@ -3460,6 +3512,7 @@ test("CLI setup persists the WorkBuddy project path before consent", () => {
       "--agent", "workbuddy",
       "--workbuddy-project", projectPath,
       "--transport", "lan",
+      "--port", String(port),
       "--manager", "manual",
       "--state-dir", stateDir,
       "--db", join(tempDir, "vital-agent.sqlite"),
@@ -3586,6 +3639,11 @@ test("bootstrap plan and state are versioned, private, resumable, and idempotent
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
+});
+
+test("bootstrap classifies receiver identity and service manager failures", () => {
+  assert.equal(classifyBootstrapError(new Error("Receiver identity conflict on port 8787")), "receiver_identity_conflict");
+  assert.equal(classifyBootstrapError(new Error("launchctl bootstrap failed: Input/output error")), "service_manager_failed");
 });
 
 test("bootstrap workflow resumes safely after every mutating stage", async () => {

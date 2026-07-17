@@ -1,4 +1,5 @@
 import SqliteDatabase from "better-sqlite3";
+import { randomUUID } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -15,8 +16,32 @@ export type VitalAgentDatabase = {
   close: () => void;
 };
 
+const DATABASE_ID_KEY = "database_id";
+
 export function getDefaultDatabasePath(): string {
   return join(homedir(), ".vital-agent-sync", "vital-agent.sqlite");
+}
+
+export function readExistingDatabaseId(path?: string): string | undefined {
+  const databasePath = expandHomePath(path ?? getDefaultDatabasePath());
+  if (!existsSync(databasePath)) return undefined;
+  const sqlite = new SqliteDatabase(databasePath, { readonly: true, fileMustExist: true });
+  try {
+    const table = sqlite.prepare(`
+      select 1 as present
+      from sqlite_master
+      where type = 'table' and name = 'runtime_metadata'
+    `).get() as { present: number } | undefined;
+    if (!table) return undefined;
+    const row = sqlite.prepare(`
+      select value
+      from runtime_metadata
+      where key = ?
+    `).get(DATABASE_ID_KEY) as { value?: unknown } | undefined;
+    return typeof row?.value === "string" && row.value.length > 0 ? row.value : undefined;
+  } finally {
+    sqlite.close();
+  }
 }
 
 export function openVitalAgentDatabase(config: Partial<DatabaseConfig> = {}): VitalAgentDatabase {
@@ -63,6 +88,11 @@ function chmodIfPossible(path: string, mode: number): void {
 
 function migrate(sqlite: BetterSqliteDatabase): void {
   sqlite.exec(`
+    create table if not exists runtime_metadata (
+      key text primary key,
+      value text not null
+    );
+
     create table if not exists pairing_sessions (
       code text primary key,
       pairing_url text not null,
@@ -211,6 +241,22 @@ function migrate(sqlite: BetterSqliteDatabase): void {
   ensureColumn(sqlite, "health_daily_summaries", "body_fat_percentage", "real");
   ensureColumn(sqlite, "health_daily_summaries", "lean_body_mass_kg", "real");
   ensureColumn(sqlite, "health_daily_summaries", "body_mass_index", "real");
+  sqlite.prepare(`
+    insert or ignore into runtime_metadata (key, value)
+    values (?, ?)
+  `).run(DATABASE_ID_KEY, randomUUID());
+}
+
+export function getDatabaseId(database: VitalAgentDatabase): string {
+  const row = database.sqlite.prepare(`
+    select value
+    from runtime_metadata
+    where key = ?
+  `).get(DATABASE_ID_KEY) as { value?: unknown } | undefined;
+  if (!row || typeof row.value !== "string" || row.value.length === 0) {
+    throw new Error("Vital Agent Sync database identity is missing.");
+  }
+  return row.value;
 }
 
 function ensureColumn(sqlite: BetterSqliteDatabase, table: string, column: string, definition: string): void {
