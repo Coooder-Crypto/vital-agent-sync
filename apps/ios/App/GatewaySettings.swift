@@ -38,6 +38,20 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     }
 }
 
+enum SyncHistoryRange: Int, CaseIterable, Identifiable {
+    case twoDays = 2
+    case sevenDays = 7
+    case fourteenDays = 14
+    case thirtyDays = 30
+
+    var id: Int { rawValue }
+    var daysBack: Int { rawValue - 1 }
+
+    var title: String {
+        NSLocalizedString("\(rawValue) days", comment: "Number of Health history days to sync")
+    }
+}
+
 @MainActor
 final class GatewaySettings: ObservableObject {
     @Published var serverURLText: String
@@ -52,6 +66,7 @@ final class GatewaySettings: ObservableObject {
     @Published var pendingRelayOnboarding: RelayOnboardingPreview?
     @Published var pairingMessage: String?
     @Published var uploadHealthEnabled: Bool
+    @Published var syncHistoryRange: SyncHistoryRange
     @Published var autoSyncEnabled: Bool
     @Published var autoSyncMinimumIntervalMinutes: Int
     @Published private(set) var lastAutoSyncAt: Date?
@@ -71,6 +86,7 @@ final class GatewaySettings: ObservableObject {
     private enum Keys {
         static let serverURL = "gateway.serverURL"
         static let uploadHealthEnabled = "gateway.uploadHealthEnabled"
+        static let syncHistoryRange = "gateway.syncHistoryRange"
         static let apiToken = "gateway.apiToken"
         static let pairedDeviceID = "gateway.pairedDeviceID"
         static let pairedAgentName = "gateway.pairedAgentName"
@@ -109,6 +125,8 @@ final class GatewaySettings: ObservableObject {
         self.directTransportPublicKey = defaults.string(forKey: Keys.directTransportPublicKey)
         self.acceptedScopes = defaults.stringArray(forKey: Keys.acceptedScopes) ?? Self.defaultAcceptedScopes
         self.uploadHealthEnabled = defaults.object(forKey: Keys.uploadHealthEnabled) as? Bool ?? true
+        self.syncHistoryRange = SyncHistoryRange(rawValue: defaults.integer(forKey: Keys.syncHistoryRange))
+            ?? .fourteenDays
         self.autoSyncEnabled = defaults.object(forKey: Keys.autoSyncEnabled) as? Bool ?? true
         let savedInterval = defaults.integer(forKey: Keys.autoSyncMinimumIntervalMinutes)
         self.autoSyncMinimumIntervalMinutes = savedInterval > 0 ? savedInterval : 30
@@ -312,6 +330,10 @@ final class GatewaySettings: ObservableObject {
 
     func saveUploadSettings() {
         defaults.set(uploadHealthEnabled, forKey: Keys.uploadHealthEnabled)
+    }
+
+    func saveSyncHistoryRange() {
+        defaults.set(syncHistoryRange.rawValue, forKey: Keys.syncHistoryRange)
     }
 
     func saveAutoSyncSettings() {

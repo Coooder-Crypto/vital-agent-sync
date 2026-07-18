@@ -155,10 +155,17 @@
 "Auto sync (%@): relay queued %lld encrypted Health summaries" = "Auto sync (%@): relay queued %lld encrypted Health summaries";
 
 "First Sync" = "First Sync";
+"Sync Range" = "Sync Range";
+"History included" = "History included";
+"2 days" = "2 days";
+"7 days" = "7 days";
+"14 days" = "14 days";
+"30 days" = "30 days";
+"Sync Now includes this range. The first automatic sync uses it too; later automatic syncs refresh today and yesterday." = "Sync Now includes this range. The first automatic sync uses it too; later automatic syncs refresh today and yesterday.";
 "Grant Health access" = "Grant Health access";
 "Approve the Health categories Vital Agent Sync can summarize." = "Approve the Health categories Vital Agent Sync can summarize.";
-"Sync today and yesterday" = "Sync today and yesterday";
-"Send compact daily summaries to your paired Agent receiver." = "Send compact daily summaries to your paired Agent receiver.";
+"Sync your selected history" = "Sync your selected history";
+"Send the selected daily-summary range to your paired Agent receiver." = "Send the selected daily-summary range to your paired Agent receiver.";
 "Ask your Agent" = "Ask your Agent";
 "The Agent reads from its local Vital Agent Sync context after sync completes." = "The Agent reads from its local Vital Agent Sync context after sync completes.";
 "Allow Health" = "Allow Health";

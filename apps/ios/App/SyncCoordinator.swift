@@ -145,16 +145,14 @@ final class SyncCoordinator: ObservableObject {
             return
         }
 
-        await sync(settings: settings, trigger: .automatic(reason: reason))
-    }
-
-    private func datesToSync(daysBack: Int) -> [Date] {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let clamped = max(0, min(daysBack, 14))
-        return stride(from: clamped, through: 0, by: -1).compactMap {
-            calendar.date(byAdding: .day, value: -$0, to: today)
-        }
+        let daysBack = settings.latestSuccessfulSyncDetail == nil
+            ? settings.syncHistoryRange.daysBack
+            : SyncHistoryRange.twoDays.daysBack
+        await sync(
+            settings: settings,
+            daysBack: daysBack,
+            trigger: .automatic(reason: reason)
+        )
     }
 
     private func makeSyncID() -> String {
@@ -373,7 +371,7 @@ final class SyncCoordinator: ObservableObject {
         private static func datesToSync(daysBack: Int) -> [Date] {
             let calendar = Calendar.current
             let today = calendar.startOfDay(for: Date())
-            let clamped = max(0, min(daysBack, 14))
+            let clamped = max(0, min(daysBack, SyncHistoryRange.thirtyDays.daysBack))
             return stride(from: clamped, through: 0, by: -1).compactMap {
                 calendar.date(byAdding: .day, value: -$0, to: today)
             }

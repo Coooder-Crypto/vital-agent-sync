@@ -93,11 +93,17 @@ struct HomeView: View {
                             lastError: sync.status.lastError ?? settings.lastSyncError,
                             onScan: { isShowingScanner = true },
                             onSync: {
-                                Task { await sync.sync(settings: settings, trigger: .manual) }
+                                syncSelectedHistory()
                             }
                         )
 
                         if settings.isPaired {
+                            SyncRangePanel(
+                                selection: $settings.syncHistoryRange,
+                                isSyncing: sync.isSyncing,
+                                onChange: settings.saveSyncHistoryRange
+                            )
+
                             if latestSyncDate == nil {
                                 FirstSyncGuidePanel(
                                     isSyncing: sync.isSyncing,
@@ -105,7 +111,7 @@ struct HomeView: View {
                                         Task { await sync.requestHealthAuthorization(settings: settings) }
                                     },
                                     onSync: {
-                                        Task { await sync.sync(settings: settings, trigger: .manual) }
+                                        syncSelectedHistory()
                                     }
                                 )
                             }
@@ -160,6 +166,16 @@ struct HomeView: View {
         sync.status.lastSyncDetail ?? settings.latestSyncDetail
     }
 
+    private func syncSelectedHistory() {
+        Task {
+            await sync.sync(
+                settings: settings,
+                daysBack: settings.syncHistoryRange.daysBack,
+                trigger: .manual
+            )
+        }
+    }
+
     private var autoSyncDetail: LocalizedStringKey {
         if !settings.autoSyncEnabled {
             return "Off"
@@ -174,6 +190,43 @@ struct HomeView: View {
             return "Next eligible \(nextEligibleAutoSyncAt.formatted(date: .omitted, time: .shortened))"
         }
         return "Ready when the app is active"
+    }
+}
+
+struct SyncRangePanel: View {
+    @Binding var selection: SyncHistoryRange
+    let isSyncing: Bool
+    let onChange: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionTitle("Sync Range")
+
+            VStack(alignment: .leading, spacing: 12) {
+                Picker("History included", selection: $selection) {
+                    ForEach(SyncHistoryRange.allCases) { range in
+                        Text(range.title).tag(range)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .disabled(isSyncing)
+                .onChange(of: selection) { _, _ in
+                    onChange()
+                }
+
+                Text("Sync Now includes this range. The first automatic sync uses it too; later automatic syncs refresh today and yesterday.")
+                    .font(.footnote)
+                    .foregroundStyle(GatewayStyle.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(16)
+            .background(GatewayStyle.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(GatewayStyle.border, lineWidth: 1)
+            )
+        }
     }
 }
 
@@ -866,8 +919,8 @@ struct FirstSyncGuidePanel: View {
 
                 FirstSyncStepRow(
                     index: 2,
-                    title: "Sync today and yesterday",
-                    detail: "Send compact daily summaries to your paired Agent receiver.",
+                    title: "Sync your selected history",
+                    detail: "Send the selected daily-summary range to your paired Agent receiver.",
                     systemImage: "icloud.and.arrow.up"
                 )
 

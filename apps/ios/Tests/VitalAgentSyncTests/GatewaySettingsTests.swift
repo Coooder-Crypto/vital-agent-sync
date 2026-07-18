@@ -62,6 +62,21 @@ final class GatewaySettingsTests: XCTestCase {
     }
 
     @MainActor
+    func testSyncHistoryRangeDefaultsToFourteenDaysAndPersists() {
+        let settings = GatewaySettings(defaults: defaults, keychain: keychain)
+
+        XCTAssertEqual(settings.syncHistoryRange, .fourteenDays)
+        XCTAssertEqual(settings.syncHistoryRange.daysBack, 13)
+
+        settings.syncHistoryRange = .thirtyDays
+        settings.saveSyncHistoryRange()
+
+        let restored = GatewaySettings(defaults: defaults, keychain: keychain)
+        XCTAssertEqual(restored.syncHistoryRange, .thirtyDays)
+        XCTAssertEqual(restored.syncHistoryRange.daysBack, 29)
+    }
+
+    @MainActor
     func testDisconnectClearsPairingAndSyncTracking() async throws {
         defaults.set("http://127.0.0.1:8787", forKey: "gateway.serverURL")
         defaults.set("dev_test", forKey: "gateway.pairedDeviceID")

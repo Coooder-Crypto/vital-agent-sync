@@ -155,10 +155,17 @@
 "Auto sync (%@): relay queued %lld encrypted Health summaries" = "自动同步（%@）：Relay 已排队 %lld 条加密健康摘要";
 
 "First Sync" = "首次同步";
+"Sync Range" = "同步范围";
+"History included" = "包含的历史";
+"2 days" = "2 天";
+"7 days" = "7 天";
+"14 days" = "14 天";
+"30 days" = "30 天";
+"Sync Now includes this range. The first automatic sync uses it too; later automatic syncs refresh today and yesterday." = "立即同步会包含所选范围。首次自动同步也使用此范围；之后的自动同步会刷新今天和昨天。";
 "Grant Health access" = "授权健康访问";
 "Approve the Health categories Vital Agent Sync can summarize." = "批准 Vital Agent Sync 可以汇总的健康数据类别。";
-"Sync today and yesterday" = "同步今天和昨天";
-"Send compact daily summaries to your paired Agent receiver." = "把紧凑的每日摘要发送给已配对的 Agent 接收器。";
+"Sync your selected history" = "同步所选历史";
+"Send the selected daily-summary range to your paired Agent receiver." = "将所选日期范围的每日摘要发送给已配对的 Agent 接收器。";
 "Ask your Agent" = "询问你的 Agent";
 "The Agent reads from its local Vital Agent Sync context after sync completes." = "同步完成后，Agent 会读取本地 Vital Agent Sync 上下文。";
 "Allow Health" = "授权健康";
