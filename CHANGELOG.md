@@ -13,8 +13,9 @@ The project coordinates preview releases across the iOS app, `vitalmcp` runtime,
 
 ### Changed
 
-- Public documentation now leads with the WorkBuddy, LAN, and Tailscale onboarding paths.
-- Public documentation leads with the current pinned npm and SkillHub release.
+- Product scope is now a strict three-phase roadmap: WorkBuddy Local, local Hermes/other Agents, then a user-owned Agent server over Tailscale.
+- Hosted relay, accounts, billing, App Store launch, public VPS, and marketing are explicitly outside the active roadmap.
+- Public documentation now leads with the current pinned npm and SkillHub release and separates current guidance from historical relay research.
 
 ## [0.5.1] - 2026-07-18
 

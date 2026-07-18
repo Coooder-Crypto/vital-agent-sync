@@ -1,10 +1,12 @@
 # Vital Agent Sync Adapter Architecture Design
 
-This document turns the architecture upgrade TODO into implementation guidance for future source apps, agent runtimes, and transport modes. It is intentionally adapter-focused: the stable product surface remains scoped pairing, normalized storage, and MCP query tools. The shared installer and orchestration contract is defined in [agent-first-onboarding.md](agent-first-onboarding.md).
+This document preserves the implementation-level adapter boundaries. The active product order is limited to WorkBuddy Local, then other local Agents, then a co-located Agent server over Tailscale. The shared installer contract is defined in [agent-first-onboarding.md](agent-first-onboarding.md), and the canonical scope is [product-plan.md](product-plan.md).
+
+Sections about Android, wearable-vendor sources, tunnels, public HTTPS, hosted/self-hosted relay, or marketplaces are historical design research. They are not roadmap commitments and must not be used to prioritize work.
 
 ## Current Status
 
-Implemented in the local MVP branch:
+Implemented foundations retained by the current roadmap:
 
 - iOS source pairing and sync into local SQLite.
 - Source-device compatibility wrappers over the legacy `devices` table.
@@ -12,21 +14,15 @@ Implemented in the local MVP branch:
 - Hermes MCP config install and optional Vital Agent Sync skill install.
 - Agent adapter and transport provider interfaces.
 - LAN default transport and private Tailscale Serve HTTPS advertisement.
-- E2EE Hosted/Self-hosted Relay runtime, onboarding, pull, and lifecycle controls.
 - OpenClaw package export and Agent adapter compatibility audits.
 - Foreground auto-sync and best-effort BGAppRefresh scheduling in the iOS app.
 - MCP freshness metadata, source coverage, audit logging, weekly summary, and feedback events.
 
-Still intentionally future work:
+Current product work:
 
-- Android app implementation.
-- Xiaomi / Mi Fitness connector implementation.
-- Automatic WorkBuddy config installer.
-- Native tunnel process management.
-- Public HTTPS deployment automation.
-- HealthKit observer-driven `needsSync` state and physical-device background validation.
-- Agent-first non-interactive bootstrap output and setup resume state.
-- Short-lived, single-use onboarding tickets for safe in-chat handoff.
+- complete WorkBuddy one-sentence installation and physical-iPhone LAN acceptance;
+- complete local Hermes and generic MCP acceptance using the same runtime;
+- complete the co-located Tailscale server path after local Agent adapters are stable.
 
 ## Boundary Model
 

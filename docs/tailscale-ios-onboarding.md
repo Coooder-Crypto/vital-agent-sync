@@ -1,4 +1,8 @@
-# Tailscale HTTPS Onboarding For iOS
+# Tailscale server onboarding for iOS
+
+This is Phase 3 of the product roadmap. Complete WorkBuddy Local and local Agent installation first.
+
+The supported first server model co-locates the selected Agent, `vitalmcp`, SQLite, and stdio MCP on the same user-owned host. Tailscale exposes only the iPhone receiver. It does not expose MCP, use Funnel, or connect a desktop WorkBuddy instance to remote MCP.
 
 Vital Agent Sync supports private cross-network pairing through Tailscale Serve:
 
@@ -25,10 +29,10 @@ See [Tailscale Serve](https://tailscale.com/docs/features/tailscale-serve) and t
 
 ## Supported Setup
 
-Run setup on the receiver host:
+Run setup on the receiver/Agent host. Linux with Hermes is the reference server path:
 
 ```bash
-vitalmcp setup --transport tailscale --agent generic
+vitalmcp setup --transport tailscale --agent hermes --manager systemd
 vitalmcp setup --resume --yes
 ```
 
