@@ -35,10 +35,17 @@
 "Version" = "版本";
 
 "Remove Paired Agent" = "移除已配对 Agent";
-"Remove paired agent?" = "移除已配对 Agent？";
+"Remove %@?" = "移除 %@？";
 "Remove Agent" = "移除 Agent";
+"Removing Agent" = "正在移除 Agent";
+"Keep Agent" = "保留 Agent";
 "Cancel" = "取消";
-"Vital Agent Sync will remove this pairing from the iPhone. If the receiver is reachable, it will also revoke the device token on the agent side." = "Vital Agent Sync 会从这台 iPhone 移除配对。如果接收端可访问，也会撤销 Agent 侧的设备令牌。";
+"This iPhone will stop sharing new Health summaries with this Agent." = "这台 iPhone 将停止向此 Agent 发送新的健康摘要。";
+"On this iPhone" = "在这台 iPhone 上";
+"Pairing credentials and local sync history will be removed." = "配对凭证和本地同步历史将被移除。";
+"On your Agent" = "在你的 Agent 上";
+"Future syncs stop. Previously synced data is not deleted." = "后续同步将停止，之前同步的数据不会被删除。";
+"For direct connections, the app also revokes this iPhone's device token when the receiver is reachable." = "在直连模式下，如果接收器可访问，应用还会撤销这台 iPhone 的设备令牌。";
 
 "Connect your agent" = "连接你的 Agent";
 "Sync needs attention" = "同步需要处理";
