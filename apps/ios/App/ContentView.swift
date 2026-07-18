@@ -364,6 +364,7 @@ struct ConnectionView: View {
     @State private var receiverStatus: ReceiverCheckState = .idle
     @State private var isAdvancedExpanded = false
     @State private var isConfirmingAgentRemoval = false
+    @State private var removalAgentName = ""
     @State private var receiverCheckTask: Task<Void, Never>?
 
     var body: some View {
@@ -393,6 +394,7 @@ struct ConnectionView: View {
 
                         if settings.isPaired {
                             Button(role: .destructive) {
+                                removalAgentName = pairedAgentDisplayName
                                 isConfirmingAgentRemoval = true
                             } label: {
                                 Label("Remove Paired Agent", systemImage: "trash")
@@ -418,23 +420,21 @@ struct ConnectionView: View {
             }
             .navigationTitle("Connection")
             .navigationBarTitleDisplayMode(.inline)
-            .confirmationDialog(
-                "Remove paired agent?",
-                isPresented: $isConfirmingAgentRemoval,
-                titleVisibility: .visible
-            ) {
-                Button("Remove Agent", role: .destructive) {
-                    Task {
-                        await settings.disconnect()
-                        if !settings.isPaired {
-                            sync.reset()
-                        }
-                        BackgroundSyncManager.scheduleAppRefresh(settings: settings)
-                    }
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Vital Agent Sync will remove this pairing from the iPhone. If the receiver is reachable, it will also revoke the device token on the agent side.")
+            .sheet(isPresented: $isConfirmingAgentRemoval, onDismiss: {
+                removalAgentName = ""
+            }) {
+                AgentRemovalConfirmationView(
+                    agentName: removalAgentName.isEmpty ? pairedAgentDisplayName : removalAgentName,
+                    isRemoving: settings.isPairing,
+                    onCancel: {
+                        isConfirmingAgentRemoval = false
+                    },
+                    onRemove: removePairedAgent
+                )
+                .interactiveDismissDisabled(settings.isPairing)
+                .presentationDetents([.fraction(0.68), .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(GatewayStyle.background)
             }
             .onAppear {
                 scheduleDeferredReceiverCheck()
@@ -443,6 +443,25 @@ struct ConnectionView: View {
                 receiverCheckTask?.cancel()
                 receiverCheckTask = nil
             }
+        }
+    }
+
+    private var pairedAgentDisplayName: String {
+        guard let name = settings.pairedAgentName?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !name.isEmpty else {
+            return String(localized: "Local Agent")
+        }
+        return name
+    }
+
+    private func removePairedAgent() {
+        Task {
+            await settings.disconnect()
+            if !settings.isPaired {
+                sync.reset()
+                isConfirmingAgentRemoval = false
+            }
+            BackgroundSyncManager.scheduleAppRefresh(settings: settings)
         }
     }
 
@@ -494,6 +513,156 @@ struct ConnectionView: View {
             || lowercased.contains("rejected")
             || lowercased.contains("not reachable")
             || lowercased.contains("error")
+    }
+}
+
+struct AgentRemovalConfirmationView: View {
+    let agentName: String
+    let isRemoving: Bool
+    let onCancel: () -> Void
+    let onRemove: () -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                ZStack {
+                    Circle()
+                        .fill(Color.red.opacity(0.12))
+
+                    Image(systemName: "person.crop.circle.badge.minus")
+                        .font(.system(size: 25, weight: .semibold))
+                        .foregroundStyle(.red)
+                }
+                .frame(width: 58, height: 58)
+                .accessibilityHidden(true)
+
+                VStack(spacing: 8) {
+                    Text("Remove \(agentName)?")
+                        .font(.title2.weight(.bold))
+                        .foregroundStyle(GatewayStyle.text)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.75)
+
+                    Text("This iPhone will stop sharing new Health summaries with this Agent.")
+                        .font(.subheadline)
+                        .foregroundStyle(GatewayStyle.mutedText)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                VStack(spacing: 0) {
+                    AgentRemovalImpactRow(
+                        title: "On this iPhone",
+                        detail: "Pairing credentials and local sync history will be removed.",
+                        systemImage: "iphone"
+                    )
+
+                    Divider()
+                        .padding(.leading, 58)
+
+                    AgentRemovalImpactRow(
+                        title: "On your Agent",
+                        detail: "Future syncs stop. Previously synced data is not deleted.",
+                        systemImage: "sparkles"
+                    )
+                }
+                .background(GatewayStyle.surface)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(GatewayStyle.border, lineWidth: 1)
+                )
+
+                Label(
+                    "For direct connections, the app also revokes this iPhone's device token when the receiver is reachable.",
+                    systemImage: "lock.shield"
+                )
+                .font(.footnote)
+                .foregroundStyle(GatewayStyle.mutedText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 22)
+            .padding(.top, 24)
+            .padding(.bottom, 18)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 10) {
+                Button(role: .destructive, action: onRemove) {
+                    HStack(spacing: 8) {
+                        if isRemoving {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Image(systemName: "trash")
+                        }
+
+                        if isRemoving {
+                            Text("Removing Agent")
+                        } else {
+                            Text("Remove Agent")
+                        }
+                    }
+                    .font(.headline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 50)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white)
+                .background(Color.red)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .disabled(isRemoving)
+
+                Button(action: onCancel) {
+                    Text("Keep Agent")
+                        .font(.headline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 46)
+                }
+                .buttonStyle(.bordered)
+                .tint(GatewayStyle.primary)
+                .disabled(isRemoving)
+            }
+            .padding(.horizontal, 22)
+            .padding(.top, 14)
+            .padding(.bottom, 10)
+            .background(GatewayStyle.surface)
+            .overlay(alignment: .top) {
+                Divider()
+            }
+        }
+        .background(GatewayStyle.background.ignoresSafeArea())
+        .scrollBounceBehavior(.basedOnSize)
+    }
+}
+
+struct AgentRemovalImpactRow: View {
+    let title: LocalizedStringKey
+    let detail: LocalizedStringKey
+    let systemImage: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(GatewayStyle.primary)
+                .frame(width: 34, height: 34)
+                .background(GatewayStyle.primary.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(GatewayStyle.text)
+
+                Text(detail)
+                    .font(.footnote)
+                    .foregroundStyle(GatewayStyle.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .accessibilityElement(children: .combine)
     }
 }
 

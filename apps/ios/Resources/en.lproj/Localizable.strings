@@ -35,10 +35,17 @@
 "Version" = "Version";
 
 "Remove Paired Agent" = "Remove Paired Agent";
-"Remove paired agent?" = "Remove paired agent?";
+"Remove %@?" = "Remove %@?";
 "Remove Agent" = "Remove Agent";
+"Removing Agent" = "Removing Agent";
+"Keep Agent" = "Keep Agent";
 "Cancel" = "Cancel";
-"Vital Agent Sync will remove this pairing from the iPhone. If the receiver is reachable, it will also revoke the device token on the agent side." = "Vital Agent Sync will remove this pairing from the iPhone. If the receiver is reachable, it will also revoke the device token on the agent side.";
+"This iPhone will stop sharing new Health summaries with this Agent." = "This iPhone will stop sharing new Health summaries with this Agent.";
+"On this iPhone" = "On this iPhone";
+"Pairing credentials and local sync history will be removed." = "Pairing credentials and local sync history will be removed.";
+"On your Agent" = "On your Agent";
+"Future syncs stop. Previously synced data is not deleted." = "Future syncs stop. Previously synced data is not deleted.";
+"For direct connections, the app also revokes this iPhone's device token when the receiver is reachable." = "For direct connections, the app also revokes this iPhone's device token when the receiver is reachable.";
 
 "Connect your agent" = "Connect your agent";
 "Sync needs attention" = "Sync needs attention";
