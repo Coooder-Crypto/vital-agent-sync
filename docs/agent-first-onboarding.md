@@ -1,341 +1,141 @@
-# Agent-First Onboarding And Runtime Bootstrap
+# Agent-first onboarding
 
-This document defines the target installation and onboarding experience for Vital Agent Sync. It replaces the assumption that the website and a shell command are the product entry point. The preferred entry point is an existing Agent conversation; the website and CLI remain portable fallbacks.
+This document defines the shared installation and first-sync contract. The preferred entry point is an existing Agent conversation, but every Agent delegates to the same `vitalmcp` runtime.
 
-Related work:
+## Priority order
 
-- [GitHub issue #54](https://github.com/Coooder-Crypto/vital-agent-sync/issues/54) owns the shared installer and bootstrap contract.
-- [GitHub issue #57](https://github.com/Coooder-Crypto/vital-agent-sync/issues/57) owns optional OpenClaw marketplace publication and smoke testing.
-- [GitHub issue #55](https://github.com/Coooder-Crypto/vital-agent-sync/issues/55) owns physical-device validation of QR, deep-link, sync, pull, and MCP behavior.
-- [GitHub issue #56](https://github.com/Coooder-Crypto/vital-agent-sync/issues/56) owns the real Hosted Relay production deployment.
+1. WorkBuddy Local on macOS over trusted LAN.
+2. Hermes and other Agents using the same local runtime.
+3. Agent and runtime on a user-owned server, with iPhone sync over Tailscale.
 
-## Product Decision
+No Agent-specific path may skip an earlier product phase by creating a second installer, service, database, or health query implementation.
 
-Vital Agent Sync is not an OpenClaw-only skill and it is not a shell installer with an iOS companion. It is four replaceable layers:
-
-```text
-Vital Agent iOS app source
-  -> encrypted transport
-  -> vitalmcp context runtime
-  -> Agent-neutral MCP
-  -> Agent adapters and optional skills
-```
-
-The default product experience should be:
+## Target experience
 
 ```text
 Ask an Agent to install Vital Agent Sync
-  -> review the setup plan
-  -> let the Agent invoke the shared bootstrap
-  -> receive one onboarding action
-  -> connect the iOS app
-  -> complete the first encrypted sync
-  -> verify fresh data through MCP
+  -> install a pinned vitalmcp package without sudo
+  -> explain the planned persistent changes
+  -> wait for explicit consent
+  -> configure the Agent's local MCP entry
+  -> start one verified receiver service
+  -> open a short-lived QR in the user's local browser
+  -> pair and sync a physical iPhone
+  -> verify status and freshness through native MCP tools
 ```
 
-The Agent can guide this flow, but it must not become the data plane. Removing an OpenClaw, Hermes, Codex, Claude, or future Agent adapter must not change relay cryptography, normalized storage, or MCP tools.
+The QR, onboarding link, pairing secret, and device token never enter the Agent conversation.
 
-## Reference Product Alignment
+## Layer ownership
 
-The current [Apple Health Sync skill on ClawHub](https://clawhub.ai/lukasosterheider/skills/apple-health-sync) and [Health Sync product walkthrough](https://gethealthsync.app/) provide a useful interaction benchmark, but Vital Agent Sync runtime Preview does not depend on any marketplace listing:
+### Distribution surface
 
-1. The user starts inside an Agent conversation.
-2. The Agent installs a Skill and initializes a local runtime.
-3. The Agent offers one onboarding format, with QR preferred and a text form as fallback.
-4. The user connects an iOS app and completes a first sync.
-5. The local runtime fetches, decrypts, validates, and persists snapshots.
-6. The Agent can generate summaries from the latest available sync.
+SkillHub or a local adapter may:
 
-Vital Agent Sync should align with that low-friction sequence, but not copy an Agent-specific runtime or duplicate the query layer in Skill scripts. Vital Agent Sync already has a reusable TypeScript runtime, E2EE relay protocol, SQLite ingest path, lifecycle controls, and 12 Agent-neutral MCP tools.
+- select a reviewed, pinned `vitalmcp` version;
+- install it in a user-writable prefix;
+- explain prerequisites;
+- invoke the shared setup/status/doctor commands.
 
-## Entry Surfaces
-
-### 1. Agent Conversation (Preferred)
-
-The user gives a supported Agent a Vital Agent Sync install URL or marketplace package. The adapter:
-
-- explains the filesystem, service, network, and Agent-config changes before applying them
-- invokes the shared `vitalmcp` bootstrap
-- presents one onboarding action at a time
-- verifies the first sync through MCP
-- returns Agent-specific reload and scheduling guidance
-
-OpenClaw and Hermes may provide first-class Skill packages. Other runtimes can invoke the same CLI and import standard MCP configuration.
-
-### 2. CLI Or Website Command (Portable Fallback)
-
-Users without a supported Agent installer use:
-
-```bash
-npx -y vitalmcp setup
-```
-
-The planned website bootstrap command may install the package into a user-writable prefix when Node/npm or global npm permissions are unsuitable:
-
-```bash
-curl -fsSL https://<vital-agent-sync-domain>/install.sh | sh
-vitalmcp setup
-```
-
-The shell script is a distribution helper, not a second setup implementation. It must delegate product initialization to `vitalmcp setup`.
-
-### 3. Mobile Agent Trigger
-
-A mobile Agent may open a Vital Agent Sync universal/deep link after an Agent-side runtime has created onboarding state:
-
-```text
-Agent mobile app
-  -> vitalmcp://onboard?... or an HTTPS universal link
-  -> Vital Agent iOS app confirms the target and requested scopes
-  -> Vital Agent Sync uploads ciphertext
-  -> vitalmcp pulls, decrypts, and exposes MCP
-```
-
-Mobile Agent callbacks carry request ID and coarse status only. They never carry health payloads, private keys, bearer tokens, envelope bodies, or detailed errors.
-
-## Target Architecture
-
-```mermaid
-flowchart LR
-  user["User"] --> chat["Agent conversation"]
-  chat --> adapter["Agent adapter or Skill"]
-  website["Website or CLI fallback"] --> bootstrap["vitalmcp bootstrap"]
-  adapter --> bootstrap
-  bootstrap --> runtime["Local runtime, keys, SQLite, MCP"]
-  bootstrap --> handoff["One onboarding action"]
-  handoff --> ios["Vital Agent iOS app"]
-  ios -->|"default: trusted LAN"| runtime
-  ios -->|"optional: authorized tailnet"| runtime
-  ios -.->|"future/experimental encrypted envelope"| relay["Hosted or self-hosted Relay"]
-  relay -.->|"pull ciphertext"| runtime
-  runtime -->|"Agent-neutral MCP"| chat
-```
-
-LAN is the Local Preview default and requires only a reachable trusted network between the iPhone and receiver. Tailscale is the optional private remote path for users who install its apps, sign in to an account, and authorize both devices on the same tailnet. Neither path asks for a relay URL, VPS, domain, Vital Agent Sync account, or payment method. Hosted Relay remains future/experimental and is not recommended or required in Local Preview.
-
-## Bootstrap Ownership
-
-### Distribution Installer
-
-The POSIX installer owns only package availability:
-
-- detect macOS, Linux, and WSL
-- verify a supported Node.js/npm environment, or explain the missing prerequisite
-- install `vitalmcp` into a user-writable prefix without `sudo`
-- use `~/.vitalmcp/npm-global` by default and support a pinned package version
-- update a supported shell profile idempotently, without replacing unrelated content
-- support a pinned package version
-- print the exact next command
-- support clean uninstall of installer-owned PATH entries
-
-It must not generate relay keys, write Agent configuration, start services, or create onboarding credentials itself.
+It must not use `curl | bash`, `sudo`, an unpinned `npx`, repository source, or an unrecognized installer.
 
 ### `vitalmcp setup`
 
-The shared runtime owns product initialization:
+The runtime owns:
 
-- detect the Agent adapter and service manager
-- select LAN by default, or Tailscale after the user confirms its prerequisites
-- keep Hosted Relay and self-hosted Relay behind an explicit future/experimental choice
-- create and harden local state
-- initialize or migrate keys and configuration
-- install/start the local pull or receiver service
-- install or print the same MCP server contract for every Agent
-- create an onboarding artifact
-- report the next user action
-- resume safely after an interrupted setup
-- verify the first sync and MCP freshness when requested
+- environment and service-manager detection;
+- receiver and database identity verification;
+- user-only state and keys;
+- Agent config backup and mutation;
+- one `launchd` or `systemd --user` receiver;
+- LAN or Tailscale transport configuration;
+- short-lived pairing state;
+- first-sync observation and MCP freshness status.
 
-### Agent Adapter Or Skill
+It returns a redacted plan before consent and resumes from persisted non-secret setup state after interruption.
+
+### Agent Skill or adapter
 
 The Agent layer owns conversation orchestration only:
 
-- invoke supported bootstrap/status/pull/lifecycle commands
-- request explicit confirmation before persistent changes
-- choose one onboarding presentation
-- explain freshness and the next action
-- explain freshness without promising an iOS delivery schedule
-- call MCP tools for all health-data reads
+- describe changes and request confirmation;
+- invoke the supported CLI contract;
+- open the local onboarding action without reading it;
+- tell the user when an Agent restart or MCP reload is required;
+- call native MCP tools for status and health context;
+- disclose that returned MCP context may be processed by the selected model provider.
 
-It must not implement cryptography, parse HealthKit payloads, maintain a separate health database, or bypass MCP.
+It must not read SQLite, call internal HTTP APIs, hand-write JSON-RPC, parse HealthKit payloads, manage keys, or create unofficial persistence.
 
-## Setup State Machine
-
-Setup must be idempotent and resumable rather than a monolithic interactive script.
+## Setup state machine
 
 ```text
 detect
   -> plan
-  -> user consent
-  -> install runtime state
+  -> consent
+  -> initialize user-owned state
   -> configure Agent MCP
-  -> start local service
-  -> create onboarding handoff
-  -> wait for first iOS sync
-  -> pull and ingest
-  -> verify MCP freshness
+  -> install and start verified service
+  -> create loopback onboarding page
+  -> wait for physical-iPhone sync
+  -> verify native MCP and freshness
   -> ready
 ```
 
-Each completed stage is persisted without storing plaintext tokens in logs. Re-running setup continues from the first incomplete stage unless the user explicitly requests reset or migration.
+Re-running setup continues from the first incomplete stage. It does not silently reset, migrate, revoke, delete, or select another port.
 
-The implemented contract uses `schema_version: 1` and stores non-secret progress in `~/.vital-agent-sync/setup/state-v1.json` with user-only permissions. Persisted stages are:
+## Machine-readable contract
 
-```text
-environment_checked
-plan_created
-consent_received
-runtime_initialized
-agent_configured
-service_installed
-service_started
-onboarding_created
-first_sync_observed
-complete
-```
-
-Setup records the database sync count after consent and only marks `first_sync_observed` when the count increases, so existing history cannot be mistaken for the first sync from a new onboarding flow.
-
-## CLI Contract
-
-The existing interactive command remains the human fallback:
+Agent integrations use:
 
 ```bash
-vitalmcp setup
-```
-
-The target Agent-facing contract should add stable non-interactive and machine-readable behavior, for example:
-
-```bash
-vitalmcp setup --agent auto --transport lan --output json
+vitalmcp setup --agent <agent> --transport <lan|tailscale> --output json
 vitalmcp setup --resume --yes --output json
-vitalmcp setup --agent auto --transport tailscale --tailscale-name <host.tailnet.ts.net> --output json
 vitalmcp status --output json
+vitalmcp doctor --agent <agent> --transport <lan|tailscale>
 ```
 
-Exact flags may follow existing CLI conventions, but the JSON schema must be versioned. Safe output includes:
+Safe output may include product version, setup stage, service state, receiver identity, database identity, non-secret address, sync count, last-sync time, and stable error codes. It never includes keys, tokens, QR contents, onboarding URLs, health values, raw database rows, or full Agent configuration.
 
-- setup state and completed stages
-- detected Agent and service manager
-- transport mode and non-secret relay origin
-- path to a locally rendered QR artifact
-- whether MCP configuration changed
-- reload hint
-- first-sync and freshness status
-- a stable error category and suggested next action
+## WorkBuddy Local contract
 
-JSON, logs, and Agent messages must not include:
+The WorkBuddy Skill is the reference product experience:
 
-- private key material
-- upload authentication secrets
-- relay access tokens
-- complete onboarding payloads
-- raw health payloads
-- raw SQLite rows
+- install the pinned package under `~/.vitalmcp/npm-global`;
+- use the same absolute CLI path throughout installation;
+- preserve and back up `~/.workbuddy/mcp.json`;
+- stop on `receiver_identity_conflict` or `service_manager_failed`;
+- open the loopback pairing page on the Mac;
+- wait for WorkBuddy native MCP tools to load;
+- call `vital_agent_status` before any health context;
+- show the model privacy disclosure and wait for confirmation before the first health read.
 
-## Onboarding Artifact Security
+## Local Agent adapter contract
 
-The current E2EE onboarding payload contains sensitive long-lived source credentials. A QR or deep link containing that payload must be treated like a password, even when it is visually encoded.
+Hermes, generic MCP, OpenClaw, and future adapters must declare:
 
-V1 rules:
+- adapter ID and display name;
+- supported platform and Agent version;
+- detection method;
+- config and Skill locations;
+- whether config can be modified or only printed;
+- backup and rollback behavior;
+- reload/restart guidance;
+- uninstall isolation behavior.
 
-- prefer a local terminal/browser QR or local file rendered by the runtime
-- never print decoded onboarding fields
-- present only one format unless the user asks for a fallback
-- do not persist QR images longer than necessary
-- require explicit user intent before an Agent uploads a QR image to a cloud-hosted chat surface
-- keep secret files private to the current user
+Every adapter points to the same local `vitalmcp mcp` implementation and database.
 
-Target follow-up:
+## Tailscale server contract
 
-- introduce a short-lived, single-use onboarding ticket before making in-chat QR/deep-link handoff the universal default ([issue #70](https://github.com/Coooder-Crypto/vital-agent-sync/issues/70))
-- bind the ticket to the intended user/source identity
-- exchange it for device credentials once, then invalidate it
-- keep long-lived relay and upload credentials out of conversation history
+The first server phase supports only a co-located Agent and runtime. `vitalmcp` and MCP stay local to the server; Tailscale exposes only the iPhone receiver through Serve HTTPS. Public MCP, remote desktop-Agent MCP, Funnel, hosted relay, and public reverse proxies are out of scope.
 
-This preserves the competitor's simple Agent-to-app handoff without copying an avoidable credential-exposure boundary.
+## Privacy and safety
 
-## Transport Defaults
+Before the first operation that reads health data, the Agent must say that:
 
-The bootstrap chooses transport independently from the Agent adapter:
+- the database and runtime stay on the user's machine or server;
+- the minimum returned MCP context may be sent to the selected model provider;
+- local storage does not guarantee local inference;
+- Vital Agent Sync is not a medical provider.
 
-| Transport | Product role | Local inbound port | User infrastructure |
-| --- | --- | --- | --- |
-| Direct LAN | Local Preview default | Yes | Reachable trusted network |
-| Tailscale | Optional private remote path | Yes | User-installed apps, account, and authorized tailnet |
-| Public direct HTTPS | Advanced existing deployment | Yes | DNS, TLS, firewall |
-| Hosted Relay | Future/experimental; not a Local Preview recommendation | No | Future hosted service |
-| Self-hosted Relay | Experimental operator path | No on Agent machine | User-operated relay host |
-
-The Agent must not silently switch transport modes. Migration preserves local history and requires new iOS onboarding when credentials or routing change.
-
-The v0.1 sync promise is user-triggered Sync Now plus catch-up when the iOS app is active or returns to the foreground. Background opportunities are best-effort. Product and Agent copy must not promise scheduled daily/weekly delivery, an exact interval, or a guaranteed background time.
-
-## Failure And Recovery UX
-
-Every setup failure should report:
-
-- the failed stage
-- a stable error category
-- a redacted one-line explanation
-- whether retry is safe
-- the exact next command or user action
-
-Required recovery paths:
-
-- package already installed
-- unsupported or old Node.js
-- npm global EACCES
-- unknown Agent
-- invalid Agent config
-- service manager unavailable
-- local port unavailable in direct mode
-- Tailscale app, sign-in, authorization, or reachability failure
-- experimental Relay unreachable
-- stale or mismatched onboarding credentials
-- first sync not completed
-- MCP installed but Agent reload required
-- expired LAN/Tailscale pairing QR: run `vitalmcp pair`
-- source reset: call MCP `revoke_source_device`, remove the saved iOS connection, and pair again without deleting local SQLite history
-
-Unknown Agents fall back to standard MCP JSON and never block setup.
-
-## Acceptance Criteria
-
-The Agent-first onboarding milestone is complete when:
-
-- a supported Agent can start setup from one install URL or marketplace command
-- the same bootstrap works through OpenClaw, Hermes, and generic MCP without Agent-specific data paths
-- macOS and Linux installation succeeds without `sudo npm install -g`
-- install and setup are idempotent and recover from interruption
-- persistent changes require a visible plan and user consent
-- LAN setup succeeds without a relay URL, VPS, domain, account, or payment method
-- Tailscale setup states its app, account, and authorized-tailnet prerequisites before making changes
-- the user sees one QR/deep-link/text action, not a dump of credential fields
-- secrets and health plaintext are absent from Agent messages, JSON, logs, and support output
-- first iOS sync is pulled and visible through `vital_agent_status` plus the standard MCP tools
-- removing an optional Skill does not remove local data or break MCP
-- generic MCP remains usable without an Agent marketplace listing
-- product copy promises manual sync plus foreground catch-up, with background delivery best-effort and unscheduled
-- automated tests cover installer EACCES fallback, shell-profile idempotency, Agent detection, setup resume, output redaction, and unknown-Agent fallback
-
-## Non-Goals
-
-This milestone does not:
-
-- deploy the production Hosted Relay
-- publish the OpenClaw package itself
-- add new HealthKit metrics or scope controls
-- implement strict real-time iOS background sync
-- make Skill installation mandatory for generic MCP clients
-- allow an Agent to read HealthKit or relay plaintext directly
-
-## Delivery Slices
-
-1. **Bootstrap contract**: versioned setup state, JSON output, resume behavior, redaction, and first-sync verification.
-2. **Distribution installer**: user-prefix npm install, PATH management, platform detection, uninstall, and CI fixtures.
-3. **Agent adapters**: OpenClaw, Hermes, and generic MCP orchestration against the same bootstrap contract.
-4. **Website entry**: platform-aware fallback commands and links to Agent-specific entry points.
-5. **Secure handoff follow-up**: short-lived, single-use onboarding tickets for safe in-chat QR/deep-link delivery.
-
-Slices 1–4 belong to issue #54. Slice 5 is tracked in issue #70. OpenClaw marketplace publication remains isolated in issue #57 so the Agent-neutral product does not depend on ClawHub.
+The Agent waits for confirmation and then requests only the data needed for the current question. Missing or stale data is reported directly and never fabricated.

@@ -1,16 +1,15 @@
 # Open-source scope
 
-Vital Agent Sync is open-source software for a user-owned Apple Health to MCP data path. The public repository contains the complete code needed to inspect, build, run, test, and self-host the supported product paths.
+Vital Agent Sync is open-source software for a user-owned Apple Health to MCP data path. The public repository contains the complete code needed to inspect, build, run, and test the active product path.
 
 ## Public source
 
 - the iOS HealthKit app and focused tests;
 - the `vitalmcp` local runtime, SQLite storage, MCP tools, and Agent adapters;
 - LAN and Tailscale transports;
-- Docker and self-hosted relay deployment code;
-- the experimental hosted-relay protocol implementation;
+- historical Docker, self-hosted relay, and hosted-relay research that is not part of the active roadmap;
 - build scripts, CI workflows, security models, and user documentation;
-- the website source and public installation script.
+- legacy website and portable-installation source retained for audit, without a product-support commitment.
 
 The WorkBuddy distribution package is also maintained in the separate public [`vital-agent-sync-skill`](https://github.com/Coooder-Crypto/vital-agent-sync-skill) repository so SkillHub can consume a small, auditable package.
 
@@ -24,13 +23,19 @@ The WorkBuddy distribution package is also maintained in the separate public [`v
 
 Example configuration may be committed only when every credential value is an obvious placeholder.
 
-## Product status
+## Supported product scope
 
-LAN is the supported Local Preview default. Tailscale is the supported optional private remote path. Docker and self-hosted relay are advanced user-operated paths. The hosted relay remains experimental and is not required for onboarding.
+The roadmap is intentionally limited to:
+
+1. WorkBuddy and `vitalmcp` on one Mac over trusted LAN;
+2. Hermes and other Agents using the same local runtime and MCP implementation;
+3. an Agent and `vitalmcp` on a user-owned server, with the iPhone reaching the receiver through Tailscale Serve HTTPS.
+
+Hosted relay, accounts, billing, App Store launch, public VPS, public MCP, and marketing are not supported product paths. Experimental source may remain public for audit and historical reference without implying maintenance or availability.
 
 ## Public-release checklist
 
-Before changing repository visibility or publishing a release:
+Before publishing each release:
 
 1. merge all intended product changes into `main`;
 2. run `npm run audit:oss` from a full clone with complete Git history;
@@ -39,5 +44,5 @@ Before changing repository visibility or publishing a release:
 5. decide whether historical author email addresses are acceptable to expose;
 6. verify the app icon, screenshots, fonts, and other media have documented provenance and redistribution rights;
 7. confirm GitHub private vulnerability reporting is enabled;
-8. clone the future public repository into a clean directory and complete the documented setup flow;
+8. clone the public repository into a clean directory and complete the active phase's documented setup flow;
 9. create the matching signed tag and GitHub release only after the public tree passes all checks.

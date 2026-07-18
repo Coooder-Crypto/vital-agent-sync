@@ -1,483 +1,136 @@
-# Vital Agent Sync Product Plan
+# Product plan
 
-Vital Agent Sync is a user-owned personal data bridge for AI agents. It lets a user connect authorized phone, watch, and feedback data to local or cloud-hosted agents without making every agent implement HealthKit, pairing, permissions, and privacy controls.
+This document is the canonical product roadmap for Vital Agent Sync.
 
-The product is not an agent. It is an agent data gateway.
+## Product definition
 
-## Product Goal
+Vital Agent Sync is an open-source, user-owned Apple Health bridge for personal AI Agents.
 
-The target experience:
-
-```text
-User asks an agent or runs a command to install Vital Agent Sync.
-Vital Agent Sync starts a receiver and shows a QR code.
-iOS app scans the QR code and pairs with the receiver.
-User chooses which data to expose and grants Apple permissions once.
-iOS app syncs compact summaries manually or automatically.
-Agent queries the latest authorized personal context.
-```
-
-The user should not need to manually export files after setup. The iOS app syncs compact summaries to a user-controlled gateway endpoint. Agents query the latest available context through MCP or an SDK. The intended steady state is "pair once, authorize once, keep syncing, ask the Agent anytime."
-
-For the canonical Agent-first install and onboarding flow, see [agent-first-onboarding.md](agent-first-onboarding.md). For the detailed Agent connection UX, see [agent-connection.md](agent-connection.md). For common deployment methods, see [deployment-methods.md](deployment-methods.md). For the multi-source, multi-agent, multi-transport upgrade checklist, see [architecture-upgrade-todo.md](architecture-upgrade-todo.md).
-
-## Principles
-
-- User-owned by default.
-- No cloud dependency required.
-- Cloud or relay is optional, not mandatory.
-- Sync summaries first, raw samples only by explicit advanced permission.
-- Each agent gets a scoped token.
-- Every agent access is auditable and revocable.
-- Agents read context; they do not get direct HealthKit database access.
-- The iOS app is the authority for Apple Health and iOS permissions.
-
-## System Components
+It connects an iPhone to an Agent without a Vital Agent Sync account or operator-hosted health service:
 
 ```text
-vital-agent-sync-ios
-  iOS app
-  HealthKit collection
-  pairing UI
-  connected-agent management
-
-vitalmcp
-  local daemon
-  HTTP API
-  SQLite store
-  pairing sessions
-  scoped agent tokens
-  local MCP server
-  optional reverse tunnel
-
-@vital-agent-sync/mcp
-  MCP server adapter for agents
-  local or remote endpoint support
-  pairing flow tools
-  context query tools
-
-@vital-agent-sync/sdk
-  TypeScript client
-  schemas
-  webhook verifier
-  scope helpers
+iPhone HealthKit
+  -> trusted LAN or the user's Tailscale network
+  -> user-owned vitalmcp runtime and SQLite database
+  -> local MCP
+  -> WorkBuddy, Hermes, or another MCP-compatible Agent
 ```
 
-The first implementation can combine `local`, `mcp`, and `sdk` into one npm package, then split them when the API stabilizes.
+The product is the installation and data bridge, not a health-analysis Agent. It does not provide medical diagnosis, treatment, emergency monitoring, or guaranteed background delivery.
 
-## Common Deployment Methods
+## Product promise
 
-Vital Agent Sync deployment is about where the receiver, database, and MCP process run. Agent runtime choice is a separate adapter concern.
+A supported user should be able to:
 
-The first supported methods are documented in [deployment-methods.md](deployment-methods.md):
+1. ask an Agent to install Vital Agent Sync;
+2. review the persistent filesystem, service, network, and Agent-config changes;
+3. approve a single shared `vitalmcp` setup flow;
+4. open a credential-bearing QR only in a local browser;
+5. scan it with the source-built iOS app and select HealthKit scopes;
+6. complete a manual first sync;
+7. verify freshness through Agent-neutral MCP tools.
 
-### 1. Mac Local Mode
+The Agent Skill or adapter orchestrates this flow. It never owns cryptography, HealthKit mapping, SQLite, or a separate health query path.
 
-Best for first-time setup, local MCP-compatible agents, and developer machines.
+## Roadmap
 
-```text
-iPhone
-  -> same Wi-Fi / LAN
-  -> macOS Vital Agent Sync receiver
-  -> ~/.vital-agent-sync/vital-agent.sqlite
-  -> MCP stdio
-  -> MCP-compatible Agent
-```
+### Phase 1: WorkBuddy Local
 
-Recommended command:
+This is the only current release priority.
 
-```bash
-npx -y vitalmcp setup
-```
+Target environment:
 
-The iOS app syncs summaries to the Mac receiver. The Agent reads the same SQLite database through MCP and does not need to reconnect after every iOS sync.
+- WorkBuddy and `vitalmcp` run on the same Mac;
+- the receiver, SQLite database, and MCP process stay on that Mac;
+- the iPhone reaches the receiver over a trusted LAN;
+- the WorkBuddy Skill is installed from SkillHub and pins a reviewed npm version.
 
-### 2. Home Server / NAS / N100 Mode
+Definition of done:
 
-Best for users with an always-on machine at home.
+- one conversation starts installation without `curl | bash`, `sudo`, or an unpinned package;
+- WorkBuddy shows a redacted setup plan before persistent changes;
+- setup preserves unrelated WorkBuddy MCP entries and creates a backup before modification;
+- the official service manager starts exactly one verified receiver;
+- the QR opens only on loopback and is never copied into the model conversation;
+- a physical iPhone pairs, syncs, and increases the local sync count;
+- WorkBuddy loads the native MCP tools, calls `vital_agent_status`, and reads only the minimum context needed;
+- the privacy disclosure appears before the first health-data read;
+- reinstall, upgrade, conflict, restart, and removal behavior are documented and tested.
 
-```text
-iPhone
-  -> LAN or Tailscale
-  -> home server receiver
-  -> server-local SQLite
-  -> MCP stdio on the server or LAN
-  -> MCP-compatible Agent
-```
+### Phase 2: Local Hermes And Other Agents
 
-Recommended receiver command on Linux home servers:
+Start only after Phase 1 passes on a clean WorkBuddy profile and a physical iPhone.
 
-```bash
-vitalmcp setup --agent generic --manager systemd
-```
+Priority order:
 
-Tailscale is the preferred private remote-access option for this mode:
+1. Hermes local installation;
+2. generic MCP configuration;
+3. local OpenClaw and other Agent adapters where their documented config contract is stable.
 
-```bash
-vitalmcp setup --transport tailscale --tailscale-name receiver.example-tailnet.ts.net --agent generic
-```
+All adapters must reuse the same local runtime, database, receiver, setup state, and MCP tools. Marketplace publication is not required. Removing an adapter must not remove local data or break another Agent.
 
-This configures a tailnet-only Tailscale Serve HTTPS route and advertises its trusted `.ts.net` URL to iOS. See [Tailscale HTTPS Onboarding For iOS](tailscale-ios-onboarding.md).
+Definition of done:
 
-This installs a user-level systemd service for the receiver, waits until it is reachable, and prints a pairing QR. If systemd is not available on the NAS, use PM2, Docker Compose, or the NAS vendor's process manager to keep the daemon running. Windows hosts are detected as manual until Task Scheduler or Windows Service support is added.
+- each supported Agent has a deterministic install/config/reload path;
+- the adapter contract declares detection, config location, mutation policy, and reload guidance;
+- existing Agent configuration is preserved and backed up;
+- the same physical-iPhone fixture produces equivalent MCP status and context across Agents;
+- generic MCP remains the portability baseline.
 
-### 3. Docker Compose Mode
+### Phase 3: User-Owned Server Over Tailscale
 
-Best for NAS/N100, WSL, Windows Docker Desktop, and users who prefer container-managed receiver deployment.
+Start only after local Agent installation is stable.
 
-```text
-iPhone
-  -> host LAN / Tailscale / HTTPS URL
-  -> Docker host port 8787
-  -> Vital Agent Sync receiver container
-  -> /data/vital-agent.sqlite mounted volume
-  -> MCP-compatible Agent on the host or shared volume
-```
+Target environment:
 
-Recommended standalone compose generation command:
+- `vitalmcp`, SQLite, MCP, and the selected Agent run under the same user on a user-owned Linux or macOS server;
+- a user-level `systemd` or `launchd` service keeps the receiver alive;
+- Tailscale Serve exposes trusted HTTPS only inside the user's tailnet;
+- the iPhone and server are authorized members of that tailnet;
+- the pairing QR advertises the verified `.ts.net` HTTPS name.
 
-```bash
-vitalmcp print-docker-compose --server-url http://192.168.31.53:8787 > docker-compose.yml
-```
+The first server release does not expose MCP over the network. The Agent consumes local stdio MCP on the same server. WorkBuddy remains a local-desktop path unless WorkBuddy publishes a supported remote MCP contract.
 
-Docker mode requires an explicit iPhone-reachable `server_url`. `127.0.0.1`, `localhost`, container names, and WSL-only IPs should not be used in pairing URLs.
+Definition of done:
 
-### 4. User-Owned VPS / Public HTTPS Mode
+- one documented command installs and plans the server service without root;
+- setup detects or accepts the exact `.ts.net` device name and refuses HTTP, raw `100.x`, Funnel, or conflicting Serve handlers;
+- an iPhone sync succeeds while on a different physical network from the server;
+- service and Tailscale restarts recover without re-pairing;
+- disconnecting Tailscale fails safely;
+- diagnostics explain service, Serve, certificate, ACL, pairing, and freshness failures without exposing secrets or health values.
 
-Best for users whose receiver and Agent already run on a user-controlled VPS.
+## Distribution
 
-```text
-iPhone
-  -> HTTPS
-  -> user-owned VPS receiver
-  -> VPS-local SQLite
-  -> MCP stdio on the VPS
-  -> MCP-compatible Agent
-```
+- `vitalmcp` is published on npm and is the only runtime implementation.
+- SkillHub is the WorkBuddy distribution surface.
+- Hermes and other Agents use local adapters or generated configuration; their marketplaces are optional and out of scope.
+- The iOS app remains source-distributed for the current roadmap. Users build it with Xcode and select their own Apple Development Team and bundle identifier.
 
-Recommended receiver command behind a user-managed reverse proxy:
+## Non-goals
 
-```bash
-vitalmcp daemon \
-  --host 0.0.0.0 \
-  --port 8787 \
-  --transport public_https \
-  --server-url https://vital-agent-sync.example.com
-```
-
-This mode requires the user to provide HTTPS, DNS, persistence, and server hardening. Health summaries leave the phone and home network, but remain on infrastructure controlled by the user.
-
-Future deployment work can add tunnel managers, an official published Docker image, remote MCP over HTTPS, and a Vital Agent Sync-hosted relay. Those are intentionally not part of the first deployment pass.
-
-## Pairing Flow
+The current product roadmap does not include:
 
-The pairing flow should follow the shape of OAuth Device Code Flow, but the user-facing language should be "pairing code".
+- an operator-hosted relay or health-data service;
+- accounts, billing, subscriptions, plans, quotas, or entitlements;
+- App Store, TestFlight, mainland-China filing, or overseas storefront launch work;
+- public VPS, public DNS, public MCP, or Tailscale Funnel deployment;
+- cloud-chat delivery of credential-bearing onboarding artifacts;
+- guaranteed daily, weekly, or interval-based iOS background sync;
+- Agent-specific databases, query implementations, or health interpretations;
+- marketing website, analytics funnel, launch campaign, or marketplace expansion work.
 
-```text
-1. User runs `vitalmcp init` or asks an agent to run it.
-2. Gateway creates a short-lived pairing session.
-3. Gateway displays a QR link.
-4. iOS app scans the QR link.
-5. iOS app shows server, transport mode, and requested scopes.
-6. User selects scopes and approves.
-7. Gateway issues a scoped device token.
-8. iOS stores the paired server and token.
-9. iOS pushes selected summaries to `/health/sync` manually or automatically.
-10. Agent calls MCP tools against the local store.
-```
+Existing experimental relay code and protocol research may remain available for audit and historical reference. They are unsupported and receive no roadmap priority.
 
-After step 10, the link is persistent. Re-pairing is only needed when the user switches machines, revokes the device, deletes local data, changes the database path, or disconnects the iOS app.
+## Product rules
 
-Pairing session shape:
+- Local-first means user-owned storage and transport; it does not imply local model inference.
+- Every health read goes through the documented MCP boundary after privacy disclosure.
+- Every persistent mutation is planned, explained, and confirmed.
+- Unknown receiver identity, database identity, service-manager behavior, or transport state fails closed.
+- Pairing artifacts, keys, tokens, databases, and health values never enter Agent prompts, public issues, or normal logs.
+- Data ownership, revocation, reset, and diagnostics remain user-controlled operations, not paid features.
 
-```json
-{
-  "pairing_code": "8K2F-J91Q",
-  "pairing_url": "vitalmcp://pair?server=http://192.168.31.25:8787&code=8K2F-J91Q",
-  "agent_name": "Desktop Assistant",
-  "requested_scopes": [
-    "health.daily.read",
-    "feedback.write"
-  ],
-  "expires_in_seconds": 600
-}
-```
+## Prioritization rule
 
-## iOS App Responsibilities
-
-The iOS app owns:
-
-- HealthKit authorization.
-- Local sync endpoint configuration.
-- Pairing code scan / input.
-- Scope approval UI.
-- Connected agents list.
-- Agent revocation.
-- Sync status and error visibility.
-- Foreground auto-sync after pairing, app launch, and app foregrounding.
-- Best-effort background sync through iOS-supported background mechanisms.
-
-The iOS app does not need to run an agent, model, or MCP server.
-
-Auto-sync should be user-controlled and throttled. It should not promise strict intervals because iOS background execution is opportunistic.
-
-## Agent-Side Tools
-
-The MCP server should expose a small, stable tool surface:
-
-```text
-vital_agent_status
-get_personal_context
-get_daily_health_summary
-get_sleep_trend
-get_workout_load
-get_recovery_signals
-list_devices
-revoke_device
-```
-
-Tool behavior:
-
-- `vital_agent_status` returns device count, sync count, and latest sync time.
-- `get_personal_context` returns the preferred combined context for broad questions about today, energy, recovery, and activity.
-- `get_daily_health_summary` returns daily health summary only.
-- Trend and load tools return compact multi-day signals.
-- Device tools list and revoke paired devices.
-- Missing data should be represented as `null`, empty arrays, or structured no-data responses.
-
-Future tools:
-
-```text
-generate_weekly_health_report
-record_feedback
-request_refresh
-```
-
-## Agent Skill Layer
-
-MCP remains the core protocol. A skill is an optional agent-specific usage guide.
-
-Vital Agent Sync should ship a portable skill document, with Hermes as the first supported target. The skill should:
-
-- trigger on natural-language questions about personal status, recovery, exercise readiness, and activity
-- call `get_personal_context` first
-- use lower-level MCP tools for drill-down questions
-- report data freshness
-- avoid diagnosis, prescriptions, and unsupported medical claims
-
-This should be additive. A generic MCP-compatible agent should still work without installing a Vital Agent Sync skill.
-
-## Scope Model
-
-Default scopes:
-
-```text
-health.daily.read
-feedback.write
-```
-
-Additional scopes:
-
-```text
-health.trends.read
-health.workouts.read
-profile.basic.read
-sync.refresh.request
-```
-
-Sensitive scopes, disabled by default:
-
-```text
-health.raw_samples.read
-location.coarse.read
-location.history.read
-```
-
-The product should make sensitive scopes visibly different in the iOS approval UI.
-
-## Data Model
-
-The gateway should store compact normalized records.
-
-```text
-devices
-agents
-agent_tokens
-pairing_sessions
-health_daily_summary
-feedback_events
-refresh_requests
-audit_log
-```
-
-The first local daemon can use SQLite. A self-hosted server can support Postgres later.
-
-Daily health summary:
-
-```json
-{
-  "date": "2026-06-22",
-  "timezone": "Asia/Shanghai",
-  "provider": "apple_health",
-  "steps": 7320,
-  "sleep_minutes": 386,
-  "resting_heart_rate_bpm": 62,
-  "avg_heart_rate_bpm": 82,
-  "max_heart_rate_bpm": 146,
-  "active_energy_kcal": 480,
-  "workout_minutes": 45
-}
-```
-
-Current context:
-
-```json
-{
-  "date": "2026-06-22",
-  "timezone": "Asia/Shanghai",
-  "health": {
-    "sleep_minutes": 386,
-    "steps": 7320,
-    "resting_heart_rate_bpm": 62,
-    "workout_minutes": 45
-  },
-  "freshness": {
-    "health_synced_at": "2026-06-22T08:31:00+08:00",
-    "is_stale": false
-  }
-}
-```
-
-## Network Design
-
-The iOS app syncs to one active gateway endpoint:
-
-```text
-http://192.168.31.25:8787
-http://100.x.y.z:8787
-https://abc.trycloudflare.com
-https://gateway.userdomain.com
-```
-
-Endpoint discovery should progress in phases:
-
-1. Manual URL input.
-2. Pairing QR code.
-3. Bonjour / mDNS local discovery.
-4. Tailscale instructions / MagicDNS.
-5. Tunnel setup from the npm daemon.
-
-For MVP, local HTTP can be allowed for LAN development. Production should prefer HTTPS or pinned local certificates.
-
-## Security Requirements
-
-- Pairing code expires after 10 minutes.
-- Pairing code is single-use.
-- Agent tokens are scoped.
-- Device tokens are separate from agent tokens.
-- Tunnel URL alone must not grant data access.
-- Every agent read/write action creates an audit log entry.
-- iOS app can revoke any agent.
-- Local daemon should bind admin APIs to `127.0.0.1` only.
-- Remote tunnel should expose only MCP and approved public endpoints.
-- Raw HealthKit samples are never exposed unless explicitly enabled.
-
-## MVP Roadmap
-
-### Milestone 1: Local Daemon
-
-- `vitalmcp`
-- SQLite store
-- health sync endpoints
-- MCP query tools
-- pairing sessions
-- scoped agent tokens
-- local MCP stdio support
-
-Status: implemented for the local development path.
-
-### Milestone 2: iOS Pairing
-
-- scan QR / input code
-- fetch pairing details
-- approve scopes
-- connected agents list
-- revoke agent
-- manual sync to paired local daemon
-- foreground auto-sync with throttling
-- best-effort background refresh
-
-Status: partially implemented. QR scanner, scope confirmation, manual sync, connected device display, and revocation are implemented for the local path. Foreground auto-sync and background refresh remain.
-
-### Milestone 3: Foolproof Agent Linking
-
-- `vitalmcp init`
-- `vitalmcp init --hermes`
-- QR page opened or printed automatically
-- `print-mcp-config`
-- `install-hermes`
-- `status` and `doctor`
-- optional Vital Agent Sync skill installer
-- generic MCP config docs for other agents
-
-Exit criteria:
-
-- A user can install the receiver with one command.
-- The iOS app can pair by scanning, without copying URL/token text.
-- An agent can query Vital Agent Sync without hand-authoring MCP JSON.
-- After the first reload/restart, new iOS syncs are visible to the agent without reconnecting.
-
-### Milestone 4: Common Deployment Methods
-
-- Mac local deployment guide
-- home server / NAS / N100 deployment guide
-- Linux systemd user service installer
-- Docker Compose and WSL deployment guide
-- Tailscale pairing guidance
-- user-owned VPS / public HTTPS deployment guide
-- clear privacy boundary for each method
-
-### Milestone 5: SDK And Packaging
-
-- `@vital-agent-sync/sdk`
-- TypeScript types
-- Zod schemas
-- webhook verifier
-- install docs for common agents
-
-### Milestone 6: Self-Hosted Server
-
-- Docker image
-- HTTPS deployment guide
-- Postgres option
-- backup/restore docs
-
-## Non-Goals For The First Version
-
-- No full chat history import.
-- No SMS or WeChat database extraction.
-- No raw minute-level heart-rate export by default.
-- No medical diagnosis.
-- No always-on iPhone background service guarantee.
-- No requirement to use a hosted cloud service.
-
-## Success Criteria
-
-First useful demo:
-
-```text
-User runs vitalmcp or npm run dev:local.
-Receiver shows pairing code.
-iOS app pairs with receiver.
-iOS app syncs Apple Health summaries.
-Agent calls MCP tools and receives useful fresh context.
-iOS syncs again and the agent reads updated context without re-pairing or reloading MCP.
-```
-
-Product-quality criteria:
-
-- Setup under 5 minutes for a local user.
-- Setup under 10 minutes for a cloud-agent user using tunnel mode.
-- Default payloads contain no raw samples.
-- Agent tools return freshness metadata.
-- Revocation takes effect immediately.
+When proposed work does not directly improve the active phase's install, pair, sync, MCP, privacy, recovery, or diagnostics path, defer it. Do not begin the next phase until the previous phase has recorded physical-device evidence.

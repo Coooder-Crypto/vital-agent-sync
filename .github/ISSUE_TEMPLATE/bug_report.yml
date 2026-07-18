@@ -16,11 +16,10 @@ body:
         - iOS app
         - vitalmcp runtime
         - WorkBuddy / SkillHub
-        - MCP client
+        - Hermes
+        - Other local MCP Agent
         - LAN
-        - Tailscale
-        - Docker / self-hosted relay
-        - Hosted relay experiment
+        - Tailscale server
         - Documentation
     validations:
       required: true
@@ -28,7 +27,7 @@ body:
     id: version
     attributes:
       label: Version
-      placeholder: "0.5.0"
+      placeholder: "0.5.1"
     validations:
       required: true
   - type: textarea
