@@ -6,6 +6,7 @@ import {
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { detectPreferredAgentAdapter, getAgentAdapter, isAgentAdapterId, type AgentAdapterId } from "./agents.js";
 import {
   BOOTSTRAP_SCHEMA_VERSION,
@@ -14,6 +15,7 @@ import {
   createBootstrapState,
   failBootstrapState,
   markBootstrapStage,
+  pauseBootstrapForServiceActivation,
   readBootstrapState,
   runBootstrapWorkflow,
   safeErrorMessage,
@@ -70,6 +72,13 @@ import {
   VITALMCP_RUNTIME_VERSION,
   type ReceiverRuntimeStatus
 } from "./runtime-status.js";
+import {
+  getRuntimeMetadataPath,
+  readRuntimeMetadata,
+  recordRuntimeMetadata,
+  runtimeMetadataMatchesCurrentProcess,
+  runtimeMetadataPathsExist
+} from "./runtime.js";
 import { createTransportProvider, getServerUrlDiagnostics, isContainerRuntime, isTransportProviderId, type TransportProviderId } from "./transports.js";
 
 type CliOptions = {
@@ -133,6 +142,7 @@ type CliOptions = {
   workbuddyProjectPath?: string;
   yes: boolean;
   resume: boolean;
+  mcpVerified: boolean;
   outputFormat: "text" | "json";
   onboardingFormat: "qr" | "deeplink" | "text";
 };
@@ -177,6 +187,7 @@ function parseArgs(argv: string[]): CliOptions {
     databasePathProvided: false,
     yes: false,
     resume: false,
+    mcpVerified: false,
     outputFormat: "text",
     onboardingFormat: "qr"
   };
@@ -384,6 +395,8 @@ function parseArgs(argv: string[]): CliOptions {
       index += 1;
     } else if (arg === "--resume") {
       options.resume = true;
+    } else if (arg === "--mcp-verified") {
+      options.mcpVerified = true;
     } else if (arg === "--hermes" || arg === "--install-hermes") {
       options.installHermes = true;
       options.agentId = "hermes";
@@ -774,6 +787,7 @@ Global:
   --workbuddy-config <path> Explicit WorkBuddy MCP configuration path
   --output text|json Versioned Agent-safe command output
   --yes              Apply a reviewed setup plan
+  --mcp-verified     Resume only after WorkBuddy loaded and called vital_agent_status
   --version, -v      Print version
   --help, -h         Show this help
 `;
@@ -835,10 +849,18 @@ async function runSetup(options: CliOptions): Promise<void> {
         state = await executeBootstrapSetup(state, requested);
         printBootstrapResult(state, requested);
       } catch (error) {
-        state = failBootstrapState(state, error, { stateDir: requested.stateDir });
+        state = classifyBootstrapError(error) === "service_activation_required"
+          ? pauseBootstrapForServiceActivation(state, error, { stateDir: requested.stateDir })
+          : failBootstrapState(state, error, { stateDir: requested.stateDir });
         if (requested.outputFormat === "json") {
           printJson(buildBootstrapOutput(state, requested));
-          process.exitCode = 1;
+          if (state.status === "failed") {
+            process.exitCode = 1;
+          }
+          return;
+        }
+        if (state.status === "awaiting_service_activation") {
+          printBootstrapResult(state, requested);
           return;
         }
         throw error;
@@ -1000,6 +1022,7 @@ async function executeBootstrapSetup(state: BootstrapState, options: CliOptions)
   let effectiveOptions = options;
   let relayConfig: ReturnType<typeof initializeRelayRuntime> | undefined;
   const agent = getAgentAdapter(options.agentId);
+  recordRuntimeMetadata({ cliPath: fileURLToPath(import.meta.url) });
   const database = openVitalAgentDatabase({ path: options.databasePath });
   const expectedDatabaseId = getDatabaseId(database);
   try {
@@ -1047,7 +1070,7 @@ async function executeBootstrapSetup(state: BootstrapState, options: CliOptions)
         workbuddyConfigPath: effectiveOptions.workbuddyConfigPath,
         workbuddyProjectPath: effectiveOptions.workbuddyProjectPath
       });
-      if (effectiveOptions.agentId !== "generic" && !detected.installed) {
+      if (effectiveOptions.agentId !== "generic" && !detected.configured) {
         agent.installMcp({ databasePath: effectiveOptions.databasePath }, {
           hermesConfigPath: effectiveOptions.hermesConfigPath,
           openclawConfigPath: effectiveOptions.openclawConfigPath,
@@ -1061,19 +1084,20 @@ async function executeBootstrapSetup(state: BootstrapState, options: CliOptions)
     },
     service_installed: () => {
       const serviceOptions = toServiceOptions(effectiveOptions);
-      if (!getVitalAgentServiceStatus(serviceOptions).installed) {
+      if (!getVitalAgentServiceStatus(serviceOptions).configured) {
         installVitalAgentService(serviceOptions);
       }
     },
     service_started: async () => {
       const serviceOptions = toServiceOptions(effectiveOptions);
-      if (!getVitalAgentServiceStatus(serviceOptions).running) {
+      if (!getVitalAgentServiceStatus(serviceOptions).loaded) {
         startVitalAgentService(serviceOptions);
       }
       if (!relayMode) {
         await waitForLocalReceiver(effectiveOptions, expectedDatabaseId);
       }
     },
+    mcp_verified: () => effectiveOptions.agentId !== "workbuddy" || effectiveOptions.mcpVerified,
     onboarding_created: async () => {
       if (relayMode) {
         relayConfig ??= readRelayRuntimeConfig({ stateDir: effectiveOptions.stateDir });
@@ -1102,6 +1126,7 @@ async function executeBootstrapSetup(state: BootstrapState, options: CliOptions)
 }
 
 function buildBootstrapOutput(state: BootstrapState, options: CliOptions): BootstrapOutput {
+  const resumeCommand = buildSetupResumeCommand(state);
   if (state.status === "awaiting_consent") {
     return sanitizeAgentOutput({
       schema_version: BOOTSTRAP_SCHEMA_VERSION,
@@ -1113,7 +1138,46 @@ function buildBootstrapOutput(state: BootstrapState, options: CliOptions): Boots
       plan: state.plan,
       next_action: {
         type: "confirm",
-        command: "vitalmcp setup --resume --yes --output json"
+        command: resumeCommand
+      }
+    });
+  }
+  if (state.status === "awaiting_service_activation") {
+    return sanitizeAgentOutput({
+      schema_version: BOOTSTRAP_SCHEMA_VERSION,
+      command: "setup",
+      status: state.status,
+      setup_id: state.setup_id,
+      current_stage: state.current_stage,
+      completed_stages: state.completed_stages,
+      next_action: {
+        type: "activate_service",
+        command: resumeCommand
+      },
+      details: {
+        execution_boundary: "macos_terminal",
+        sudo_required: false,
+        reason: "WorkBuddy's sandbox cannot activate user launchd services. Run the command in macOS Terminal, then return to WorkBuddy."
+      }
+    });
+  }
+  if (state.status === "awaiting_mcp_approval") {
+    return sanitizeAgentOutput({
+      schema_version: BOOTSTRAP_SCHEMA_VERSION,
+      command: "setup",
+      status: state.status,
+      setup_id: state.setup_id,
+      current_stage: state.current_stage,
+      completed_stages: state.completed_stages,
+      next_action: {
+        type: "approve_mcp",
+        command: `${resumeCommand} --mcp-verified`,
+        suggested_prompt: "Approve vital-agent-sync in WorkBuddy MCP settings, restart or reload WorkBuddy, and call vital_agent_status. Only then run the resume command."
+      },
+      details: {
+        config_registered: true,
+        approval_required: true,
+        direct_approval_file_edits_allowed: false
       }
     });
   }
@@ -1122,11 +1186,11 @@ function buildBootstrapOutput(state: BootstrapState, options: CliOptions): Boots
     const health = getHealthStatus(database);
     const relay = getRelayLocalStatus({ stateDir: options.stateDir });
     const nextAction = state.status === "awaiting_first_sync"
-        ? { type: "sync_ios" as const, url: state.onboarding_url, command: "vitalmcp setup --resume --yes --output json" }
+        ? { type: "sync_ios" as const, url: state.onboarding_url, command: resumeCommand }
         : state.status === "complete"
           ? { type: "ask_agent" as const, suggested_prompt: "How am I doing today?" }
           : state.status === "failed"
-            ? { type: "retry" as const, command: "vitalmcp setup --resume --yes --output json" }
+            ? { type: "retry" as const, command: resumeCommand }
             : undefined;
     return sanitizeAgentOutput({
       schema_version: BOOTSTRAP_SCHEMA_VERSION,
@@ -1163,12 +1227,29 @@ function printBootstrapResult(state: BootstrapState, options: CliOptions): void 
     console.log(`Open this local onboarding page: ${state.onboarding_url}`);
     console.log("This page contains credentials. Do not upload or paste it into an Agent chat.");
   }
-  if (state.status === "awaiting_first_sync") {
+  if (state.status === "awaiting_service_activation") {
+    console.log("WorkBuddy's sandbox cannot activate launchd. Run this in macOS Terminal; do not use sudo:");
+    console.log(`  ${buildSetupResumeCommand(state)}`);
+  } else if (state.status === "awaiting_mcp_approval") {
+    console.log("Next: approve vital-agent-sync in WorkBuddy MCP settings, restart or reload WorkBuddy, call vital_agent_status, then resume with --mcp-verified.");
+  } else if (state.status === "awaiting_first_sync") {
     console.log("Next: connect the Vital Agent app, run the first sync, then run vitalmcp setup --resume --yes.");
   } else if (state.status === "complete") {
     console.log("First sync observed. Verify freshness with vital_agent_status, then ask: How am I doing today?");
     console.log(agent.reloadHint());
   }
+}
+
+function buildSetupResumeCommand(state: BootstrapState): string {
+  const runtime = state.config.agent_id === "workbuddy"
+    ? `"$HOME/.vitalmcp/npm-global/bin/vitalmcp"`
+    : "vitalmcp";
+  const stateDir = state.config.state_dir ? ` --state-dir ${quoteShellArgument(state.config.state_dir)}` : "";
+  return `${runtime} setup --resume --yes${stateDir} --output json`;
+}
+
+function quoteShellArgument(value: string): string {
+  return `'${value.replaceAll("'", `'"'"'`)}'`;
 }
 
 function printJson(value: unknown): void {
@@ -1365,8 +1446,8 @@ async function printServiceStatusDetails(status: VitalAgentServiceStatus, option
     console.log("Vital Agent Sync service");
     console.log(`Manager:   ${status.manager}`);
     console.log(`Label:     ${status.label}`);
-    console.log(`Installed: ${status.installed ? "yes" : "no"}`);
-    console.log(`Running:   ${status.running ? "yes" : "no"}`);
+    console.log(`Configured: ${status.configured ? "yes" : "no"}`);
+    console.log(`Loaded:    ${status.loaded ? "yes" : "no"}`);
     console.log(`Receiver:  ${receiver.compatible ? "verified" : receiver.reachable ? "identity mismatch" : "not reachable"} (${receiver.detail})`);
     console.log(`Config:    ${status.configPath}`);
     console.log(`Local API: http://127.0.0.1:${options.port}`);
@@ -1375,10 +1456,10 @@ async function printServiceStatusDetails(status: VitalAgentServiceStatus, option
     console.log(`Stderr:    ${status.stderrPath}`);
     console.log(`Last sync: ${health.last_sync_at ?? "never"}`);
     console.log("");
-    if (!status.installed) {
-      console.log("Next: run vitalmcp setup to install and start the receiver.");
-    } else if (!status.running) {
-      console.log("Next: run vitalmcp service start, then vitalmcp pair.");
+    if (!status.configured) {
+      console.log("Next: run vitalmcp setup to configure and activate the receiver.");
+    } else if (!status.loaded) {
+      console.log("Next: run vitalmcp service start outside an Agent sandbox, then vitalmcp pair.");
     } else if (!receiver.compatible) {
       console.log(`Next: check vitalmcp logs and confirm port ${options.port} is not occupied by another process.`);
     } else {
@@ -1784,6 +1865,23 @@ async function printDoctor(options: CliOptions): Promise<void> {
     detail: `${process.version} ${nodeMajor >= 22 ? "meets" : "does not meet"} >=22`
   });
 
+  try {
+    const runtime = readRuntimeMetadata();
+    results.push({
+      status: runtime && runtimeMetadataPathsExist(runtime) && runtimeMetadataMatchesCurrentProcess(runtime) ? "OK" : "WARN",
+      label: "Pinned runtime",
+      detail: runtime
+        ? `${runtime.node_path} ${runtime.node_version} ABI ${runtime.modules_abi}; metadata ${getRuntimeMetadataPath()}`
+        : `not recorded; run vitalmcp setup from the trusted Agent runtime (${getRuntimeMetadataPath()})`
+    });
+  } catch (error) {
+    results.push({
+      status: "FAIL",
+      label: "Pinned runtime",
+      detail: error instanceof Error ? error.message : String(error)
+    });
+  }
+
   let databasePath = options.databasePath ?? "";
   try {
     const database = openVitalAgentDatabase({ path: options.databasePath });
@@ -1825,19 +1923,25 @@ async function printDoctor(options: CliOptions): Promise<void> {
     workbuddyConfigPath: options.workbuddyConfigPath,
     workbuddyProjectPath: options.workbuddyProjectPath
   });
+  const setupState = readBootstrapState({ stateDir: options.stateDir });
+  const workBuddyMcpVerified = options.agentId === "workbuddy" &&
+    setupState?.config.agent_id === "workbuddy" &&
+    bootstrapStageComplete(setupState, "mcp_verified");
   results.push({
-    status: agentStatus.installed ? "OK" : "WARN",
+    status: agentStatus.installed || workBuddyMcpVerified ? "OK" : "WARN",
     label: `${agent.displayName} adapter`,
-    detail: agentStatus.detail
+    detail: workBuddyMcpVerified
+      ? `vital-agent-sync MCP is registered and native tool verification is recorded for setup ${setupState?.setup_id}`
+      : agentStatus.detail
   });
 
   const serviceStatus = getVitalAgentServiceStatus(toServiceOptions(options));
   results.push({
-    status: serviceStatus.running ? "OK" : serviceStatus.installed ? "WARN" : "WARN",
+    status: serviceStatus.loaded ? "OK" : "WARN",
     label: `${serviceStatus.manager} service`,
-    detail: serviceStatus.installed
-      ? `${serviceStatus.running ? "running" : "installed but not running"} (${serviceStatus.configPath})`
-      : serviceStatus.detail ?? `not installed (${serviceStatus.configPath})`
+    detail: serviceStatus.configured
+      ? `${serviceStatus.loaded ? "configured and loaded" : "configured but not loaded"} (${serviceStatus.configPath})`
+      : serviceStatus.detail ?? `not configured (${serviceStatus.configPath})`
   });
 
   const receiverStatus = await checkLocalReceiver(options);

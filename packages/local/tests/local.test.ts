@@ -89,7 +89,10 @@ import {
   installLaunchdService,
   readLaunchdServiceLog,
   readLaunchdPlist,
-  resolveServiceManagerId
+  resolveServiceManagerId,
+  isWorkBuddySandbox,
+  ServiceActivationRequiredError,
+  startLaunchdService
 } from "../src/service.js";
 import { runServiceEnsureWorkflow, runServiceSetupWorkflow } from "../src/setup.js";
 import {
@@ -109,6 +112,13 @@ import {
   parseCompatibleReceiverRuntimeStatus,
   VITALMCP_RUNTIME_VERSION
 } from "../src/runtime-status.js";
+import {
+  getRuntimeMetadataPath,
+  readRuntimeMetadata,
+  recordRuntimeMetadata,
+  runtimeMetadataMatchesCurrentProcess,
+  runtimeMetadataPathsExist
+} from "../src/runtime.js";
 import {
   createTransportProvider,
   getServerUrlDiagnostics,
@@ -2024,7 +2034,9 @@ test("WorkBuddy MCP install merges project config idempotently with backups and 
       mcpServers: Record<string, { command: string; args: string[] }>;
     };
 
-    assert.equal(status.installed, true);
+    assert.equal(status.configured, true);
+    assert.equal(status.installed, false);
+    assert.equal(status.approvalStatus, "awaiting_user_approval");
     assert.equal(first.configPath, configPath);
     assert.ok(first.backupPath);
     assert.ok(second.backupPath);
@@ -2107,7 +2119,9 @@ test("Agent adapters expose generic MCP config and Hermes install behavior", () 
       mcpServers: { "vital-agent-sync": { args: string[] } };
     };
     assert.equal(workbuddyInstalled.id, "workbuddy");
-    assert.equal(workbuddyStatus.installed, true);
+    assert.equal(workbuddyStatus.configured, true);
+    assert.equal(workbuddyStatus.installed, false);
+    assert.match(workbuddyStatus.detail, /approval/i);
     assert.equal(workbuddyInstalled.configPath, join(workbuddyProjectPath, ".workbuddy", "mcp.json"));
     assert.deepEqual(workbuddyConfig.mcpServers["vital-agent-sync"].args.slice(0, 2), ["mcp", "--db"]);
     assert.match(workbuddy.reloadHint(), /restart WorkBuddy/i);
@@ -2188,8 +2202,8 @@ test("Vital Agent Sync skill can be printed and installed for Hermes", () => {
     assert.match(openclawMarkdown, /Hosted Relay is not available, recommended, or required in the Local Preview flow/);
     assert.match(openclawMarkdown, /vitalmcp setup --transport relay --relay-url https:\/\/HOSTED-RELAY --agent openclaw/);
     assert.match(openclawMarkdown, /Never invent a relay domain/);
-    assert.match(openclawMarkdown, /npx -y vitalmcp@0\.5\.1 --version/);
-    assert.match(openclawMarkdown, /prefix every local CLI invocation below with `npx -y vitalmcp@0\.5\.1`/);
+    assert.match(openclawMarkdown, /npx -y vitalmcp@0\.5\.2 --version/);
+    assert.match(openclawMarkdown, /prefix every local CLI invocation below with `npx -y vitalmcp@0\.5\.2`/);
     assert.match(openclawMarkdown, /Do not switch runners midway through setup/);
     assert.match(openclawMarkdown, /setup --resume --yes --output json/);
     assert.match(openclawMarkdown, /next_action\.url/);
@@ -2214,7 +2228,7 @@ test("Vital Agent Sync skill can be printed and installed for Hermes", () => {
     assert.match(workbuddyMarkdown, /# Vital Agent Sync for WorkBuddy/);
     assert.match(workbuddyMarkdown, /name: vital-agent-sync/);
     assert.match(workbuddyMarkdown, /npm install --global --prefix/);
-    assert.match(workbuddyMarkdown, /vitalmcp@0\.5\.1/);
+    assert.match(workbuddyMarkdown, /vitalmcp@0\.5\.2/);
     assert.match(workbuddyMarkdown, /~\/\.workbuddy\/mcp\.json/);
     assert.match(workbuddyMarkdown, /setup --transport lan --agent workbuddy --output json/);
     assert.match(workbuddyMarkdown, /open <next_action\.url>/);
@@ -2282,12 +2296,12 @@ test("Vital Agent Sync skill can be exported as an OpenClaw package", () => {
     assert.equal(result.packageDir, packageDir);
     assert.deepEqual(readdirSync(packageDir).sort(), ["README.md", "SKILL.md"]);
     assert.equal(frontmatter.name, "vitalmcp-personal-context");
-    assert.equal(frontmatter.version, "0.5.1");
+    assert.equal(frontmatter.version, "0.5.2");
     assert.equal(frontmatter.license, undefined);
     assert.deepEqual(frontmatter.metadata.openclaw.requires.bins, ["vitalmcp"]);
     assert.deepEqual(frontmatter.metadata.openclaw.install, [{
       kind: "node",
-      package: "vitalmcp@0.5.1",
+      package: "vitalmcp@0.5.2",
       bins: ["vitalmcp"]
     }]);
     assert.deepEqual(frontmatter.metadata.openclaw.os, ["macos", "linux", "windows"]);
@@ -2326,7 +2340,7 @@ test("Vital Agent Sync skill can be exported as a WorkBuddy and SkillHub package
     assert.deepEqual(Object.keys(frontmatter).sort(), ["description", "name"]);
     assert.equal(frontmatter.name, "vital-agent-sync");
     assert.match(String(frontmatter.description), /WorkBuddy/);
-    assert.match(skill, /vitalmcp@0\.5\.1/);
+    assert.match(skill, /vitalmcp@0\.5\.2/);
     assert.match(skill, /~\/\.workbuddy\/mcp\.json/);
     assert.match(skill, /next_action\.url/);
     assert.doesNotMatch(skill, /BEGIN PRIVATE KEY|relay_access_token|upload_auth_secret/);
@@ -2956,6 +2970,43 @@ test("service manager selection distinguishes macOS, Linux, Windows, and overrid
   assert.match(windowsStatus.detail ?? "", /Windows background service installation is not implemented yet/);
 });
 
+test("WorkBuddy sandbox detection stops launchd activation without unsafe retries", () => {
+  assert.equal(isWorkBuddySandbox({ WORKBUDDY_SANDBOX: "1" }), true);
+  assert.equal(isWorkBuddySandbox({ IN_DOCKER: "1", CODEBUDDY_TASK_ID: "fixture" }), true);
+  assert.equal(isWorkBuddySandbox({ IN_DOCKER: "1" }), false);
+
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-workbuddy-launchd-"));
+  const previous = process.env.WORKBUDDY_SANDBOX;
+  try {
+    installLaunchdService({
+      platform: "darwin",
+      homeDir: tempDir,
+      cliCommand: "/tmp/vitalmcp",
+      databasePath: join(tempDir, "vital-agent.sqlite"),
+      host: "0.0.0.0",
+      port: 8787,
+      transport: "lan"
+    });
+    process.env.WORKBUDDY_SANDBOX = "1";
+    assert.throws(
+      () => startLaunchdService({
+        platform: "darwin",
+        homeDir: tempDir,
+        cliCommand: "/tmp/vitalmcp",
+        databasePath: join(tempDir, "vital-agent.sqlite"),
+        host: "0.0.0.0",
+        port: 8787,
+        transport: "lan"
+      }),
+      (error: unknown) => error instanceof ServiceActivationRequiredError && error.code === "service_activation_required"
+    );
+  } finally {
+    if (previous === undefined) delete process.env.WORKBUDDY_SANDBOX;
+    else process.env.WORKBUDDY_SANDBOX = previous;
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("port diagnostics parse lsof listener output", () => {
   const listeners = parseLsofListenOutput([
     "COMMAND   PID    USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME",
@@ -3065,15 +3116,37 @@ test("local package manifest is ready for public npm packing", () => {
   };
 
   assert.equal(manifest.name, "vitalmcp");
-  assert.equal(manifest.version, "0.5.1");
+  assert.equal(manifest.version, "0.5.2");
   assert.equal(manifest.private, undefined);
   assert.equal(manifest.license, "MIT");
-  assert.equal(manifest.bin?.["vitalmcp"], "./dist/cli.js");
+  assert.equal(manifest.bin?.["vitalmcp"], "./dist/launcher.js");
   assert.deepEqual(manifest.files, ["dist", "README.md"]);
   assert.equal(manifest.publishConfig?.access, "public");
   assert.equal(manifest.scripts?.prepack, "npm run build");
   assert.equal(manifest.scripts?.["pack:check"], "npm pack --dry-run");
   assert.equal(manifest.scripts?.["relay:fixture-flow"], "tsx src/relay-fixture-flow.ts");
+});
+
+test("runtime metadata pins the Node executable, ABI, and CLI path privately", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-runtime-metadata-"));
+  try {
+    const cliPath = resolve(packageRoot, "src", "cli.ts");
+    const recorded = recordRuntimeMetadata({
+      homeDir: tempDir,
+      cliPath,
+      now: new Date("2026-07-19T00:00:00.000Z")
+    });
+    const read = readRuntimeMetadata({ homeDir: tempDir });
+    assert.deepEqual(read, recorded);
+    assert.equal(runtimeMetadataMatchesCurrentProcess(recorded), true);
+    assert.equal(runtimeMetadataPathsExist(recorded), true);
+    const path = getRuntimeMetadataPath({ homeDir: tempDir });
+    if (process.platform !== "win32") {
+      assert.equal(statSync(path).mode & 0o777, 0o600);
+    }
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
 });
 
 test("root package exposes repeatable relay release audit gates", () => {
@@ -3311,7 +3384,7 @@ test("portable installer uses a user prefix and manages its PATH block idempoten
 
     let lastStdout = "";
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      const result = spawnSync("sh", [installScript, "--version", "0.5.1"], { env, encoding: "utf8" });
+      const result = spawnSync("sh", [installScript, "--version", "0.5.2"], { env, encoding: "utf8" });
       assert.equal(result.status, 0, result.stderr);
       lastStdout = result.stdout;
     }
@@ -3319,7 +3392,7 @@ test("portable installer uses a user prefix and manages its PATH block idempoten
     const installedProfile = readFileSync(profile, "utf8");
     assert.equal((installedProfile.match(/# >>> vitalmcp >>>/g) ?? []).length, 1);
     assert.match(installedProfile, new RegExp(escapeRegExp(`export PATH="${prefix}/bin:$PATH"`)));
-    assert.match(readFileSync(npmLog, "utf8"), /install --global --prefix .*vitalmcp@0\.5\.1/);
+    assert.match(readFileSync(npmLog, "utf8"), /install --global --prefix .*vitalmcp@0\.5\.2/);
     assert.equal(readFileSync(websiteInstallScript, "utf8"), readFileSync(installScript, "utf8"));
 
     const uninstall = spawnSync("sh", [installScript, "--uninstall"], { env, encoding: "utf8" });
@@ -3433,7 +3506,7 @@ test("CLI setup emits one redacted JSON document for plan and resumable failure"
   const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-cli-bootstrap-"));
   try {
     const cliPath = join(packageRoot, "src", "cli.ts");
-    const stateDir = join(tempDir, "state");
+    const stateDir = join(tempDir, "state with space");
     const databasePath = join(tempDir, "vital-agent.sqlite");
     const commonArgs = [
       "--import", "tsx", cliPath,
@@ -3467,10 +3540,11 @@ test("CLI setup emits one redacted JSON document for plan and resumable failure"
       "--output", "json"
     ], { env, encoding: "utf8" });
     assert.equal(plan.status, 0, plan.stderr);
-    const planOutput = JSON.parse(plan.stdout) as { status: string; schema_version: number; next_action: { type: string } };
+    const planOutput = JSON.parse(plan.stdout) as { status: string; schema_version: number; next_action: { type: string; command: string } };
     assert.equal(planOutput.schema_version, 1);
     assert.equal(planOutput.status, "awaiting_consent");
     assert.equal(planOutput.next_action.type, "confirm");
+    assert.match(planOutput.next_action.command, /--state-dir '[^']+state with space'/);
     assert.equal(existsSync(databasePath), false);
     assert.equal(existsSync(join(stateDir, "config.json")), false);
 
@@ -3531,6 +3605,54 @@ test("CLI setup persists the WorkBuddy project path before consent", async () =>
     assert.equal(state?.config.workbuddy_project_path, projectPath);
     assert.equal(state?.config.workbuddy_config_path, undefined);
     assert.equal(existsSync(join(projectPath, ".workbuddy", "mcp.json")), false);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("CLI WorkBuddy setup reports MCP registration as awaiting approval", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-cli-workbuddy-approval-"));
+  try {
+    const stateDir = join(tempDir, "state");
+    const databasePath = join(tempDir, "vital-agent.sqlite");
+    let state = writeBootstrapState(createBootstrapState({
+      agent_id: "workbuddy",
+      transport_id: "lan",
+      service_manager: "manual",
+      service_mode: "receiver",
+      host: "127.0.0.1",
+      port: 8787,
+      pull_interval_seconds: 300,
+      install_skill: false,
+      state_dir: stateDir,
+      database_path: databasePath,
+      workbuddy_project_path: join(tempDir, "project")
+    }), { stateDir });
+    for (const stage of ["consent_received", "runtime_initialized", "agent_configured", "service_installed", "service_started"] as const) {
+      state = markBootstrapStage(state, stage, { status: "running", stateDir });
+    }
+    const cliPath = join(packageRoot, "src", "cli.ts");
+    const result = spawnSync(process.execPath, [
+      "--import", "tsx", cliPath,
+      "setup", "--resume", "--yes",
+      "--state-dir", stateDir,
+      "--output", "json"
+    ], {
+      env: { ...process.env, HOME: tempDir },
+      encoding: "utf8"
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const output = JSON.parse(result.stdout) as {
+      status: string;
+      next_action: { type: string; command: string };
+      details: { config_registered: boolean; approval_required: boolean; direct_approval_file_edits_allowed: boolean };
+    };
+    assert.equal(output.status, "awaiting_mcp_approval");
+    assert.equal(output.next_action.type, "approve_mcp");
+    assert.match(output.next_action.command, /--mcp-verified/);
+    assert.equal(output.details.config_registered, true);
+    assert.equal(output.details.approval_required, true);
+    assert.equal(output.details.direct_approval_file_edits_allowed, false);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
@@ -3620,7 +3742,7 @@ test("bootstrap plan and state are versioned, private, resumable, and idempotent
       relay_url: "https://relay.example.com"
     };
     const plan = buildBootstrapPlan(config);
-    assert.equal(plan.length, 5);
+    assert.equal(plan.length, 6);
     assert.equal(plan.some((item) => item.id === "configure_agent" && item.persistent_change), true);
 
     let state = createBootstrapState(config, new Date("2026-07-12T00:00:00.000Z"));
@@ -3644,6 +3766,51 @@ test("bootstrap plan and state are versioned, private, resumable, and idempotent
 test("bootstrap classifies receiver identity and service manager failures", () => {
   assert.equal(classifyBootstrapError(new Error("Receiver identity conflict on port 8787")), "receiver_identity_conflict");
   assert.equal(classifyBootstrapError(new Error("launchctl bootstrap failed: Input/output error")), "service_manager_failed");
+  assert.equal(classifyBootstrapError(new ServiceActivationRequiredError()), "service_activation_required");
+});
+
+test("WorkBuddy bootstrap pauses for MCP approval before creating onboarding credentials", async () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-bootstrap-mcp-approval-"));
+  try {
+    const state = writeBootstrapState(createBootstrapState({
+      agent_id: "workbuddy",
+      transport_id: "lan",
+      service_manager: "launchd",
+      service_mode: "receiver",
+      host: "0.0.0.0",
+      port: 8787,
+      pull_interval_seconds: 300,
+      install_skill: false,
+      state_dir: tempDir
+    }), { stateDir: tempDir });
+    let approved = false;
+    let onboardingCreated = false;
+    const actions = {
+      runtime_initialized: () => undefined,
+      agent_configured: () => undefined,
+      service_installed: () => undefined,
+      service_started: () => undefined,
+      mcp_verified: () => approved,
+      onboarding_created: () => {
+        onboardingCreated = true;
+        return { onboarding_url: "http://127.0.0.1:8787/pair" };
+      },
+      first_sync_observed: () => false
+    };
+
+    const waiting = await runBootstrapWorkflow(state, actions, { stateDir: tempDir });
+    assert.equal(waiting.status, "awaiting_mcp_approval");
+    assert.equal(waiting.completed_stages.includes("mcp_verified"), false);
+    assert.equal(onboardingCreated, false);
+
+    approved = true;
+    const resumed = await runBootstrapWorkflow(waiting, actions, { stateDir: tempDir });
+    assert.equal(resumed.status, "awaiting_first_sync");
+    assert.equal(resumed.completed_stages.includes("mcp_verified"), true);
+    assert.equal(onboardingCreated, true);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
 });
 
 test("bootstrap workflow resumes safely after every mutating stage", async () => {
@@ -3677,6 +3844,7 @@ test("bootstrap workflow resumes safely after every mutating stage", async () =>
         agent_configured: () => call("agent_configured"),
         service_installed: () => call("service_installed"),
         service_started: () => call("service_started"),
+        mcp_verified: () => true,
         onboarding_created: () => {
           call("onboarding_created");
           return { onboarding_url: "file:///tmp/vital-agent-sync-onboarding-fixture.html" };
@@ -3725,6 +3893,7 @@ test("bootstrap waits for first sync without repeating completed setup actions",
       agent_configured: () => { mutations += 1; },
       service_installed: () => { mutations += 1; },
       service_started: () => { mutations += 1; },
+      mcp_verified: () => true,
       onboarding_created: () => {
         mutations += 1;
         return { onboarding_url: "http://127.0.0.1:8787/pair" };

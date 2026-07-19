@@ -5,7 +5,7 @@ services:
     build:
       context: ../..
       dockerfile: deploy/relay/Dockerfile
-    image: ${VITALMCP_RELAY_IMAGE:-vital-agent-sync-relay:0.5.1}
+    image: ${VITALMCP_RELAY_IMAGE:-vital-agent-sync-relay:0.5.2}
     restart: unless-stopped
     init: true
     expose:

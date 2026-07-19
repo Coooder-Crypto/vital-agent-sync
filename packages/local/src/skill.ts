@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 
 export const VITALMCP_SKILL_NAME = "vitalmcp-personal-context";
 export const WORKBUDDY_SKILL_NAME = "vital-agent-sync";
-export const VITALMCP_SKILL_VERSION = "0.5.1";
+export const VITALMCP_SKILL_VERSION = "0.5.2";
 
 export type SkillInstallOptions = {
   hermesHome?: string;
@@ -311,7 +311,7 @@ Vital Agent Sync 是用户控制的数据网关，不是医疗服务。不得诊
    ${runtime} --version
    \`\`\`
 
-4. 如果 Node.js 或 npm 不存在，停止并请用户先通过 WorkBuddy 的运行环境设置安装 Node.js 22 或更新版本。不要下载或执行来源不明的安装脚本。
+4. 如果 Node.js 或 npm 不存在，停止并请用户先通过 WorkBuddy 的运行环境设置安装 Node.js 22 或更新版本。安装后的 launcher 会固定本次 setup 使用的 Node 路径和原生模块 ABI；不得改用系统 Node 运行内部 CLI 文件。
 5. 如果不是 macOS，说明当前“一句话安装 + 后台服务”首发流程只完成了 macOS 验证，然后停止自动安装；不要假装 Windows 后台服务已经可用。
 
 ## 一键引导流程
@@ -337,13 +337,19 @@ ${runtime} setup --transport lan --agent workbuddy --output json
 
 如果命令返回 \`receiver_identity_conflict\`，说明端口上存在旧版或无法验证的接收端，然后停止。不得停止旧进程、迁移 \`~/.healthlink\`、复制 SQLite、删除 plist 或改用另一个端口；先让用户选择保留旧版、备份后迁移，或明确指定新端口重新配对。
 
-### 2. 执行计划并显示本地二维码
+### 2. 执行计划并处理系统边界
 
 只有用户明确确认后才能运行：
 
 \`\`\`bash
 ${runtime} setup --resume --yes --output json
 \`\`\`
+
+严格按返回的 \`next_action.type\` 继续：
+
+- \`activate_service\`：WorkBuddy 沙箱不能调用用户级 \`launchctl bootstrap\`。把返回的单条 \`next_action.command\` 原样交给用户，请用户在 macOS Terminal 中执行，然后等待用户返回。不得在 WorkBuddy 内重试，不得使用 \`sudo\`，不得递归删除 quarantine 属性。
+- \`approve_mcp\`：告诉用户在 WorkBuddy MCP 设置中审批并启用 \`vital-agent-sync\`，随后重启或重载 WorkBuddy。不得读取或修改 \`~/.workbuddy/mcp-approvals.json\`。新任务中必须先确认原生 \`vital_agent_status\` 工具可见并成功调用，之后才能运行返回的带 \`--mcp-verified\` 恢复命令。
+- \`sync_ios\`：只有 launchd 已加载且 WorkBuddy MCP 已审批、重载并验证后，才显示本地配对页面。
 
 当 \`next_action.type\` 为 \`sync_ios\` 时：
 
@@ -362,9 +368,7 @@ ${runtime} setup --resume --yes --output json
 ${runtime} status --output json
 \`\`\`
 
-确认 \`sync_count\` 增加且存在最新同步时间。然后让用户在 WorkBuddy 的“插件 → MCP 服务器”中确认 \`vital-agent-sync\` 为绿色；若工具还未出现，提示重启 WorkBuddy。
-
-MCP 可用后调用 \`vital_agent_status\`。只有状态和新鲜度正常时，才调用 \`get_personal_context\` 给出第一次摘要。
+确认 \`sync_count\` 增加且存在最新同步时间。再次调用原生 \`vital_agent_status\`；只有状态和新鲜度正常时，才调用 \`get_personal_context\` 给出第一次摘要。
 如果原生 MCP 工具尚未加载，停止并请用户重启 WorkBuddy。不得直接读取 SQLite，不得用 Python、CLI 内部 API 或手写 JSON-RPC 绕过 MCP 的权限与隐私边界。
 
 ## 首次健康数据调用前的隐私提示
@@ -405,7 +409,8 @@ ${runtime} logs --lines 100
 - 若 \`vital-agent-sync\` MCP 为红色，检查 \`~/.workbuddy/mcp.json\` 是否为有效 JSON，以及其中的 Node 和 CLI 绝对路径是否存在。
 - 若二维码在 iPhone 上不可达，确认 Mac 与 iPhone 在同一可信局域网，且配对地址不是面向 iPhone 的 \`localhost\`。
 - 若 CLI 返回 \`receiver_identity_conflict\`，只展示脱敏诊断和官方下一步，不读取或迁移旧数据库。
-- 若 CLI 返回 \`service_manager_failed\` 或 \`launchctl\` 错误，停止并展示错误。不得修改 \`.zprofile\`、\`.zshrc\`、登录项或 LaunchAgent 文件，不得使用 \`nohup\`、\`screen\`、Python \`Popen\` 等方式绕过正式服务管理器。
+- 若 CLI 返回 \`service_activation_required\`，只交付返回的 Terminal 命令并等待；若返回其他 \`service_manager_failed\` 或 \`launchctl\` 错误，停止并展示错误。不得修改 \`.zprofile\`、\`.zshrc\`、登录项或 LaunchAgent 文件，不得使用 \`nohup\`、\`screen\`、Python \`Popen\` 等方式绕过正式服务管理器。
+- 不得对 WorkBuddy、Node 或 npm 目录执行递归 \`xattr\`、\`chmod\` 或 \`chown\`，不得编辑 MCP 审批存储来伪造授权。
 - 不得自动执行停止旧服务、删除、重置、数据迁移、密钥轮换或设备撤销。
 - 移除或升级 Skill 不得删除 \`~/.vital-agent-sync\`、本地历史、运行时身份、服务或 MCP 配置。
 

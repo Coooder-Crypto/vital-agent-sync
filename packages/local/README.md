@@ -34,7 +34,7 @@ The preferred entry is the reviewed [Vital Agent Sync SkillHub package](https://
 Manual fallback:
 
 ```bash
-npx -y vitalmcp@0.5.1 setup --agent workbuddy --transport lan
+npx -y vitalmcp@0.5.2 setup --agent workbuddy --transport lan
 ```
 
 For a machine-readable consent flow:
@@ -46,9 +46,11 @@ vitalmcp setup --resume --yes --output json
 
 Without execution consent, non-interactive setup stops at `awaiting_consent`. It must not install a service, rewrite Agent configuration, or create pairing credentials before approval.
 
+On macOS, WorkBuddy cannot activate a user LaunchAgent from inside its sandbox. Setup therefore stops at `awaiting_service_activation` and returns one `activate_service` command for the user to run in macOS Terminal without `sudo`. The launcher records and reuses the Node path and native-module ABI that completed setup.
+
 WorkBuddy user configuration lives at `~/.workbuddy/mcp.json`. Use `--workbuddy-project <dir>` for `<dir>/.workbuddy/mcp.json`, or `--workbuddy-config <path>` for an explicit file. Existing fields and unrelated MCP servers are preserved, and a modified file receives a timestamped backup.
 
-After installation, restart WorkBuddy if required and confirm `vital-agent-sync` is healthy in MCP settings. Pair a physical iPhone, perform a manual sync, then verify:
+Writing this file only registers the MCP server. Setup then stops at `awaiting_mcp_approval`; approve `vital-agent-sync` in WorkBuddy, reload or restart WorkBuddy, call the native `vital_agent_status` tool, and only then resume with the returned `--mcp-verified` command. Pair a physical iPhone, perform a manual sync, then verify:
 
 ```bash
 vitalmcp status --output json
@@ -62,9 +64,9 @@ Before the Agent reads any health context, it must disclose that the selected mo
 Every adapter uses the same receiver, SQLite database, setup state, and `vitalmcp mcp` implementation:
 
 ```bash
-npx -y vitalmcp@0.5.1 setup --agent hermes --transport lan
-npx -y vitalmcp@0.5.1 setup --agent generic --transport lan
-npx -y vitalmcp@0.5.1 setup --agent openclaw --transport lan
+npx -y vitalmcp@0.5.2 setup --agent hermes --transport lan
+npx -y vitalmcp@0.5.2 setup --agent generic --transport lan
+npx -y vitalmcp@0.5.2 setup --agent openclaw --transport lan
 ```
 
 Hermes is the next first-class adapter. Generic stdio MCP is the portability baseline. Marketplace publication is not required.
@@ -93,7 +95,7 @@ An adapter must:
 Phase 3 keeps the Agent, runtime, SQLite, and stdio MCP on the same user-owned macOS or Linux server. Tailscale exposes only the iPhone receiver:
 
 ```bash
-npx -y vitalmcp@0.5.1 setup \
+npx -y vitalmcp@0.5.2 setup \
   --agent hermes \
   --manager systemd \
   --transport tailscale \

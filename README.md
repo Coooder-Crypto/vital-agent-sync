@@ -12,7 +12,7 @@ It is a data connector, not an Agent, hosted health cloud, medical device, or so
 
 ## Current roadmap
 
-Version `0.5.1` is a source-distributed Local Preview. Work proceeds in this order:
+Version `0.5.2` is a source-distributed Local Preview. Work proceeds in this order:
 
 | Phase | Experience | Status |
 | --- | --- | --- |
@@ -32,14 +32,16 @@ The Skill:
 
 - installs a pinned `vitalmcp` version into a user-owned prefix without `sudo`;
 - shows a redacted plan before changing files, services, network state, or WorkBuddy MCP configuration;
-- uses the official service manager and verifies the receiver and database identity;
+- records the setup Node runtime and native-module ABI so Terminal, launchd, and MCP use one compatible runtime;
+- pauses at the WorkBuddy sandbox boundary and asks the user to run one returned command in macOS Terminal to activate launchd without `sudo`;
+- waits for explicit WorkBuddy MCP approval, reload, and a native `vital_agent_status` call before pairing;
 - opens the credential-bearing QR only in the user's local browser;
 - requires a privacy disclosure before any health-data read.
 
 Manual fallback:
 
 ```bash
-npx -y vitalmcp@0.5.1 setup --agent workbuddy --transport lan
+npx -y vitalmcp@0.5.2 setup --agent workbuddy --transport lan
 ```
 
 After the first iPhone sync:
@@ -54,9 +56,9 @@ vitalmcp doctor --agent workbuddy --transport lan
 These paths reuse the same receiver, database, setup state, and MCP tools:
 
 ```bash
-npx -y vitalmcp@0.5.1 setup --agent hermes --transport lan
-npx -y vitalmcp@0.5.1 setup --agent generic --transport lan
-npx -y vitalmcp@0.5.1 setup --agent openclaw --transport lan
+npx -y vitalmcp@0.5.2 setup --agent hermes --transport lan
+npx -y vitalmcp@0.5.2 setup --agent generic --transport lan
+npx -y vitalmcp@0.5.2 setup --agent openclaw --transport lan
 ```
 
 Hermes is the next first-class local adapter. Generic stdio MCP remains the portability baseline. Marketplace publication is not required.
@@ -66,7 +68,7 @@ Hermes is the next first-class local adapter. Generic stdio MCP remains the port
 The planned server mode keeps the selected Agent, `vitalmcp`, SQLite, and MCP on the same user-owned host. Tailscale is used only for the iPhone-to-receiver HTTPS path:
 
 ```bash
-npx -y vitalmcp@0.5.1 setup \
+npx -y vitalmcp@0.5.2 setup \
   --agent hermes \
   --manager systemd \
   --transport tailscale \

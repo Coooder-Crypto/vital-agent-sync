@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -51,6 +51,7 @@ try {
   await installTarball(tarballPath);
   const binaryPath = resolveInstalledBinary();
   verifyInstalledCli(binaryPath);
+  verifyPinnedRuntimeHandoff(binaryPath);
   await verifyInstalledRelayFlow(binaryPath);
   verifyInstalledSkillExport(binaryPath);
   verifyRelayLogs();
@@ -70,7 +71,7 @@ function verifyPinnedNpxFallback(tarballPath) {
     "vitalmcp",
     "--version"
   ], { cwd: tempDir, env: npmEnv, timeoutMs: 5 * 60_000 }).trim();
-  assert(version === "vitalmcp 0.5.1", "Pinned npm exec fallback reports the wrong version.");
+  assert(version === "vitalmcp 0.5.2", "Pinned npm exec fallback reports the wrong version.");
   console.log(version);
   const status = JSON.parse(capture("npm", [
     "exec",
@@ -104,7 +105,7 @@ function packVitalAgentSync() {
   const packed = JSON.parse(output);
   const artifact = packed[0];
   assert(artifact?.name === "vitalmcp", "npm pack returned the wrong package name.");
-  assert(artifact.version === "0.5.1", "npm pack returned the wrong package version.");
+  assert(artifact.version === "0.5.2", "npm pack returned the wrong package version.");
   assert(Array.isArray(artifact.files), "npm pack did not report package files.");
   const packagePaths = artifact.files.map((entry) => entry.path);
   for (const required of [
@@ -160,7 +161,7 @@ function resolveInstalledBinary() {
 function verifyInstalledCli(binaryPath) {
   console.log("\n==> isolated installed CLI");
   const version = capture(binaryPath, ["--version"], { cwd: tempDir, env: npmEnv }).trim();
-  assert(version === "vitalmcp 0.5.1", "Installed CLI reports the wrong version.");
+  assert(version === "vitalmcp 0.5.2", "Installed CLI reports the wrong version.");
   const help = capture(binaryPath, ["--help"], { cwd: tempDir, env: npmEnv });
   for (const expected of [
     "setup --transport relay",
@@ -170,6 +171,33 @@ function verifyInstalledCli(binaryPath) {
     assert(help.includes(expected), `Installed CLI help is missing: ${expected}.`);
   }
   console.log(version);
+}
+
+function verifyPinnedRuntimeHandoff(binaryPath) {
+  console.log("\n==> pinned Node runtime handoff");
+  const runtimeDir = join(isolatedHome, ".vital-agent-sync");
+  const metadataPath = join(runtimeDir, "runtime-v1.json");
+  const pinnedNodePath = join(tempDir, "pinned-node");
+  const pinnedCliPath = join(tempDir, "pinned-cli.mjs");
+  mkdirSync(runtimeDir, { recursive: true });
+  symlinkSync(process.execPath, pinnedNodePath);
+  writeFileSync(pinnedCliPath, "console.log(JSON.stringify({ marker: 'pinned-runtime', args: process.argv.slice(2) }));\n", "utf8");
+  writeFileSync(metadataPath, `${JSON.stringify({
+    schema_version: 1,
+    node_path: pinnedNodePath,
+    node_version: process.version,
+    modules_abi: process.versions.modules,
+    cli_path: pinnedCliPath,
+    recorded_at: new Date().toISOString()
+  }, null, 2)}\n`, "utf8");
+  try {
+    const result = JSON.parse(capture(binaryPath, ["runtime-handoff-fixture"], { cwd: tempDir, env: npmEnv }));
+    assert(result.marker === "pinned-runtime", "Installed launcher did not hand off to the pinned Node runtime.");
+    assert(result.args[0] === "runtime-handoff-fixture", "Installed launcher did not preserve CLI arguments during runtime handoff.");
+  } finally {
+    rmSync(metadataPath, { force: true });
+  }
+  console.log(JSON.stringify({ pinned_runtime_handoff: true, modules_abi: process.versions.modules }));
 }
 
 async function verifyInstalledRelayFlow(binaryPath) {
@@ -302,8 +330,8 @@ function verifyInstalledSkillExport(binaryPath) {
   const readme = readFileSync(join(skillDir, "README.md"), "utf8");
   for (const expected of [
     "name: vitalmcp-personal-context",
-    "version: 0.5.1",
-    "vitalmcp@0.5.1",
+    "version: 0.5.2",
+    "vitalmcp@0.5.2",
     "vitalmcp pull"
   ]) {
     assert(skill.includes(expected), `Installed CLI skill export is missing: ${expected}.`);
@@ -313,7 +341,7 @@ function verifyInstalledSkillExport(binaryPath) {
   for (const forbidden of [relayApiToken, metricsToken, "BEGIN PRIVATE KEY"]) {
     assert(!exported.includes(forbidden), "Installed CLI skill export contains sensitive runtime material.");
   }
-  console.log(JSON.stringify({ files: ["README.md", "SKILL.md"], version: "0.5.1" }));
+  console.log(JSON.stringify({ files: ["README.md", "SKILL.md"], version: "0.5.2" }));
 
   console.log("\n==> isolated installed WorkBuddy SkillHub export");
   capture(binaryPath, [
@@ -330,7 +358,7 @@ function verifyInstalledSkillExport(binaryPath) {
   const workBuddySkill = readFileSync(join(workBuddySkillDir, "SKILL.md"), "utf8");
   for (const expected of [
     "name: vital-agent-sync",
-    "vitalmcp@0.5.1",
+    "vitalmcp@0.5.2",
     "~/.workbuddy/mcp.json",
     "setup --transport lan --agent workbuddy --output json",
     "next_action.url"
@@ -340,7 +368,7 @@ function verifyInstalledSkillExport(binaryPath) {
   for (const forbidden of [relayApiToken, metricsToken, "BEGIN PRIVATE KEY", "relay_access_token", "upload_auth_secret"]) {
     assert(!workBuddySkill.includes(forbidden), "Installed CLI WorkBuddy export contains sensitive runtime material.");
   }
-  console.log(JSON.stringify({ files: ["SKILL.md"], version: "0.5.1", agent: "workbuddy" }));
+  console.log(JSON.stringify({ files: ["SKILL.md"], version: "0.5.2", agent: "workbuddy" }));
 }
 
 function verifyRelayLogs() {

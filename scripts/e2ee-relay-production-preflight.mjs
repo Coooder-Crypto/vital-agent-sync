@@ -8,7 +8,7 @@ const caddyfilePath = resolve(root, "deploy", "relay", "Caddyfile");
 const domain = requireDomain(process.env.VITALMCP_RELAY_DOMAIN);
 const relayApiToken = requireToken("VITALMCP_RELAY_API_TOKEN");
 const metricsToken = requireToken("VITALMCP_RELAY_METRICS_TOKEN");
-const image = requirePinnedImage(process.env.VITALMCP_RELAY_IMAGE ?? "vital-agent-sync-relay:0.5.1");
+const image = requirePinnedImage(process.env.VITALMCP_RELAY_IMAGE ?? "vital-agent-sync-relay:0.5.2");
 
 if (relayApiToken === metricsToken) {
   throw new Error("VITALMCP_RELAY_API_TOKEN and VITALMCP_RELAY_METRICS_TOKEN must be different values.");

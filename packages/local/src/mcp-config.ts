@@ -64,6 +64,9 @@ export type OpenClawMcpInstallStatus = {
 export type WorkBuddyMcpInstallStatus = {
   configPath: string;
   exists: boolean;
+  configured: boolean;
+  approvalStatus: "not_configured" | "awaiting_user_approval";
+  /** WorkBuddy activation cannot be proven from its config file alone. */
   installed: boolean;
   server?: unknown;
 };
@@ -278,6 +281,8 @@ export function getWorkBuddyMcpInstallStatus(options: WorkBuddyInstallOptions = 
     return {
       configPath,
       exists: false,
+      configured: false,
+      approvalStatus: "not_configured",
       installed: false
     };
   }
@@ -285,10 +290,13 @@ export function getWorkBuddyMcpInstallStatus(options: WorkBuddyInstallOptions = 
   const config = parseJsonRecord(readFileSync(configPath, "utf8"), "WorkBuddy");
   const mcpServers = isRecord(config.mcpServers) ? config.mcpServers : {};
   const server = mcpServers["vital-agent-sync"];
+  const configured = isRecord(server);
   return {
     configPath,
     exists: true,
-    installed: isRecord(server),
+    configured,
+    approvalStatus: configured ? "awaiting_user_approval" : "not_configured",
+    installed: false,
     server
   };
 }

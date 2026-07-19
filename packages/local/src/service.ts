@@ -44,10 +44,23 @@ export type VitalAgentServicePaths = {
 
 export type VitalAgentServiceStatus = VitalAgentServicePaths & {
   label: string;
+  configured: boolean;
+  loaded: boolean;
+  /** @deprecated Use configured. */
   installed: boolean;
+  /** @deprecated Use loaded. */
   running: boolean;
   detail?: string;
 };
+
+export class ServiceActivationRequiredError extends Error {
+  readonly code = "service_activation_required";
+
+  constructor() {
+    super("WorkBuddy registered the Vital Agent Sync LaunchAgent, but its sandbox cannot activate user launchd services. Run the setup resume command shown in next_action from macOS Terminal; do not use sudo or remove quarantine attributes.");
+    this.name = "ServiceActivationRequiredError";
+  }
+}
 
 export type VitalAgentServiceLog = {
   path: string;
@@ -230,6 +243,9 @@ export function startLaunchdService(options: LaunchdServiceOptions): VitalAgentS
   if (!existsSync(paths.plistPath)) {
     throw new Error(`Vital Agent Sync launchd service is not installed: ${paths.plistPath}`);
   }
+  if (isWorkBuddySandbox()) {
+    throw new ServiceActivationRequiredError();
+  }
   runLaunchctl(["bootstrap", launchdDomain(), paths.plistPath]);
   runLaunchctl(["kickstart", "-k", `${launchdDomain()}/${label}`]);
   return getLaunchdServiceStatus(options);
@@ -297,10 +313,14 @@ export function uninstallSystemdService(options: LaunchdServiceOptions): VitalAg
 export function getLaunchdServiceStatus(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "mode"> = {}): VitalAgentServiceStatus {
   const paths = getLaunchdServicePaths(options);
   const mode = options.mode ?? "receiver";
+  const configured = existsSync(paths.plistPath);
+  const loaded = isLaunchdServiceRunning(mode);
   return {
     label: serviceLaunchdLabel(mode),
-    installed: existsSync(paths.plistPath),
-    running: isLaunchdServiceRunning(mode),
+    configured,
+    loaded,
+    installed: configured,
+    running: loaded,
     ...paths
   };
 }
@@ -308,10 +328,14 @@ export function getLaunchdServiceStatus(options: Pick<LaunchdServiceOptions, "ho
 export function getSystemdServiceStatus(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "mode"> = {}): VitalAgentServiceStatus {
   const paths = getSystemdServicePaths(options);
   const mode = options.mode ?? "receiver";
+  const configured = existsSync(paths.configPath);
+  const loaded = isSystemdServiceRunning(mode);
   return {
     label: serviceSystemdUnit(mode),
-    installed: existsSync(paths.configPath),
-    running: isSystemdServiceRunning(mode),
+    configured,
+    loaded,
+    installed: configured,
+    running: loaded,
     ...paths
   };
 }
@@ -325,6 +349,8 @@ export function getManualServiceStatus(options: Pick<LaunchdServiceOptions, "hom
     manager: "manual",
     mode,
     label: "manual",
+    configured: false,
+    loaded: false,
     installed: false,
     running: false,
     configPath: "manual",
@@ -481,6 +507,15 @@ function assertLinuxSystemd(): void {
   }
 }
 
+export function isWorkBuddySandbox(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (env.WORKBUDDY_SANDBOX === "1" || env.CODEBUDDY_SANDBOX === "1") {
+    return true;
+  }
+  return env.IN_DOCKER === "1" && Object.keys(env).some((key) =>
+    key.startsWith("CODEBUDDY_") || key.startsWith("WORKBUDDY_")
+  );
+}
+
 function runLaunchctl(args: string[], options: { allowFailure?: boolean } = {}): void {
   try {
     execFileSync("launchctl", args, {
@@ -494,11 +529,18 @@ function runLaunchctl(args: string[], options: { allowFailure?: boolean } = {}):
 }
 
 function processManagerError(command: string, args: string[], error: unknown): Error {
+  const stdout = typeof error === "object" && error !== null && "stdout" in error
+    ? String((error as { stdout?: unknown }).stdout ?? "").trim()
+    : "";
   const stderr = typeof error === "object" && error !== null && "stderr" in error
     ? String((error as { stderr?: unknown }).stderr ?? "").trim()
     : "";
-  const detail = stderr || (error instanceof Error ? error.message : String(error));
-  return new Error(`${command} ${args[0] ?? "command"} failed${detail ? `: ${detail}` : "."}`);
+  const status = typeof error === "object" && error !== null && "status" in error
+    ? (error as { status?: unknown }).status
+    : undefined;
+  const detail = stderr || stdout || (error instanceof Error ? error.message : String(error));
+  const statusSuffix = typeof status === "number" ? ` with exit ${status}` : "";
+  return new Error(`${command} ${args[0] ?? "command"} failed${statusSuffix}${detail ? `: ${detail}` : "."}`);
 }
 
 function runSystemctl(args: string[], options: { allowFailure?: boolean } = {}): void {

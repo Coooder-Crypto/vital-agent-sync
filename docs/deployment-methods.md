@@ -28,14 +28,16 @@ iPhone
 Preferred entry: install the Vital Agent Sync Skill from SkillHub and ask WorkBuddy to install it. Manual fallback:
 
 ```bash
-npx -y vitalmcp@0.5.1 setup --agent workbuddy --transport lan
+npx -y vitalmcp@0.5.2 setup --agent workbuddy --transport lan
 ```
 
 The setup flow plans and confirms changes before it:
 
 - creates user-only state under `~/.vital-agent-sync`;
 - preserves and backs up existing WorkBuddy MCP configuration;
-- installs one `launchd` receiver service;
+- records one Node runtime/ABI identity for CLI, launchd, and MCP;
+- writes one `launchd` receiver definition, then pauses for a one-command macOS Terminal activation because WorkBuddy cannot bootstrap LaunchAgents from its sandbox;
+- pauses again for explicit WorkBuddy MCP approval, reload, and native tool verification;
 - opens the short-lived QR in a loopback-only local page;
 - waits for a physical-iPhone sync and MCP freshness verification.
 
@@ -48,7 +50,7 @@ vitalmcp status --output json
 vitalmcp doctor --agent workbuddy --transport lan
 ```
 
-If setup reports `receiver_identity_conflict` or `service_manager_failed`, stop and follow the official diagnostic. Do not migrate an older database, stop an unknown service, change shell profiles, or invent another daemon without a separate user decision.
+If setup returns `activate_service`, run only its command in macOS Terminal without `sudo`. If it reports `receiver_identity_conflict` or another `service_manager_failed`, stop and follow the official diagnostic. Do not migrate an older database, stop an unknown service, clear quarantine recursively, change shell profiles, edit MCP approval files, or invent another daemon.
 
 ## 2. Local Hermes And Other Agents
 
@@ -65,9 +67,9 @@ iPhone
 Commands:
 
 ```bash
-npx -y vitalmcp@0.5.1 setup --agent hermes --transport lan
-npx -y vitalmcp@0.5.1 setup --agent generic --transport lan
-npx -y vitalmcp@0.5.1 setup --agent openclaw --transport lan
+npx -y vitalmcp@0.5.2 setup --agent hermes --transport lan
+npx -y vitalmcp@0.5.2 setup --agent generic --transport lan
+npx -y vitalmcp@0.5.2 setup --agent openclaw --transport lan
 ```
 
 Adapter requirements:
@@ -105,7 +107,7 @@ Requirements:
 Linux/Hermes example:
 
 ```bash
-npx -y vitalmcp@0.5.1 setup \
+npx -y vitalmcp@0.5.2 setup \
   --agent hermes \
   --manager systemd \
   --transport tailscale \
