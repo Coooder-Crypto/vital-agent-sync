@@ -30,6 +30,7 @@ export type AgentAdapterId = typeof AGENT_ADAPTER_IDS[number];
 export type AgentInstallStatus = {
   id: AgentAdapterId;
   available: boolean;
+  configured: boolean;
   installed: boolean;
   detail: string;
   configPath?: string;
@@ -149,6 +150,7 @@ const genericAgentAdapter: AgentAdapter = {
     return {
       id: "generic",
       available: true,
+      configured: true,
       installed: true,
       detail: "Generic agents use the printed mcpServers JSON; Vital Agent Sync does not write agent-specific config."
     };
@@ -179,6 +181,7 @@ const hermesAgentAdapter: AgentAdapter = {
     return {
       id: "hermes",
       available: status.exists,
+      configured: status.installed,
       installed: status.installed,
       configPath: status.configPath,
       detail: status.installed
@@ -223,6 +226,7 @@ const openClawAgentAdapter: AgentAdapter = {
       return {
         id: "openclaw",
         available: status.exists,
+        configured: status.installed,
         installed: status.installed,
         configPath: status.configPath,
         detail: status.installed
@@ -233,6 +237,7 @@ const openClawAgentAdapter: AgentAdapter = {
       return {
         id: "openclaw",
         available: true,
+        configured: false,
         installed: false,
         configPath: options?.openclawConfigPath,
         detail: error instanceof Error ? error.message : String(error)
@@ -269,16 +274,18 @@ const workBuddyAgentAdapter: AgentAdapter = {
       return {
         id: "workbuddy",
         available: status.exists,
+        configured: status.configured,
         installed: status.installed,
         configPath: status.configPath,
-        detail: status.installed
-          ? `vital-agent-sync MCP is installed in ${status.configPath}`
+        detail: status.configured
+          ? `vital-agent-sync MCP is registered in ${status.configPath}; WorkBuddy user approval and Agent reload are still required`
           : `${status.configPath} ${status.exists ? "does not include" : "does not exist for"} vital-agent-sync`
       };
     } catch (error) {
       return {
         id: "workbuddy",
         available: true,
+        configured: false,
         installed: false,
         configPath: options?.workbuddyConfigPath,
         detail: error instanceof Error ? error.message : String(error)
@@ -292,7 +299,7 @@ const workBuddyAgentAdapter: AgentAdapter = {
       configPath: result.configPath,
       backupPath: result.backupPath,
       server: result.server,
-      message: `Vital Agent Sync MCP installed for WorkBuddy in ${result.configPath}`
+      message: `Vital Agent Sync MCP registered for WorkBuddy in ${result.configPath}; user approval and Agent reload are required`
     };
   },
   formatMcpConfig(config) {

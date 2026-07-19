@@ -43,8 +43,8 @@ try {
 }
 
 function assertReleaseManifest(value) {
-  if (value.name !== "vitalmcp" || value.version !== "0.5.1") {
-    throw new Error("Expected the release manifest to be vitalmcp@0.5.1.");
+  if (value.name !== "vitalmcp" || value.version !== "0.5.2") {
+    throw new Error("Expected the release manifest to be vitalmcp@0.5.2.");
   }
   if (value.private === true || value.publishConfig?.access !== "public") {
     throw new Error("vitalmcp must be a public publishable package.");

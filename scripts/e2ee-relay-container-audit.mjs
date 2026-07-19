@@ -120,7 +120,7 @@ function verifyRuntimeImage() {
     "packages/local/dist/cli.js",
     "--version"
   ]).trim();
-  assert(version === "vitalmcp 0.5.1", "Relay image contains the wrong vitalmcp version.");
+  assert(version === "vitalmcp 0.5.2", "Relay image contains the wrong vitalmcp version.");
   console.log(version);
 }
 

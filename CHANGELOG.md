@@ -17,6 +17,14 @@ The project coordinates preview releases across the iOS app, `vitalmcp` runtime,
 - Hosted relay, accounts, billing, App Store launch, public VPS, and marketing are explicitly outside the active roadmap.
 - Public documentation now leads with the current pinned npm and SkillHub release and separates current guidance from historical relay research.
 
+## [0.5.2] - 2026-07-19
+
+### Fixed
+
+- Pin CLI execution to the Node runtime and native-module ABI that completed setup, including WorkBuddy-to-Terminal handoff.
+- Pause WorkBuddy setup at the launchd sandbox boundary and provide an explicit, non-root Terminal activation step.
+- Treat WorkBuddy MCP JSON as registered rather than active until the user approves it, reloads WorkBuddy, and verifies the native tool.
+
 ## [0.5.1] - 2026-07-18
 
 ### Fixed

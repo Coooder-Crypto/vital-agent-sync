@@ -28,6 +28,7 @@ export const BOOTSTRAP_STAGES = [
   "agent_configured",
   "service_installed",
   "service_started",
+  "mcp_verified",
   "onboarding_created",
   "first_sync_observed",
   "complete"
@@ -38,6 +39,8 @@ export type BootstrapStatus =
   | "planning"
   | "awaiting_consent"
   | "running"
+  | "awaiting_service_activation"
+  | "awaiting_mcp_approval"
   | "awaiting_ios"
   | "awaiting_first_sync"
   | "complete"
@@ -88,7 +91,7 @@ export type BootstrapState = {
 };
 
 export type BootstrapNextAction = {
-  type: "confirm" | "open_local_onboarding" | "sync_ios" | "ask_agent" | "retry";
+  type: "confirm" | "activate_service" | "approve_mcp" | "open_local_onboarding" | "sync_ios" | "ask_agent" | "retry";
   command?: string;
   url?: string;
   suggested_prompt?: string;
@@ -121,6 +124,7 @@ export type BootstrapWorkflowActions = {
   agent_configured: () => Promise<void> | void;
   service_installed: () => Promise<void> | void;
   service_started: () => Promise<void> | void;
+  mcp_verified: () => Promise<boolean> | boolean;
   onboarding_created: () => Promise<{ onboarding_url: string }> | { onboarding_url: string };
   first_sync_observed: () => Promise<boolean> | boolean;
 };
@@ -150,7 +154,7 @@ const bootstrapConfigSchema = z.object({
 const bootstrapStateSchema = z.object({
   schema_version: z.literal(BOOTSTRAP_SCHEMA_VERSION),
   setup_id: z.string().regex(/^setup_[a-f0-9]{32}$/),
-  status: z.enum(["planning", "awaiting_consent", "running", "awaiting_ios", "awaiting_first_sync", "complete", "failed"]),
+  status: z.enum(["planning", "awaiting_consent", "running", "awaiting_service_activation", "awaiting_mcp_approval", "awaiting_ios", "awaiting_first_sync", "complete", "failed"]),
   current_stage: z.enum(BOOTSTRAP_STAGES),
   completed_stages: z.array(z.enum(BOOTSTRAP_STAGES)),
   config: bootstrapConfigSchema,
@@ -198,6 +202,13 @@ export function buildBootstrapPlan(config: BootstrapConfig): BootstrapPlanItem[]
       id: "install_service",
       description: `Install and start the ${serviceLabel} service with ${config.service_manager}`,
       persistent_change: true
+    },
+    {
+      id: "verify_mcp",
+      description: config.agent_id === "workbuddy"
+        ? "Wait for explicit WorkBuddy MCP approval and verify the native vital_agent_status tool after reload"
+        : `Verify that ${config.agent_id} can load the native Vital Agent Sync MCP tools`,
+      persistent_change: false
     },
     {
       id: "create_onboarding",
@@ -287,6 +298,19 @@ export function failBootstrapState(
   }, options);
 }
 
+export function pauseBootstrapForServiceActivation(
+  state: BootstrapState,
+  error: unknown,
+  options: { stateDir?: string; homeDir?: string } = {}
+): BootstrapState {
+  return writeBootstrapState({
+    ...state,
+    status: "awaiting_service_activation",
+    last_error_code: "service_activation_required",
+    last_error_message: safeErrorMessage(error)
+  }, options);
+}
+
 export function bootstrapStageComplete(state: BootstrapState, stage: BootstrapStage): boolean {
   return state.completed_stages.includes(stage);
 }
@@ -305,6 +329,19 @@ export async function runBootstrapWorkflow(
     if (bootstrapStageComplete(state, stage)) continue;
     await actions[stage]();
     state = markBootstrapStage(state, stage, { ...options, status: "running" });
+  }
+
+  if (!bootstrapStageComplete(state, "mcp_verified")) {
+    if (!await actions.mcp_verified()) {
+      return writeBootstrapState({
+        ...state,
+        status: "awaiting_mcp_approval",
+        current_stage: "service_started",
+        last_error_code: undefined,
+        last_error_message: undefined
+      }, options);
+    }
+    state = markBootstrapStage(state, "mcp_verified", { ...options, status: "running" });
   }
 
   if (!bootstrapStageComplete(state, "onboarding_created")) {
@@ -367,6 +404,10 @@ export function safeErrorMessage(error: unknown): string {
 }
 
 export function classifyBootstrapError(error: unknown): string {
+  if (typeof error === "object" && error !== null && "code" in error &&
+    (error as { code?: unknown }).code === "service_activation_required") {
+    return "service_activation_required";
+  }
   const message = error instanceof Error ? error.message : String(error);
   if (/another vital-agent-sync setup/i.test(message)) return "setup_locked";
   if (/consent|--yes/i.test(message)) return "consent_required";

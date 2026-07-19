@@ -68,19 +68,19 @@ Preferred entry: the reviewed [SkillHub package](https://skillhub.cn/skills/vita
 Manual fallback:
 
 ```bash
-npx -y vitalmcp@0.5.1 setup --agent workbuddy --transport lan
+npx -y vitalmcp@0.5.2 setup --agent workbuddy --transport lan
 ```
 
-WorkBuddy setup preserves unrelated entries in `~/.workbuddy/mcp.json`, creates a timestamped backup before mutation, and tells the user when a restart is required.
+WorkBuddy setup preserves unrelated entries in `~/.workbuddy/mcp.json` and creates a timestamped backup before mutation. It returns `activate_service` for the one launchd activation command that must run outside the WorkBuddy sandbox, then returns `approve_mcp` until the user approves the server, reloads WorkBuddy, and verifies `vital_agent_status`. It never edits WorkBuddy's approval store directly.
 
 ## Other local Agents
 
 All Agent adapters reuse the same receiver, database, status model, and MCP tools:
 
 ```bash
-npx -y vitalmcp@0.5.1 setup --agent hermes --transport lan
-npx -y vitalmcp@0.5.1 setup --agent generic --transport lan
-npx -y vitalmcp@0.5.1 setup --agent openclaw --transport lan
+npx -y vitalmcp@0.5.2 setup --agent hermes --transport lan
+npx -y vitalmcp@0.5.2 setup --agent generic --transport lan
+npx -y vitalmcp@0.5.2 setup --agent openclaw --transport lan
 ```
 
 Hermes is the first Phase 2 target. Generic stdio MCP is the baseline when no first-class adapter exists.
@@ -99,7 +99,7 @@ iPhone with Tailscale
 ```
 
 ```bash
-npx -y vitalmcp@0.5.1 setup \
+npx -y vitalmcp@0.5.2 setup \
   --agent hermes \
   --manager systemd \
   --transport tailscale \
