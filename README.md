@@ -12,7 +12,7 @@ It is a data connector, not an Agent, hosted health cloud, medical device, or so
 
 ## Current roadmap
 
-Version `0.5.2` is a source-distributed Local Preview. Work proceeds in this order:
+Version `0.5.3` is a source-distributed Local Preview. Work proceeds in this order:
 
 | Phase | Experience | Status |
 | --- | --- | --- |
@@ -26,22 +26,22 @@ The roadmap does not include a hosted relay service, accounts, billing, subscrip
 
 Install [Vital Agent Sync from SkillHub](https://skillhub.cn/skills/vital-agent-sync), then tell WorkBuddy:
 
-> 安装 Vital Agent Sync，使用局域网连接我的 iPhone。先说明所有持久化修改，等我确认后执行，最后在本机打开配对二维码。
+> 启动 Vital Agent Sync，通过局域网连接我的 iPhone。
 
 The Skill:
 
 - installs a pinned `vitalmcp` version into a user-owned prefix without `sudo`;
-- shows a redacted plan before changing files, services, network state, or WorkBuddy MCP configuration;
-- records the setup Node runtime and native-module ABI so Terminal, launchd, and MCP use one compatible runtime;
-- pauses at the WorkBuddy sandbox boundary and asks the user to run one returned command in macOS Terminal to activate launchd without `sudo`;
-- waits for explicit WorkBuddy MCP approval, reload, and a native `vital_agent_status` call before pairing;
+- requests one installation confirmation covering the pinned runtime, private state, WorkBuddy MCP entry, trusted-LAN listener, and local pairing page;
+- records the setup Node runtime and native-module ABI so the CLI, receiver, and MCP use one compatible runtime;
+- starts a WorkBuddy-managed Local Preview receiver without requiring Terminal or `sudo`; this preview process may stop when WorkBuddy exits;
+- opens the private local QR before MCP approval, while still requiring explicit WorkBuddy MCP approval before any health-data read;
 - opens the credential-bearing QR only in the user's local browser;
 - requires a privacy disclosure before any health-data read.
 
 Manual fallback:
 
 ```bash
-npx -y vitalmcp@0.5.2 setup --agent workbuddy --transport lan
+npx -y vitalmcp@0.5.3 setup --agent workbuddy --transport lan
 ```
 
 After the first iPhone sync:
@@ -56,9 +56,9 @@ vitalmcp doctor --agent workbuddy --transport lan
 These paths reuse the same receiver, database, setup state, and MCP tools:
 
 ```bash
-npx -y vitalmcp@0.5.2 setup --agent hermes --transport lan
-npx -y vitalmcp@0.5.2 setup --agent generic --transport lan
-npx -y vitalmcp@0.5.2 setup --agent openclaw --transport lan
+npx -y vitalmcp@0.5.3 setup --agent hermes --transport lan
+npx -y vitalmcp@0.5.3 setup --agent generic --transport lan
+npx -y vitalmcp@0.5.3 setup --agent openclaw --transport lan
 ```
 
 Hermes is the next first-class local adapter. Generic stdio MCP remains the portability baseline. Marketplace publication is not required.
@@ -68,7 +68,7 @@ Hermes is the next first-class local adapter. Generic stdio MCP remains the port
 The planned server mode keeps the selected Agent, `vitalmcp`, SQLite, and MCP on the same user-owned host. Tailscale is used only for the iPhone-to-receiver HTTPS path:
 
 ```bash
-npx -y vitalmcp@0.5.2 setup \
+npx -y vitalmcp@0.5.3 setup \
   --agent hermes \
   --manager systemd \
   --transport tailscale \

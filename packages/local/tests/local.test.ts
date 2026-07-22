@@ -85,14 +85,19 @@ import {
   buildSystemdUnit,
   getLaunchdServicePaths,
   getManualServiceStatus,
+  getSessionServiceStatus,
   getSystemdServicePaths,
   installLaunchdService,
+  installSessionService,
   readLaunchdServiceLog,
   readLaunchdPlist,
   resolveServiceManagerId,
   isWorkBuddySandbox,
   ServiceActivationRequiredError,
-  startLaunchdService
+  startLaunchdService,
+  startSessionService,
+  stopSessionService,
+  uninstallSessionService
 } from "../src/service.js";
 import { runServiceEnsureWorkflow, runServiceSetupWorkflow } from "../src/setup.js";
 import {
@@ -2202,8 +2207,8 @@ test("Vital Agent Sync skill can be printed and installed for Hermes", () => {
     assert.match(openclawMarkdown, /Hosted Relay is not available, recommended, or required in the Local Preview flow/);
     assert.match(openclawMarkdown, /vitalmcp setup --transport relay --relay-url https:\/\/HOSTED-RELAY --agent openclaw/);
     assert.match(openclawMarkdown, /Never invent a relay domain/);
-    assert.match(openclawMarkdown, /npx -y vitalmcp@0\.5\.2 --version/);
-    assert.match(openclawMarkdown, /prefix every local CLI invocation below with `npx -y vitalmcp@0\.5\.2`/);
+    assert.match(openclawMarkdown, /npx -y vitalmcp@0\.5\.3 --version/);
+    assert.match(openclawMarkdown, /prefix every local CLI invocation below with `npx -y vitalmcp@0\.5\.3`/);
     assert.match(openclawMarkdown, /Do not switch runners midway through setup/);
     assert.match(openclawMarkdown, /setup --resume --yes --output json/);
     assert.match(openclawMarkdown, /next_action\.url/);
@@ -2228,9 +2233,14 @@ test("Vital Agent Sync skill can be printed and installed for Hermes", () => {
     assert.match(workbuddyMarkdown, /# Vital Agent Sync for WorkBuddy/);
     assert.match(workbuddyMarkdown, /name: vital-agent-sync/);
     assert.match(workbuddyMarkdown, /npm install --global --prefix/);
-    assert.match(workbuddyMarkdown, /vitalmcp@0\.5\.2/);
+    assert.match(workbuddyMarkdown, /vitalmcp@0\.5\.3/);
     assert.match(workbuddyMarkdown, /~\/\.workbuddy\/mcp\.json/);
-    assert.match(workbuddyMarkdown, /setup --transport lan --agent workbuddy --output json/);
+    assert.match(workbuddyMarkdown, /setup --transport lan --agent workbuddy --yes --output json/);
+    assert.match(workbuddyMarkdown, /首次配对前唯一一次安装确认/);
+    assert.match(workbuddyMarkdown, /0\.0\.0\.0:8787/);
+    assert.match(workbuddyMarkdown, /浏览器页面应当是本机 `127\.0\.0\.1`；这不等于 iPhone 的连接地址/);
+    assert.match(workbuddyMarkdown, /不要让 MCP 审批阻塞二维码/);
+    assert.doesNotMatch(workbuddyMarkdown, /请用户在 macOS Terminal 中执行/);
     assert.match(workbuddyMarkdown, /open <next_action\.url>/);
     assert.match(workbuddyMarkdown, /可能会发送给你在 WorkBuddy 中选择的模型提供商/);
     assert.match(workbuddyMarkdown, /不得读取、截图、上传或转述页面里的二维码/);
@@ -2296,12 +2306,12 @@ test("Vital Agent Sync skill can be exported as an OpenClaw package", () => {
     assert.equal(result.packageDir, packageDir);
     assert.deepEqual(readdirSync(packageDir).sort(), ["README.md", "SKILL.md"]);
     assert.equal(frontmatter.name, "vitalmcp-personal-context");
-    assert.equal(frontmatter.version, "0.5.2");
+    assert.equal(frontmatter.version, "0.5.3");
     assert.equal(frontmatter.license, undefined);
     assert.deepEqual(frontmatter.metadata.openclaw.requires.bins, ["vitalmcp"]);
     assert.deepEqual(frontmatter.metadata.openclaw.install, [{
       kind: "node",
-      package: "vitalmcp@0.5.2",
+      package: "vitalmcp@0.5.3",
       bins: ["vitalmcp"]
     }]);
     assert.deepEqual(frontmatter.metadata.openclaw.os, ["macos", "linux", "windows"]);
@@ -2340,7 +2350,7 @@ test("Vital Agent Sync skill can be exported as a WorkBuddy and SkillHub package
     assert.deepEqual(Object.keys(frontmatter).sort(), ["description", "name"]);
     assert.equal(frontmatter.name, "vital-agent-sync");
     assert.match(String(frontmatter.description), /WorkBuddy/);
-    assert.match(skill, /vitalmcp@0\.5\.2/);
+    assert.match(skill, /vitalmcp@0\.5\.3/);
     assert.match(skill, /~\/\.workbuddy\/mcp\.json/);
     assert.match(skill, /next_action\.url/);
     assert.doesNotMatch(skill, /BEGIN PRIVATE KEY|relay_access_token|upload_auth_secret/);
@@ -3007,6 +3017,42 @@ test("WorkBuddy sandbox detection stops launchd activation without unsafe retrie
   }
 });
 
+test("WorkBuddy session service starts without launchd and keeps private local state", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-workbuddy-session-"));
+  const fakeRuntime = join(tempDir, "fake-vitalmcp");
+  writeFileSync(fakeRuntime, "#!/bin/sh\ntrap 'exit 0' TERM INT\nwhile true; do sleep 1; done\n", "utf8");
+  chmodSync(fakeRuntime, 0o755);
+  const options = {
+    manager: "session" as const,
+    homeDir: tempDir,
+    cliCommand: fakeRuntime,
+    databasePath: join(tempDir, "vital-agent.sqlite"),
+    host: "0.0.0.0",
+    port: 8787,
+    transport: "lan" as const
+  };
+  try {
+    const installed = installSessionService(options);
+    assert.equal(installed.manager, "session");
+    assert.equal(installed.configured, true);
+    assert.equal(installed.loaded, false);
+    if (process.platform !== "win32") {
+      assert.equal(statSync(installed.configPath).mode & 0o777, 0o600);
+    }
+
+    const started = startSessionService(options);
+    assert.equal(started.loaded, true);
+    assert.equal(getSessionServiceStatus(options).loaded, true);
+    const stopped = stopSessionService(options);
+    assert.equal(stopped.loaded, false);
+    const uninstalled = uninstallSessionService(options);
+    assert.equal(uninstalled.configured, false);
+  } finally {
+    stopSessionService(options);
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("port diagnostics parse lsof listener output", () => {
   const listeners = parseLsofListenOutput([
     "COMMAND   PID    USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME",
@@ -3116,7 +3162,7 @@ test("local package manifest is ready for public npm packing", () => {
   };
 
   assert.equal(manifest.name, "vitalmcp");
-  assert.equal(manifest.version, "0.5.2");
+  assert.equal(manifest.version, "0.5.3");
   assert.equal(manifest.private, undefined);
   assert.equal(manifest.license, "MIT");
   assert.equal(manifest.bin?.["vitalmcp"], "./dist/launcher.js");
@@ -3384,7 +3430,7 @@ test("portable installer uses a user prefix and manages its PATH block idempoten
 
     let lastStdout = "";
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      const result = spawnSync("sh", [installScript, "--version", "0.5.2"], { env, encoding: "utf8" });
+      const result = spawnSync("sh", [installScript, "--version", "0.5.3"], { env, encoding: "utf8" });
       assert.equal(result.status, 0, result.stderr);
       lastStdout = result.stdout;
     }
@@ -3392,7 +3438,7 @@ test("portable installer uses a user prefix and manages its PATH block idempoten
     const installedProfile = readFileSync(profile, "utf8");
     assert.equal((installedProfile.match(/# >>> vitalmcp >>>/g) ?? []).length, 1);
     assert.match(installedProfile, new RegExp(escapeRegExp(`export PATH="${prefix}/bin:$PATH"`)));
-    assert.match(readFileSync(npmLog, "utf8"), /install --global --prefix .*vitalmcp@0\.5\.2/);
+    assert.match(readFileSync(npmLog, "utf8"), /install --global --prefix .*vitalmcp@0\.5\.3/);
     assert.equal(readFileSync(websiteInstallScript, "utf8"), readFileSync(installScript, "utf8"));
 
     const uninstall = spawnSync("sh", [installScript, "--uninstall"], { env, encoding: "utf8" });
@@ -3610,6 +3656,39 @@ test("CLI setup persists the WorkBuddy project path before consent", async () =>
   }
 });
 
+test("CLI WorkBuddy setup selects a session receiver inside the WorkBuddy sandbox", async () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-cli-workbuddy-session-"));
+  try {
+    const port = (await findAvailableTcpPort({ preferredPort: 29887, host: "127.0.0.1" })).port;
+    const cliPath = join(packageRoot, "src", "cli.ts");
+    const stateDir = join(tempDir, "state");
+    const result = spawnSync(process.execPath, [
+      "--import", "tsx", cliPath,
+      "setup",
+      "--agent", "workbuddy",
+      "--transport", "lan",
+      "--port", String(port),
+      "--state-dir", stateDir,
+      "--db", join(tempDir, "vital-agent.sqlite"),
+      "--output", "json"
+    ], {
+      env: { ...process.env, HOME: tempDir, WORKBUDDY_SANDBOX: "1" },
+      encoding: "utf8"
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    const output = JSON.parse(result.stdout) as {
+      status: string;
+      plan: Array<{ id: string; description: string }>;
+    };
+    assert.equal(output.status, "awaiting_consent");
+    assert.match(output.plan.find((item) => item.id === "install_service")?.description ?? "", /WorkBuddy-managed Local Preview process/);
+    assert.equal(readBootstrapState({ stateDir })?.config.service_manager, "session");
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("CLI WorkBuddy setup reports MCP registration as awaiting approval", () => {
   const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-cli-workbuddy-approval-"));
   try {
@@ -3644,13 +3723,15 @@ test("CLI WorkBuddy setup reports MCP registration as awaiting approval", () => 
     assert.equal(result.status, 0, result.stderr);
     const output = JSON.parse(result.stdout) as {
       status: string;
-      next_action: { type: string; command: string };
-      details: { config_registered: boolean; approval_required: boolean; direct_approval_file_edits_allowed: boolean };
+      next_action: { type: string; command: string; url: string };
+      details: { config_registered: boolean; onboarding_ready: boolean; approval_required: boolean; direct_approval_file_edits_allowed: boolean };
     };
     assert.equal(output.status, "awaiting_mcp_approval");
     assert.equal(output.next_action.type, "approve_mcp");
     assert.match(output.next_action.command, /--mcp-verified/);
+    assert.equal(output.next_action.url, "http://127.0.0.1:8787/pair");
     assert.equal(output.details.config_registered, true);
+    assert.equal(output.details.onboarding_ready, true);
     assert.equal(output.details.approval_required, true);
     assert.equal(output.details.direct_approval_file_edits_allowed, false);
   } finally {
@@ -3766,10 +3847,11 @@ test("bootstrap plan and state are versioned, private, resumable, and idempotent
 test("bootstrap classifies receiver identity and service manager failures", () => {
   assert.equal(classifyBootstrapError(new Error("Receiver identity conflict on port 8787")), "receiver_identity_conflict");
   assert.equal(classifyBootstrapError(new Error("launchctl bootstrap failed: Input/output error")), "service_manager_failed");
+  assert.equal(classifyBootstrapError(new Error("Could not start the WorkBuddy-managed session receiver.")), "service_manager_failed");
   assert.equal(classifyBootstrapError(new ServiceActivationRequiredError()), "service_activation_required");
 });
 
-test("WorkBuddy bootstrap pauses for MCP approval before creating onboarding credentials", async () => {
+test("WorkBuddy bootstrap creates local onboarding before pausing for MCP approval", async () => {
   const tempDir = mkdtempSync(join(tmpdir(), "vital-agent-sync-bootstrap-mcp-approval-"));
   try {
     const state = writeBootstrapState(createBootstrapState({
@@ -3801,7 +3883,9 @@ test("WorkBuddy bootstrap pauses for MCP approval before creating onboarding cre
     const waiting = await runBootstrapWorkflow(state, actions, { stateDir: tempDir });
     assert.equal(waiting.status, "awaiting_mcp_approval");
     assert.equal(waiting.completed_stages.includes("mcp_verified"), false);
-    assert.equal(onboardingCreated, false);
+    assert.equal(waiting.completed_stages.includes("onboarding_created"), true);
+    assert.equal(waiting.onboarding_url, "http://127.0.0.1:8787/pair");
+    assert.equal(onboardingCreated, true);
 
     approved = true;
     const resumed = await runBootstrapWorkflow(waiting, actions, { stateDir: tempDir });

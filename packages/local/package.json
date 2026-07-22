@@ -1,6 +1,6 @@
 {
   "name": "vitalmcp",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Local runtime for Vital Agent Sync: private Apple Health pairing, sync, storage, and MCP tools.",
   "license": "MIT",
   "type": "module",

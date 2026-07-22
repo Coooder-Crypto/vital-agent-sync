@@ -1,5 +1,5 @@
-import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { execFileSync, spawn } from "node:child_process";
+import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,7 +11,7 @@ export const VITALMCP_SYSTEMD_UNIT = "vitalmcp.service";
 export const VITALMCP_RELAY_PULL_LAUNCHD_LABEL = "com.vitalmcp.local.relay-pull";
 export const VITALMCP_RELAY_PULL_SYSTEMD_UNIT = "vitalmcp-relay-pull.service";
 
-export type ServiceManagerId = "auto" | "launchd" | "systemd" | "manual";
+export type ServiceManagerId = "auto" | "launchd" | "systemd" | "session" | "manual";
 export type VitalAgentServiceMode = "receiver" | "relay_pull";
 
 export type LaunchdServiceOptions = {
@@ -69,7 +69,7 @@ export type VitalAgentServiceLog = {
 };
 
 export function isServiceManagerId(value: string): value is ServiceManagerId {
-  return value === "auto" || value === "launchd" || value === "systemd" || value === "manual";
+  return value === "auto" || value === "launchd" || value === "systemd" || value === "session" || value === "manual";
 }
 
 export function resolveServiceManagerId(options: Pick<LaunchdServiceOptions, "manager" | "platform"> = {}): Exclude<ServiceManagerId, "auto"> {
@@ -120,6 +120,26 @@ export function getSystemdServicePaths(options: Pick<LaunchdServiceOptions, "hom
     logDir,
     stdoutPath: `journalctl --user -u ${unit}`,
     stderrPath: `journalctl --user -u ${unit}`,
+    databasePath: resolveHomePath(options.databasePath ?? getDefaultDatabasePath(), home)
+  };
+}
+
+export function getSessionServicePaths(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "mode"> = {}): VitalAgentServicePaths {
+  const home = options.homeDir ?? homedir();
+  const vitalAgentSyncDir = join(home, ".vital-agent-sync");
+  const serviceDir = join(vitalAgentSyncDir, "services");
+  const logDir = join(vitalAgentSyncDir, "logs");
+  const mode = options.mode ?? "receiver";
+  const prefix = mode === "relay_pull" ? "relay-pull-session" : "receiver-session";
+  const configPath = join(serviceDir, `${prefix}.json`);
+  return {
+    manager: "session",
+    mode,
+    configPath,
+    plistPath: configPath,
+    logDir,
+    stdoutPath: join(logDir, `${prefix}.out.log`),
+    stderrPath: join(logDir, `${prefix}.err.log`),
     databasePath: resolveHomePath(options.databasePath ?? getDefaultDatabasePath(), home)
   };
 }
@@ -310,6 +330,79 @@ export function uninstallSystemdService(options: LaunchdServiceOptions): VitalAg
   return getSystemdServiceStatus(options);
 }
 
+export function installSessionService(options: LaunchdServiceOptions): VitalAgentServiceStatus {
+  const paths = getSessionServicePaths(options);
+  mkdirSync(dirname(paths.configPath), { recursive: true });
+  mkdirSync(paths.logDir, { recursive: true });
+  writeFileSync(paths.configPath, `${JSON.stringify({
+    schema_version: 1,
+    manager: "session",
+    mode: options.mode ?? "receiver",
+    program_arguments: buildServiceProgramArguments(options, paths.databasePath),
+    note: "WorkBuddy-managed local preview process; it may stop when WorkBuddy exits."
+  }, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+  chmodIfPossible(paths.configPath, 0o600);
+  return getSessionServiceStatus(options);
+}
+
+export function startSessionService(options: LaunchdServiceOptions): VitalAgentServiceStatus {
+  const paths = getSessionServicePaths(options);
+  if (!existsSync(paths.configPath)) {
+    throw new Error(`Vital Agent Sync session service is not configured: ${paths.configPath}`);
+  }
+  const current = getSessionServiceStatus(options);
+  if (current.loaded) {
+    return current;
+  }
+  mkdirSync(paths.logDir, { recursive: true });
+  const args = buildServiceProgramArguments(options, paths.databasePath);
+  const stdout = openSync(paths.stdoutPath, "a", 0o600);
+  const stderr = openSync(paths.stderrPath, "a", 0o600);
+  try {
+    const child = spawn(args[0]!, args.slice(1), {
+      detached: true,
+      stdio: ["ignore", stdout, stderr],
+      env: { ...process.env, VITALMCP_SESSION_SERVICE: "1" }
+    });
+    child.on("error", () => undefined);
+    if (!child.pid) {
+      throw new Error("Vital Agent Sync could not start the WorkBuddy-managed session receiver.");
+    }
+    writeFileSync(getSessionPidPath(options), `${child.pid}\n`, { encoding: "utf8", mode: 0o600 });
+    chmodIfPossible(getSessionPidPath(options), 0o600);
+    child.unref();
+  } finally {
+    closeSync(stdout);
+    closeSync(stderr);
+  }
+  return getSessionServiceStatus(options);
+}
+
+export function stopSessionService(options: LaunchdServiceOptions): VitalAgentServiceStatus {
+  const pidPath = getSessionPidPath(options);
+  const pid = readSessionPid(pidPath);
+  if (pid !== undefined && isProcessRunning(pid)) {
+    try {
+      process.kill(pid, "SIGTERM");
+    } catch {
+      // A stale or already-exited session process is equivalent to stopped.
+    }
+  }
+  if (existsSync(pidPath)) {
+    unlinkSync(pidPath);
+  }
+  return getSessionServiceStatus(options);
+}
+
+export function uninstallSessionService(options: LaunchdServiceOptions): VitalAgentServiceStatus {
+  stopSessionService(options);
+  const configPath = getSessionServicePaths(options).configPath;
+  if (existsSync(configPath)) {
+    unlinkSync(configPath);
+  }
+  return getSessionServiceStatus(options);
+}
+
 export function getLaunchdServiceStatus(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "mode"> = {}): VitalAgentServiceStatus {
   const paths = getLaunchdServicePaths(options);
   const mode = options.mode ?? "receiver";
@@ -336,6 +429,22 @@ export function getSystemdServiceStatus(options: Pick<LaunchdServiceOptions, "ho
     loaded,
     installed: configured,
     running: loaded,
+    ...paths
+  };
+}
+
+export function getSessionServiceStatus(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "mode"> = {}): VitalAgentServiceStatus {
+  const paths = getSessionServicePaths(options);
+  const pid = readSessionPid(getSessionPidPath(options));
+  const configured = existsSync(paths.configPath);
+  const loaded = pid !== undefined && isProcessRunning(pid);
+  return {
+    label: options.mode === "relay_pull" ? "vitalmcp-relay-pull-session" : "vitalmcp-receiver-session",
+    configured,
+    loaded,
+    installed: configured,
+    running: loaded,
+    detail: "WorkBuddy-managed local preview process; it may stop when WorkBuddy exits.",
     ...paths
   };
 }
@@ -371,6 +480,9 @@ export function getVitalAgentServiceStatus(options: Pick<LaunchdServiceOptions, 
   if (manager === "systemd") {
     return getSystemdServiceStatus(options);
   }
+  if (manager === "session") {
+    return getSessionServiceStatus(options);
+  }
   return getManualServiceStatus(options);
 }
 
@@ -381,6 +493,9 @@ export function installVitalAgentService(options: LaunchdServiceOptions): VitalA
   }
   if (manager === "systemd") {
     return installSystemdService(options);
+  }
+  if (manager === "session") {
+    return installSessionService(options);
   }
   throw new Error(manualServiceMessage(options.platform));
 }
@@ -393,6 +508,9 @@ export function startVitalAgentService(options: LaunchdServiceOptions): VitalAge
   if (manager === "systemd") {
     return startSystemdService(options);
   }
+  if (manager === "session") {
+    return startSessionService(options);
+  }
   throw new Error(manualServiceMessage(options.platform));
 }
 
@@ -404,6 +522,9 @@ export function stopVitalAgentService(options: LaunchdServiceOptions): VitalAgen
   if (manager === "systemd") {
     return stopSystemdService(options);
   }
+  if (manager === "session") {
+    return stopSessionService(options);
+  }
   throw new Error(manualServiceMessage(options.platform));
 }
 
@@ -414,6 +535,9 @@ export function uninstallVitalAgentService(options: LaunchdServiceOptions): Vita
   }
   if (manager === "systemd") {
     return uninstallSystemdService(options);
+  }
+  if (manager === "session") {
+    return uninstallSessionService(options);
   }
   throw new Error(manualServiceMessage(options.platform));
 }
@@ -460,10 +584,26 @@ export function readVitalAgentServiceLog(options: Pick<LaunchdServiceOptions, "h
   if (manager === "systemd") {
     return readSystemdServiceLog(options);
   }
+  if (manager === "session") {
+    return readSessionServiceLog(options);
+  }
   return {
     path: "manual daemon stdout/stderr",
     exists: false,
     content: manualServiceMessage(options.platform)
+  };
+}
+
+function readSessionServiceLog(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "mode"> & {
+  stream: "stdout" | "stderr";
+  lines?: number;
+}): VitalAgentServiceLog {
+  const paths = getSessionServicePaths(options);
+  const path = options.stream === "stdout" ? paths.stdoutPath : paths.stderrPath;
+  return {
+    path,
+    exists: existsSync(path),
+    content: existsSync(path) ? tailLines(readFileSync(path, "utf8"), options.lines ?? 80) : ""
   };
 }
 
@@ -603,6 +743,33 @@ function getCliCommandPath(): string {
     return resolve(dirname(currentFile), "cli.js");
   }
   return "vitalmcp";
+}
+
+function getSessionPidPath(options: Pick<LaunchdServiceOptions, "homeDir" | "databasePath" | "mode">): string {
+  return `${getSessionServicePaths(options).configPath}.pid`;
+}
+
+function readSessionPid(path: string): number | undefined {
+  if (!existsSync(path)) return undefined;
+  const pid = Number.parseInt(readFileSync(path, "utf8").trim(), 10);
+  return Number.isSafeInteger(pid) && pid > 0 ? pid : undefined;
+}
+
+function isProcessRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function chmodIfPossible(path: string, mode: number): void {
+  try {
+    chmodSync(path, mode);
+  } catch {
+    // Some filesystems do not expose POSIX modes.
+  }
 }
 
 function resolveHomePath(path: string, home: string): string {

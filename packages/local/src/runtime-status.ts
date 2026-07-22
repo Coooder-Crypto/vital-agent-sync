@@ -4,7 +4,7 @@ import { getHealthStatus } from "./health-ingest.js";
 
 export const VITAL_AGENT_PRODUCT = "vital-agent-sync" as const;
 export const VITALMCP_SERVICE = "vitalmcp" as const;
-export const VITALMCP_RUNTIME_VERSION = "0.5.2" as const;
+export const VITALMCP_RUNTIME_VERSION = "0.5.3" as const;
 export const RECEIVER_STATUS_PROTOCOL_VERSION = 1 as const;
 
 export type ReceiverRuntimeStatus = {

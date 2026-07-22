@@ -34,6 +34,7 @@ import { startMcpServer } from "./mcp.js";
 import {
   getVitalAgentServiceStatus,
   installVitalAgentService,
+  isWorkBuddySandbox,
   isServiceManagerId,
   readVitalAgentServiceLog,
   startVitalAgentService,
@@ -349,7 +350,7 @@ function parseArgs(argv: string[]): CliOptions {
     } else if (arg === "--manager") {
       const value = argv[index + 1];
       if (!value || !isServiceManagerId(value)) {
-        throw new Error("Expected --manager to be one of: auto, launchd, systemd, manual.");
+        throw new Error("Expected --manager to be one of: auto, launchd, systemd, session, manual.");
       }
       options.serviceManager = value;
       index += 1;
@@ -785,6 +786,7 @@ Global:
   --tailscale-name   MagicDNS name used by private Tailscale Serve HTTPS
   --workbuddy-project <dir> Project directory for <dir>/.workbuddy/mcp.json
   --workbuddy-config <path> Explicit WorkBuddy MCP configuration path
+  --manager <id>     auto, launchd, systemd, session, or manual
   --output text|json Versioned Agent-safe command output
   --yes              Apply a reviewed setup plan
   --mcp-verified     Resume only after WorkBuddy loaded and called vital_agent_status
@@ -904,11 +906,15 @@ async function prepareNewBootstrapOptions(options: CliOptions): Promise<CliOptio
   const workbuddyConfigPath = agentId === "workbuddy"
     ? normalizeWorkBuddyConfigPath(resolved.workbuddyConfigPath)
     : resolved.workbuddyConfigPath;
+  const serviceManager = agentId === "workbuddy" && resolved.serviceManager === "auto" && isWorkBuddySandbox()
+    ? "session"
+    : resolved.serviceManager;
   return {
     ...resolved,
     agentId,
     agentAuto: false,
     serviceMode,
+    serviceManager,
     workbuddyConfigPath,
     workbuddyProjectPath
   };
@@ -1171,11 +1177,13 @@ function buildBootstrapOutput(state: BootstrapState, options: CliOptions): Boots
       completed_stages: state.completed_stages,
       next_action: {
         type: "approve_mcp",
+        url: state.onboarding_url,
         command: `${resumeCommand} --mcp-verified`,
-        suggested_prompt: "Approve vital-agent-sync in WorkBuddy MCP settings, restart or reload WorkBuddy, and call vital_agent_status. Only then run the resume command."
+        suggested_prompt: "The private local pairing page is ready now. Approve vital-agent-sync in WorkBuddy MCP settings before any health data is read. After reload, call vital_agent_status and resume automatically."
       },
       details: {
         config_registered: true,
+        onboarding_ready: state.onboarding_url !== undefined,
         approval_required: true,
         direct_approval_file_edits_allowed: false
       }
@@ -1231,7 +1239,7 @@ function printBootstrapResult(state: BootstrapState, options: CliOptions): void 
     console.log("WorkBuddy's sandbox cannot activate launchd. Run this in macOS Terminal; do not use sudo:");
     console.log(`  ${buildSetupResumeCommand(state)}`);
   } else if (state.status === "awaiting_mcp_approval") {
-    console.log("Next: approve vital-agent-sync in WorkBuddy MCP settings, restart or reload WorkBuddy, call vital_agent_status, then resume with --mcp-verified.");
+    console.log("The private local pairing page is ready. Approve vital-agent-sync in WorkBuddy MCP settings before any health data is read; after reload, call vital_agent_status and resume automatically.");
   } else if (state.status === "awaiting_first_sync") {
     console.log("Next: connect the Vital Agent app, run the first sync, then run vitalmcp setup --resume --yes.");
   } else if (state.status === "complete") {

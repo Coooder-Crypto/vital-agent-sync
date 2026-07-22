@@ -34,23 +34,22 @@ The preferred entry is the reviewed [Vital Agent Sync SkillHub package](https://
 Manual fallback:
 
 ```bash
-npx -y vitalmcp@0.5.2 setup --agent workbuddy --transport lan
+npx -y vitalmcp@0.5.3 setup --agent workbuddy --transport lan
 ```
 
 For a machine-readable consent flow:
 
 ```bash
-vitalmcp setup --agent workbuddy --transport lan --output json
-vitalmcp setup --resume --yes --output json
+vitalmcp setup --agent workbuddy --transport lan --yes --output json
 ```
 
-Without execution consent, non-interactive setup stops at `awaiting_consent`. It must not install a service, rewrite Agent configuration, or create pairing credentials before approval.
+Without execution consent, non-interactive setup stops at `awaiting_consent`. The WorkBuddy Skill requests one confirmation covering the pinned npm runtime and this complete plan; after that confirmation it invokes setup with `--yes` and does not ask again.
 
-On macOS, WorkBuddy cannot activate a user LaunchAgent from inside its sandbox. Setup therefore stops at `awaiting_service_activation` and returns one `activate_service` command for the user to run in macOS Terminal without `sudo`. The launcher records and reuses the Node path and native-module ABI that completed setup.
+On macOS, setup detects the WorkBuddy sandbox and starts a WorkBuddy-managed Local Preview receiver instead of requiring `launchctl` or Terminal. This preview process may stop when WorkBuddy exits; persistent background activation is a later optional step. The launcher records and reuses the Node path and native-module ABI that completed setup.
 
 WorkBuddy user configuration lives at `~/.workbuddy/mcp.json`. Use `--workbuddy-project <dir>` for `<dir>/.workbuddy/mcp.json`, or `--workbuddy-config <path>` for an explicit file. Existing fields and unrelated MCP servers are preserved, and a modified file receives a timestamped backup.
 
-Writing this file only registers the MCP server. Setup then stops at `awaiting_mcp_approval`; approve `vital-agent-sync` in WorkBuddy, reload or restart WorkBuddy, call the native `vital_agent_status` tool, and only then resume with the returned `--mcp-verified` command. Pair a physical iPhone, perform a manual sync, then verify:
+Writing this file only registers the MCP server. Setup may return `awaiting_mcp_approval`, but its loopback `next_action.url` is already ready and can be opened for local iPhone pairing. Approve `vital-agent-sync`, reload or restart WorkBuddy, call the native `vital_agent_status` tool, and then resume with the returned `--mcp-verified` command before any health data is read. Pair a physical iPhone, perform a manual sync, then verify:
 
 ```bash
 vitalmcp status --output json
