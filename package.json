@@ -1,6 +1,6 @@
 {
   "name": "vital-agent-sync",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "private": true,
   "description": "Local-first Apple Health bridge for WorkBuddy and other MCP-compatible Agents.",
   "license": "MIT",

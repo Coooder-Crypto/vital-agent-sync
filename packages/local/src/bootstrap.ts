@@ -28,8 +28,8 @@ export const BOOTSTRAP_STAGES = [
   "agent_configured",
   "service_installed",
   "service_started",
-  "mcp_verified",
   "onboarding_created",
+  "mcp_verified",
   "first_sync_observed",
   "complete"
 ] as const;
@@ -132,7 +132,7 @@ export type BootstrapWorkflowActions = {
 const bootstrapConfigSchema = z.object({
   agent_id: z.enum(["generic", "hermes", "openclaw", "workbuddy"]),
   transport_id: z.enum(["lan", "tailscale", "cloudflare", "ngrok", "public_https", "relay", "self_hosted_relay"]),
-  service_manager: z.enum(["auto", "launchd", "systemd", "manual"]),
+  service_manager: z.enum(["auto", "launchd", "systemd", "session", "manual"]),
   service_mode: z.enum(["receiver", "relay_pull"]),
   host: z.string().min(1),
   port: z.number().int().positive(),
@@ -183,6 +183,9 @@ export function buildBootstrapPlan(config: BootstrapConfig): BootstrapPlanItem[]
         : "~/.workbuddy/mcp.json")}`
       : `configure ${config.agent_id} MCP`;
   const serviceLabel = config.service_mode === "relay_pull" ? "relay-pull" : "receiver";
+  const serviceDescription = config.service_manager === "session"
+    ? `Start the ${serviceLabel} as a WorkBuddy-managed Local Preview process (it may stop when WorkBuddy exits)`
+    : `Install and start the ${serviceLabel} service with ${config.service_manager}`;
   return [
     {
       id: "initialize_runtime",
@@ -200,20 +203,22 @@ export function buildBootstrapPlan(config: BootstrapConfig): BootstrapPlanItem[]
     },
     {
       id: "install_service",
-      description: `Install and start the ${serviceLabel} service with ${config.service_manager}`,
+      description: serviceDescription,
+      persistent_change: true
+    },
+    {
+      id: "create_onboarding",
+      description: config.transport_id === "lan"
+        ? "Create one local credential-bearing onboarding action; the Mac listens on the trusted LAN and the browser page stays on loopback"
+        : "Create one local credential-bearing onboarding action for the Vital Agent app",
       persistent_change: true
     },
     {
       id: "verify_mcp",
       description: config.agent_id === "workbuddy"
-        ? "Wait for explicit WorkBuddy MCP approval and verify the native vital_agent_status tool after reload"
+        ? "Wait for explicit WorkBuddy MCP approval before any health data is read"
         : `Verify that ${config.agent_id} can load the native Vital Agent Sync MCP tools`,
       persistent_change: false
-    },
-    {
-      id: "create_onboarding",
-      description: "Create one local credential-bearing onboarding action for the Vital Agent app",
-      persistent_change: true
     },
     {
       id: "verify_first_sync",
@@ -331,19 +336,6 @@ export async function runBootstrapWorkflow(
     state = markBootstrapStage(state, stage, { ...options, status: "running" });
   }
 
-  if (!bootstrapStageComplete(state, "mcp_verified")) {
-    if (!await actions.mcp_verified()) {
-      return writeBootstrapState({
-        ...state,
-        status: "awaiting_mcp_approval",
-        current_stage: "service_started",
-        last_error_code: undefined,
-        last_error_message: undefined
-      }, options);
-    }
-    state = markBootstrapStage(state, "mcp_verified", { ...options, status: "running" });
-  }
-
   if (!bootstrapStageComplete(state, "onboarding_created")) {
     const artifact = await actions.onboarding_created();
     state = writeBootstrapState({
@@ -353,6 +345,19 @@ export async function runBootstrapWorkflow(
       completed_stages: [...state.completed_stages, "onboarding_created"],
       onboarding_url: artifact.onboarding_url
     }, options);
+  }
+
+  if (!bootstrapStageComplete(state, "mcp_verified")) {
+    if (!await actions.mcp_verified()) {
+      return writeBootstrapState({
+        ...state,
+        status: "awaiting_mcp_approval",
+        current_stage: "onboarding_created",
+        last_error_code: undefined,
+        last_error_message: undefined
+      }, options);
+    }
+    state = markBootstrapStage(state, "mcp_verified", { ...options, status: "running" });
   }
 
   if (await actions.first_sync_observed()) {
@@ -412,7 +417,7 @@ export function classifyBootstrapError(error: unknown): string {
   if (/another vital-agent-sync setup/i.test(message)) return "setup_locked";
   if (/consent|--yes/i.test(message)) return "consent_required";
   if (/receiver identity conflict|legacy.*installation|database identity/i.test(message)) return "receiver_identity_conflict";
-  if (/launchctl|systemctl|service manager/i.test(message)) return "service_manager_failed";
+  if (/launchctl|systemctl|service manager|session receiver/i.test(message)) return "service_manager_failed";
   if (/relay.*url|https/i.test(message)) return "relay_url_invalid";
   if (/service.*ready|not reachable|connection/i.test(message)) return "service_unreachable";
   if (/agent|mcp|config/i.test(message)) return "agent_configuration_failed";

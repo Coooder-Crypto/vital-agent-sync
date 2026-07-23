@@ -15,10 +15,9 @@ No Agent-specific path may skip an earlier product phase by creating a second in
 ```text
 Ask an Agent to install Vital Agent Sync
   -> install a pinned vitalmcp package without sudo
-  -> explain the planned persistent changes
-  -> wait for explicit consent
+  -> explain the complete install plan and wait for one explicit consent
   -> configure the Agent's local MCP entry
-  -> start one verified receiver service
+  -> start one verified receiver (WorkBuddy-managed for Local Preview)
   -> open a short-lived QR in the user's local browser
   -> pair and sync a physical iPhone
   -> verify status and freshness through native MCP tools
@@ -47,7 +46,7 @@ The runtime owns:
 - receiver and database identity verification;
 - user-only state and keys;
 - Agent config backup and mutation;
-- one `launchd` or `systemd --user` receiver;
+- one WorkBuddy-managed Local Preview, `launchd`, or `systemd --user` receiver;
 - LAN or Tailscale transport configuration;
 - short-lived pairing state;
 - first-sync observation and MCP freshness status.
@@ -75,8 +74,9 @@ detect
   -> consent
   -> initialize user-owned state
   -> configure Agent MCP
-  -> install and start verified service
+  -> start a verified WorkBuddy-managed Local Preview or platform service
   -> create loopback onboarding page
+  -> wait for explicit MCP approval before any health read
   -> wait for physical-iPhone sync
   -> verify native MCP and freshness
   -> ready
@@ -89,13 +89,13 @@ Re-running setup continues from the first incomplete stage. It does not silently
 Agent integrations use:
 
 ```bash
-vitalmcp setup --agent <agent> --transport <lan|tailscale> --output json
+vitalmcp setup --agent <agent> --transport <lan|tailscale> --yes --output json
 vitalmcp setup --resume --yes --output json
 vitalmcp status --output json
 vitalmcp doctor --agent <agent> --transport <lan|tailscale>
 ```
 
-Safe output may include product version, setup stage, service state, receiver identity, database identity, non-secret address, sync count, last-sync time, and stable error codes. It never includes keys, tokens, QR contents, onboarding URLs, health values, raw database rows, or full Agent configuration.
+Safe output may include product version, setup stage, service state, receiver identity, database identity, non-secret address, the loopback-only pairing-page URL, sync count, last-sync time, and stable error codes. It never includes keys, tokens, QR contents, deep links, pairing codes, health values, raw database rows, or full Agent configuration.
 
 ## WorkBuddy Local contract
 
@@ -104,9 +104,11 @@ The WorkBuddy Skill is the reference product experience:
 - install the pinned package under `~/.vitalmcp/npm-global`;
 - use the same absolute CLI path throughout installation;
 - preserve and back up `~/.workbuddy/mcp.json`;
+- request one confirmation for the complete first-install plan;
+- use a WorkBuddy-managed Local Preview receiver so first pairing never requires Terminal;
 - stop on `receiver_identity_conflict` or `service_manager_failed`;
 - open the loopback pairing page on the Mac;
-- wait for WorkBuddy native MCP tools to load;
+- allow pairing-page display before MCP approval, but wait for WorkBuddy native MCP tools before any health read;
 - call `vital_agent_status` before any health context;
 - show the model privacy disclosure and wait for confirmation before the first health read.
 

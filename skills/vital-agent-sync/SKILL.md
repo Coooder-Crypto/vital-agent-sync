@@ -13,18 +13,19 @@ Vital Agent Sync 是用户控制的数据网关，不是医疗服务。不得诊
 
 当 Skill 刚安装，或用户要求安装、连接、显示二维码时，主动开始下面的流程。不要让用户自己寻找终端命令。
 
-1. 说明将发生的持久化改动：
-   - 将固定版本 `vitalmcp@0.5.2` 安装到用户目录 `~/.vitalmcp/npm-global`；
+1. 一次性说明并请求确认以下改动：
+   - 将固定版本 `vitalmcp@0.5.3` 安装到用户目录 `~/.vitalmcp/npm-global`；
    - 在本机创建 `~/.vital-agent-sync` 私有状态和 SQLite 数据库；
    - 将 `vital-agent-sync` MCP 合并到 `~/.workbuddy/mcp.json`；
-   - 安装并启动本地接收服务；
+   - 在当前 WorkBuddy 会话中启动局域网接收进程；该 Local Preview 进程可能在 WorkBuddy 退出后停止；
    - 创建一个短时有效的 iPhone 配对页面。
-2. 请求用户批准安装运行时。不得使用 `sudo`，不得安装未固定版本。
-3. 获得批准后运行：
+2. 同时明确：Mac 将在 `0.0.0.0:8787` 接收同一可信局域网内的 iPhone 请求；本机浏览器通过 `127.0.0.1` 显示私密二维码，二维码内部使用 iPhone 可达的 Mac 局域网地址。
+3. 这是首次配对前唯一一次安装确认。用户确认后不得再生成第二份计划或再次询问是否执行，直接运行：
 
    ```bash
-   npm install --global --prefix "$HOME/.vitalmcp/npm-global" vitalmcp@0.5.2
+   npm install --global --prefix "$HOME/.vitalmcp/npm-global" vitalmcp@0.5.3
    "$HOME/.vitalmcp/npm-global/bin/vitalmcp" --version
+   "$HOME/.vitalmcp/npm-global/bin/vitalmcp" setup --transport lan --agent workbuddy --yes --output json
    ```
 
 4. 如果 Node.js 或 npm 不存在，停止并请用户先通过 WorkBuddy 的运行环境设置安装 Node.js 22 或更新版本。安装后的 launcher 会固定本次 setup 使用的 Node 路径和原生模块 ABI；不得改用系统 Node 运行内部 CLI 文件。
@@ -41,39 +42,29 @@ Vital Agent Sync 是用户控制的数据网关，不是医疗服务。不得诊
 不要在同一次安装中切换到裸 `vitalmcp`、未固定的 `npx` 或仓库源码。
 Skill 只编排上述固定运行时。不得用 Python、SQLite 客户端、`nohup`、`screen` 或自制脚本实现第二套安装、迁移、查询或后台服务。
 
-### 1. 生成可审阅计划
+### 1. 单次确认后执行
 
-运行以下命令，不得添加 `--yes`：
-
-```bash
-"$HOME/.vitalmcp/npm-global/bin/vitalmcp" setup --transport lan --agent workbuddy --output json
-```
-
-只概括返回的 `plan` 和持久化改动，不展示或推断任何被隐藏的字段。明确说明 iPhone 与 Mac 需要位于可互相访问的可信局域网，然后请求用户确认执行。
+安装确认必须同时覆盖 npm 运行时和 CLI 返回的持久化计划。不得在 npm 安装后再次请求确认。CLI 使用 `--yes` 是因为用户已经批准了上面的完整改动清单；不得把 `--yes` 用于清单之外的删除、迁移、密钥轮换或网络模式切换。
 
 如果命令返回 `receiver_identity_conflict`，说明端口上存在旧版或无法验证的接收端，然后停止。不得停止旧进程、迁移 `~/.healthlink`、复制 SQLite、删除 plist 或改用另一个端口；先让用户选择保留旧版、备份后迁移，或明确指定新端口重新配对。
 
-### 2. 执行计划并处理系统边界
-
-只有用户明确确认后才能运行：
-
-```bash
-"$HOME/.vitalmcp/npm-global/bin/vitalmcp" setup --resume --yes --output json
-```
+### 2. 显示本地二维码并处理 MCP 审批
 
 严格按返回的 `next_action.type` 继续：
 
-- `activate_service`：WorkBuddy 沙箱不能调用用户级 `launchctl bootstrap`。把返回的单条 `next_action.command` 原样交给用户，请用户在 macOS Terminal 中执行，然后等待用户返回。不得在 WorkBuddy 内重试，不得使用 `sudo`，不得递归删除 quarantine 属性。
-- `approve_mcp`：告诉用户在 WorkBuddy MCP 设置中审批并启用 `vital-agent-sync`，随后重启或重载 WorkBuddy。不得读取或修改 `~/.workbuddy/mcp-approvals.json`。新任务中必须先确认原生 `vital_agent_status` 工具可见并成功调用，之后才能运行返回的带 `--mcp-verified` 恢复命令。
-- `sync_ios`：只有 launchd 已加载且 WorkBuddy MCP 已审批、重载并验证后，才显示本地配对页面。
+- `activate_service`：默认 WorkBuddy Local Preview 不应返回此状态。不要把 Terminal 命令交给普通用户；说明运行时未切换到会话托管模式并停止，交由产品故障排查。
+- `approve_mcp`：如果同时返回 `next_action.url`，立即打开本地配对页面，不要让 MCP 审批阻塞二维码。随后引导用户在 WorkBuddy MCP 设置中信任 `vital-agent-sync`；批准只影响后续健康数据读取，不影响本机二维码显示。不得读取或修改 WorkBuddy 的审批存储。
+- `sync_ios`：立即打开返回的本地配对页面。
 
-当 `next_action.type` 为 `sync_ios` 时：
+当返回任何 `next_action.url` 时：
 
-1. 只使用返回的 `next_action.url`。它应当是本机 `127.0.0.1` 配对页面。
+1. 只使用返回的 `next_action.url`。浏览器页面应当是本机 `127.0.0.1`；这不等于 iPhone 的连接地址，二维码内部必须使用 Mac 的局域网地址。
 2. 在 macOS 上用 `open <next_action.url>` 打开该本地页面，并同时给用户一个可点击的本地链接。
 3. 告诉用户：页面会显示二维码；在 Vital Agent iOS App 中扫码、授权需要的 Apple Health 项目，然后执行“立即同步”。
 4. 不得读取、截图、上传或转述页面里的二维码、深链、配对码及完整凭据。二维码只能在用户本机浏览器与 iPhone 之间传递。
 5. 如果过期，运行 `"$HOME/.vitalmcp/npm-global/bin/vitalmcp" pair` 创建新的本地二维码。
+
+WorkBuddy 重启或重载后，只要原生 `vital_agent_status` 已可调用，就立即执行返回的带 `--mcp-verified` 恢复命令，不再要求用户发送第二句安装指令或再次确认。MCP 未经批准前不得读取健康数据，也不得用 SQLite、CLI 查询或手写 MCP 协议绕过审批。
 
 ### 3. 验证首次同步
 
@@ -125,7 +116,7 @@ Skill 只编排上述固定运行时。不得用 Python、SQLite 客户端、`no
 - 若 `vital-agent-sync` MCP 为红色，检查 `~/.workbuddy/mcp.json` 是否为有效 JSON，以及其中的 Node 和 CLI 绝对路径是否存在。
 - 若二维码在 iPhone 上不可达，确认 Mac 与 iPhone 在同一可信局域网，且配对地址不是面向 iPhone 的 `localhost`。
 - 若 CLI 返回 `receiver_identity_conflict`，只展示脱敏诊断和官方下一步，不读取或迁移旧数据库。
-- 若 CLI 返回 `service_activation_required`，只交付返回的 Terminal 命令并等待；若返回其他 `service_manager_failed` 或 `launchctl` 错误，停止并展示错误。不得修改 `.zprofile`、`.zshrc`、登录项或 LaunchAgent 文件，不得使用 `nohup`、`screen`、Python `Popen` 等方式绕过正式服务管理器。
+- 若默认 WorkBuddy 流程返回 `service_activation_required`，停止并报告会话托管模式未生效，不要要求普通用户打开 Terminal。不得修改 `.zprofile`、`.zshrc`、登录项或 LaunchAgent 文件，不得使用 `nohup`、`screen`、Python `Popen` 等方式绕过官方运行时。
 - 不得对 WorkBuddy、Node 或 npm 目录执行递归 `xattr`、`chmod` 或 `chown`，不得编辑 MCP 审批存储来伪造授权。
 - 不得自动执行停止旧服务、删除、重置、数据迁移、密钥轮换或设备撤销。
 - 移除或升级 Skill 不得删除 `~/.vital-agent-sync`、本地历史、运行时身份、服务或 MCP 配置。
