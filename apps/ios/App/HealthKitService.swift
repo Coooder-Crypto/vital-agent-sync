@@ -2,6 +2,8 @@ import Foundation
 import HealthKit
 
 final class HealthKitService: @unchecked Sendable {
+    private static let maxConcurrentQuantityQueries = 4
+
     private let store = HKHealthStore()
     private let calendar = Calendar.current
 
@@ -174,7 +176,12 @@ final class HealthKitService: @unchecked Sendable {
         to end: Date
     ) async throws -> [QuantityMetric: [Date: Double]] {
         try await withThrowingTaskGroup(of: (QuantityMetric, [Date: Double]).self) { group in
-            for metric in QuantityMetric.allCases {
+            var remainingMetrics = ArraySlice(QuantityMetric.allCases)
+
+            func enqueueNextMetric() {
+                guard let metric = remainingMetrics.popFirst() else {
+                    return
+                }
                 group.addTask {
                     (
                         metric,
@@ -187,9 +194,14 @@ final class HealthKitService: @unchecked Sendable {
                 }
             }
 
+            for _ in 0..<min(Self.maxConcurrentQuantityQueries, remainingMetrics.count) {
+                enqueueNextMetric()
+            }
+
             var values: [QuantityMetric: [Date: Double]] = [:]
             for try await (metric, dailyValues) in group {
                 values[metric] = dailyValues
+                enqueueNextMetric()
             }
             return values
         }
@@ -211,6 +223,8 @@ final class HealthKitService: @unchecked Sendable {
         )
         var interval = DateComponents()
         interval.day = 1
+        let healthStore = store
+        let calendar = calendar
 
         return try await withCheckedThrowingContinuation { continuation in
             let query = HKStatisticsCollectionQuery(
@@ -220,7 +234,10 @@ final class HealthKitService: @unchecked Sendable {
                 anchorDate: start,
                 intervalComponents: interval
             )
-            query.initialResultsHandler = { _, collection, error in
+            query.initialResultsHandler = { query, collection, error in
+                // Collection queries stay registered until explicitly stopped.
+                defer { healthStore.stop(query) }
+
                 if let error {
                     if Self.isNoDataError(error) {
                         continuation.resume(returning: [:])
@@ -238,12 +255,12 @@ final class HealthKitService: @unchecked Sendable {
                     guard let quantity = metric.quantity(from: statistics) else {
                         return
                     }
-                    let day = self.calendar.startOfDay(for: statistics.startDate)
+                    let day = calendar.startOfDay(for: statistics.startDate)
                     values[day] = quantity.doubleValue(for: metric.unit) * metric.scale
                 }
                 continuation.resume(returning: values)
             }
-            store.execute(query)
+            healthStore.execute(query)
         }
     }
 
