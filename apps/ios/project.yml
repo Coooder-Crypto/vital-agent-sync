@@ -68,3 +68,11 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.vitalmcp.ios.tests
         GENERATE_INFOPLIST_FILE: "YES"
+schemes:
+  VitalAgentSync-NoDebugger:
+    build:
+      targets:
+        VitalAgentSync: run
+    run:
+      config: Debug
+      debugEnabled: false

@@ -20,6 +20,12 @@ open VitalAgentSync.xcodeproj
 
 For a physical-device build, select your Apple Developer Team, use a unique bundle identifier, and keep the HealthKit capability enabled. Signing certificates, provisioning profiles, and App Store Connect credentials must never be committed.
 
+If Xcode reports that launching is taking longer than expected because LLDB is
+reading device memory to resolve symbols, stop that run and select the
+`VitalAgentSync-NoDebugger` scheme. It builds and installs the same Debug app
+without attaching LLDB. Switch back to `VitalAgentSync` when breakpoints are
+needed.
+
 ## Test
 
 Run the simulator suite from the repository root:
