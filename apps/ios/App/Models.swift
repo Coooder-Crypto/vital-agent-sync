@@ -42,6 +42,70 @@ struct DailyHealthSummary: Codable, Identifiable {
     let workouts: [WorkoutSummary]
 }
 
+struct SyncProgress: Equatable {
+    let completedDays: Int
+    let totalDays: Int?
+    let currentDateRange: String?
+
+    var fractionCompleted: Double? {
+        guard let totalDays, totalDays > 0 else {
+            return nil
+        }
+        return min(1, Double(completedDays) / Double(totalDays))
+    }
+}
+
+enum SyncDatePlanner {
+    static let uploadBatchSize = 14
+
+    static func recentDates(
+        dayCount: Int,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> [Date] {
+        let today = calendar.startOfDay(for: now)
+        return stride(from: max(1, dayCount) - 1, through: 0, by: -1).compactMap {
+            calendar.date(byAdding: .day, value: -$0, to: today)
+        }
+    }
+
+    static func allDates(
+        startingAt earliestDate: Date,
+        through now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> [Date] {
+        let firstDay = calendar.startOfDay(for: min(earliestDate, now))
+        let today = calendar.startOfDay(for: now)
+        guard let dayCount = calendar.dateComponents([.day], from: firstDay, to: today).day else {
+            return [today]
+        }
+        return (0...max(0, dayCount)).compactMap {
+            calendar.date(byAdding: .day, value: $0, to: firstDay)
+        }
+    }
+
+    static func batches<Element>(
+        _ values: [Element],
+        size: Int = uploadBatchSize
+    ) -> [[Element]] {
+        guard size > 0 else {
+            return values.isEmpty ? [] : [values]
+        }
+        return stride(from: 0, to: values.count, by: size).map {
+            Array(values[$0..<min($0 + size, values.count)])
+        }
+    }
+
+    static func dateRangeDescription(_ dates: [Date]) -> String? {
+        guard let first = dates.first, let last = dates.last else {
+            return nil
+        }
+        let start = DateFormatter.gatewayDate.string(from: first)
+        let end = DateFormatter.gatewayDate.string(from: last)
+        return start == end ? start : "\(start) - \(end)"
+    }
+}
+
 struct SyncStatus: Codable {
     var lastHealthSyncAt: Date?
     var lastError: String?

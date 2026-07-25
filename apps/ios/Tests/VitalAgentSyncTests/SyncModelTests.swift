@@ -60,4 +60,61 @@ final class SyncModelTests: XCTestCase {
         XCTAssertNil(detail.acceptedSyncID)
         XCTAssertEqual(detail.failureCategory?.rawValue, SyncFailureCategory.networkUnavailable.rawValue)
     }
+
+    func testRecentDatePlanningIncludesTodayAndYesterdayAcrossDST() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        let now = try XCTUnwrap(
+            calendar.date(from: DateComponents(year: 2026, month: 3, day: 9, hour: 12))
+        )
+
+        let dates = SyncDatePlanner.recentDates(dayCount: 2, now: now, calendar: calendar)
+
+        XCTAssertEqual(dates.count, 2)
+        XCTAssertEqual(calendar.component(.day, from: dates[0]), 8)
+        XCTAssertEqual(calendar.component(.day, from: dates[1]), 9)
+        XCTAssertEqual(dates.map { calendar.component(.hour, from: $0) }, [0, 0])
+    }
+
+    func testAllHistoryDatePlanningIncludesBothEndpoints() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Asia/Shanghai"))
+        let earliest = try XCTUnwrap(
+            calendar.date(from: DateComponents(year: 2026, month: 7, day: 1, hour: 18))
+        )
+        let now = try XCTUnwrap(
+            calendar.date(from: DateComponents(year: 2026, month: 7, day: 4, hour: 9))
+        )
+
+        let dates = SyncDatePlanner.allDates(
+            startingAt: earliest,
+            through: now,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(dates.count, 4)
+        XCTAssertEqual(calendar.component(.day, from: dates.first!), 1)
+        XCTAssertEqual(calendar.component(.day, from: dates.last!), 4)
+    }
+
+    func testUploadBatchesStayWithinFourteenDays() {
+        let batches = SyncDatePlanner.batches(Array(0..<31))
+
+        XCTAssertEqual(batches.map(\.count), [14, 14, 3])
+        XCTAssertEqual(batches.flatMap { $0 }, Array(0..<31))
+    }
+
+    func testSyncProgressFractionIsClamped() {
+        XCTAssertEqual(
+            SyncProgress(completedDays: 7, totalDays: 14, currentDateRange: nil).fractionCompleted,
+            0.5
+        )
+        XCTAssertEqual(
+            SyncProgress(completedDays: 20, totalDays: 14, currentDateRange: nil).fractionCompleted,
+            1
+        )
+        XCTAssertNil(
+            SyncProgress(completedDays: 0, totalDays: nil, currentDateRange: nil).fractionCompleted
+        )
+    }
 }

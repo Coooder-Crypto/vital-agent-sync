@@ -30,6 +30,14 @@ npm run test:ios
 
 HealthKit authorization, QR scanning, LAN/Tailscale reachability, and first sync still require a physical-device smoke test.
 
+## Sync behavior
+
+- Manual sync defaults to 30 days and offers 2, 7, 14, 30, 90 days, or all available history.
+- All-history sync discovers the earliest readable HealthKit sample, builds daily summaries, and uploads them in 14-day batches.
+- All-history sync runs only as an explicit foreground action. The Home screen shows progress and allows cancellation.
+- Automatic and Agent-triggered deep-link syncs always refresh today and yesterday.
+- Retrying a partial history sync is safe because the receiver upserts stable daily-summary records.
+
 ## Layout
 
 | Path | Purpose |

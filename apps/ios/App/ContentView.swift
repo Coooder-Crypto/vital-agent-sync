@@ -76,6 +76,7 @@ struct HomeView: View {
     @EnvironmentObject private var settings: GatewaySettings
     @EnvironmentObject private var sync: SyncCoordinator
     @Binding var isShowingScanner: Bool
+    @State private var isConfirmingAllHistory = false
 
     var body: some View {
         NavigationStack {
@@ -101,7 +102,9 @@ struct HomeView: View {
                             SyncRangePanel(
                                 selection: $settings.syncHistoryRange,
                                 isSyncing: sync.isSyncing,
-                                onChange: settings.saveSyncHistoryRange
+                                progress: sync.progress,
+                                onChange: settings.saveSyncHistoryRange,
+                                onCancel: sync.cancelCurrentSync
                             )
 
                             if latestSyncDate == nil {
@@ -142,6 +145,19 @@ struct HomeView: View {
             }
             .navigationTitle("Vital Agent Sync")
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $isConfirmingAllHistory) {
+                HistorySyncConfirmationView(
+                    onCancel: {
+                        isConfirmingAllHistory = false
+                    },
+                    onConfirm: {
+                        isConfirmingAllHistory = false
+                        startSelectedHistorySync()
+                    }
+                )
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+            }
         }
     }
 
@@ -167,10 +183,18 @@ struct HomeView: View {
     }
 
     private func syncSelectedHistory() {
+        if settings.syncHistoryRange == .allHistory {
+            isConfirmingAllHistory = true
+            return
+        }
+        startSelectedHistorySync()
+    }
+
+    private func startSelectedHistorySync() {
         Task {
-            await sync.sync(
+            await sync.syncHistory(
                 settings: settings,
-                daysBack: settings.syncHistoryRange.daysBack,
+                range: settings.syncHistoryRange,
                 trigger: .manual
             )
         }
@@ -196,28 +220,69 @@ struct HomeView: View {
 struct SyncRangePanel: View {
     @Binding var selection: SyncHistoryRange
     let isSyncing: Bool
+    let progress: SyncProgress?
     let onChange: () -> Void
+    let onCancel: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionTitle("Sync Range")
+            SectionTitle("Manual Sync Range")
 
-            VStack(alignment: .leading, spacing: 12) {
-                Picker("History included", selection: $selection) {
+            VStack(alignment: .leading, spacing: 14) {
+                Menu {
                     ForEach(SyncHistoryRange.allCases) { range in
-                        Text(range.title).tag(range)
+                        Button {
+                            selection = range
+                            onChange()
+                        } label: {
+                            if range == selection {
+                                Label(range.title, systemImage: "checkmark")
+                            } else {
+                                Text(range.title)
+                            }
+                        }
                     }
-                }
-                .pickerStyle(.segmented)
-                .disabled(isSyncing)
-                .onChange(of: selection) { _, _ in
-                    onChange()
-                }
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "calendar.badge.clock")
+                            .font(.headline)
+                            .foregroundStyle(GatewayStyle.primary)
+                            .frame(width: 34, height: 34)
+                            .background(GatewayStyle.primary.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
-                Text("Sync Now includes this range. The first automatic sync uses it too; later automatic syncs refresh today and yesterday.")
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("History included")
+                                .font(.footnote)
+                                .foregroundStyle(GatewayStyle.mutedText)
+
+                            Text(selection.title)
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(GatewayStyle.text)
+                        }
+
+                        Spacer(minLength: 8)
+
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(GatewayStyle.primary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(isSyncing)
+                .accessibilityLabel("History included")
+                .accessibilityValue(selection.title)
+
+                Text("Manual sync uses this range. Automatic and agent-triggered syncs refresh today and yesterday.")
                     .font(.footnote)
                     .foregroundStyle(GatewayStyle.mutedText)
                     .fixedSize(horizontal: false, vertical: true)
+
+                if isSyncing, let progress {
+                    Divider()
+                    SyncProgressView(progress: progress, onCancel: onCancel)
+                }
             }
             .padding(16)
             .background(GatewayStyle.surface)
@@ -226,6 +291,155 @@ struct SyncRangePanel: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .stroke(GatewayStyle.border, lineWidth: 1)
             )
+        }
+    }
+}
+
+private struct SyncProgressView: View {
+    let progress: SyncProgress
+    let onCancel: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let totalDays = progress.totalDays, totalDays > 0,
+               let fraction = progress.fractionCompleted {
+                ProgressView(value: fraction)
+                    .tint(GatewayStyle.primary)
+
+                HStack {
+                    Text("\(progress.completedDays) of \(totalDays) days")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(GatewayStyle.text)
+
+                    Spacer()
+
+                    Text("\(Int((fraction * 100).rounded()))%")
+                        .font(.footnote.monospacedDigit())
+                        .foregroundStyle(GatewayStyle.mutedText)
+                }
+            } else {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text("Finding earliest Health record...")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(GatewayStyle.text)
+                }
+            }
+
+            if let currentDateRange = progress.currentDateRange {
+                Label(currentDateRange, systemImage: "calendar")
+                    .font(.caption)
+                    .foregroundStyle(GatewayStyle.mutedText)
+            }
+
+            Button(role: .cancel, action: onCancel) {
+                Label("Cancel Sync", systemImage: "xmark.circle")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+        }
+    }
+}
+
+private struct HistorySyncConfirmationView: View {
+    let onCancel: () -> Void
+    let onConfirm: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 28, weight: .semibold))
+                            .foregroundStyle(GatewayStyle.primary)
+
+                        Text("Sync All Health History")
+                            .font(.title2.weight(.bold))
+                            .foregroundStyle(GatewayStyle.text)
+
+                        Text("Vital Agent Sync will find your earliest available Health record and send encrypted daily summaries to your paired Agent.")
+                            .font(.body)
+                            .foregroundStyle(GatewayStyle.mutedText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    VStack(alignment: .leading, spacing: 16) {
+                        HistorySyncFactRow(
+                            systemImage: "square.stack.3d.up",
+                            title: "Uploaded in small batches",
+                            detail: "History is processed 14 days at a time to keep each encrypted upload reliable."
+                        )
+                        HistorySyncFactRow(
+                            systemImage: "iphone",
+                            title: "Keep this app open",
+                            detail: "A long history can take several minutes. You can cancel from the Home screen."
+                        )
+                        HistorySyncFactRow(
+                            systemImage: "arrow.clockwise",
+                            title: "Safe to retry",
+                            detail: "Dates already received by your Agent are updated safely when you sync again."
+                        )
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+                .padding(.bottom, 120)
+            }
+            .background(GatewayStyle.background)
+            .safeAreaInset(edge: .bottom) {
+                VStack(spacing: 10) {
+                    Button(action: onConfirm) {
+                        Label("Sync All History", systemImage: "icloud.and.arrow.up")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(GatewayStyle.primary)
+
+                    Button("Not Now", action: onCancel)
+                        .buttonStyle(.plain)
+                        .foregroundStyle(GatewayStyle.mutedText)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
+                .background(.bar)
+            }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(action: onCancel) {
+                        Image(systemName: "xmark")
+                    }
+                    .accessibilityLabel("Close")
+                }
+            }
+        }
+    }
+}
+
+private struct HistorySyncFactRow: View {
+    let systemImage: String
+    let title: LocalizedStringKey
+    let detail: LocalizedStringKey
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(GatewayStyle.primary)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(GatewayStyle.text)
+                Text(detail)
+                    .font(.footnote)
+                    .foregroundStyle(GatewayStyle.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 }

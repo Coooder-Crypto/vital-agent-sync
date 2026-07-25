@@ -7,6 +7,7 @@ final class SyncCoordinator: ObservableObject {
     var isSyncing: Bool { state.isSyncing }
     var status: SyncStatus { state.status }
     var latestHealthSummary: DailyHealthSummary? { state.latestHealthSummary }
+    var progress: SyncProgress? { state.progress }
 
     private let healthService = HealthKitService()
     private var contextGeneration = UUID()
@@ -16,19 +17,37 @@ final class SyncCoordinator: ObservableObject {
         case automatic(reason: String)
     }
 
+    private enum SyncScope {
+        case recent(dayCount: Int)
+        case allHistory
+
+        var initialProgress: SyncProgress {
+            switch self {
+            case .recent(let dayCount):
+                return SyncProgress(
+                    completedDays: 0,
+                    totalDays: max(1, dayCount),
+                    currentDateRange: nil
+                )
+            case .allHistory:
+                return SyncProgress(completedDays: 0, totalDays: nil, currentDateRange: nil)
+            }
+        }
+    }
+
     func requestHealthAuthorization(settings: GatewaySettings? = nil) async {
         beginOperation()
         let succeeded: Bool
         do {
             do {
-                try await self.healthService.requestAuthorization()
+                try await healthService.requestAuthorization()
             } catch GatewayError.healthKitUnavailable {
                 throw GatewayError.healthKitUnavailable
             } catch {
                 throw GatewayError.healthPermissionRequired
             }
             finishOperation { state in
-                state.status.lastSuccessMessage = "Health permission request completed"
+                state.status.lastSuccessMessage = String(localized: "Health permission request completed")
             }
             succeeded = true
         } catch {
@@ -44,95 +63,39 @@ final class SyncCoordinator: ObservableObject {
     }
 
     @discardableResult
-    func sync(settings: GatewaySettings, daysBack: Int = 1, trigger: SyncTrigger = .manual) async -> Bool {
-        settings.recordSyncAttempt()
-        let syncError: String?
-        let attemptedAt = Date()
-        var attemptedContext: SyncRequestContext?
-        let operationGeneration = contextGeneration
+    func sync(
+        settings: GatewaySettings,
+        daysBack: Int = 1,
+        trigger: SyncTrigger = .manual
+    ) async -> Bool {
+        await performSync(
+            settings: settings,
+            scope: .recent(dayCount: max(1, daysBack + 1)),
+            trigger: trigger
+        )
+    }
 
-        do {
-            let context = try SyncRequestContext(settings: settings, daysBack: daysBack)
-            attemptedContext = context
-            beginOperation()
+    @discardableResult
+    func syncHistory(
+        settings: GatewaySettings,
+        range: SyncHistoryRange,
+        trigger: SyncTrigger = .manual
+    ) async -> Bool {
+        let scope = range.dayCount.map(SyncScope.recent(dayCount:)) ?? .allHistory
+        return await performSync(settings: settings, scope: scope, trigger: trigger)
+    }
 
-            let healthSummaries = try await buildHealthSummaries(context: context)
-            guard operationGeneration == contextGeneration else {
-                return false
-            }
-            let request = try makeHealthSyncRequest(healthSummaries, context: context, settings: settings)
-            let uploadResult = try await uploadHealthSyncRequest(request)
-            guard operationGeneration == contextGeneration else {
-                return false
-            }
-            let response = uploadResult.response
-            let latestSummary = healthSummaries.last
-            let syncedAt = Date()
-            let detail = LastSyncDetail(
-                attemptedAt: attemptedAt,
-                completedAt: syncedAt,
-                trigger: trigger.displayName,
-                serverURL: context.displayServerURL,
-                agentName: context.agentName,
-                requestedDateRange: context.dateRangeDescription,
-                uploadedDayCount: response.health_daily_count,
-                acceptedSyncID: response.accepted_sync_id,
-                isIdempotent: response.idempotent,
-                deliveryState: uploadResult.deliveryState,
-                failureCategory: nil,
-                failureMessage: nil
-            )
-
-            finishOperation { state in
-                if let latestSummary {
-                    state.latestHealthSummary = latestSummary
-                    state.status.lastHealthSyncAt = syncedAt
-                }
-                state.status.lastSuccessMessage = self.successMessage(
-                    response: response,
-                    trigger: trigger,
-                    deliveryState: uploadResult.deliveryState
-                )
-                state.status.lastSyncDetail = detail
-            }
-            settings.recordSyncDetail(detail)
-            syncError = nil
-        } catch {
-            guard operationGeneration == contextGeneration else {
-                return false
-            }
-            let category = Self.failureCategory(for: error)
-            let message = error.localizedDescription
-            let detail = LastSyncDetail(
-                attemptedAt: attemptedAt,
-                completedAt: nil,
-                trigger: trigger.displayName,
-                serverURL: attemptedContext?.displayServerURL ?? settings.serverURL?.absoluteString,
-                agentName: attemptedContext?.agentName ?? settings.pairedAgentName,
-                requestedDateRange: attemptedContext?.dateRangeDescription,
-                uploadedDayCount: 0,
-                acceptedSyncID: nil,
-                isIdempotent: nil,
-                deliveryState: nil,
-                failureCategory: category,
-                failureMessage: message
-            )
-            finishOperation { state in
-                state.status.lastError = message
-                state.status.lastSyncDetail = detail
-            }
-            settings.recordSyncDetail(detail)
-            syncError = self.status.lastError
+    func cancelCurrentSync() {
+        guard isSyncing else {
+            return
         }
-
-        switch trigger {
-        case .manual:
-            settings.recordManualSyncResult(success: syncError == nil, error: syncError)
-        case .automatic:
-            settings.recordAutoSyncResult(success: syncError == nil, error: syncError)
-        }
-
-        return syncError == nil
+        contextGeneration = UUID()
+        var next = state
+        next.isSyncing = false
+        next.progress = nil
+        next.status.lastError = nil
+        next.status.lastSuccessMessage = String(localized: "Sync cancelled")
+        state = next
     }
 
     func reset() {
@@ -145,39 +108,217 @@ final class SyncCoordinator: ObservableObject {
             return
         }
 
-        let daysBack = settings.latestSuccessfulSyncDetail == nil
-            ? settings.syncHistoryRange.daysBack
-            : SyncHistoryRange.twoDays.daysBack
         await sync(
             settings: settings,
-            daysBack: daysBack,
+            daysBack: 1,
             trigger: .automatic(reason: reason)
         )
     }
 
-    private func makeSyncID() -> String {
-        "sync_\(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased())"
-    }
-
-    private func buildHealthSummaries(context: SyncRequestContext) async throws -> [DailyHealthSummary] {
-        guard context.uploadHealthEnabled else {
-            return []
+    private func performSync(
+        settings: GatewaySettings,
+        scope: SyncScope,
+        trigger: SyncTrigger
+    ) async -> Bool {
+        guard !isSyncing else {
+            return false
         }
 
-        var healthSummaries: [DailyHealthSummary] = []
-        healthSummaries.reserveCapacity(context.dates.count)
+        settings.recordSyncAttempt()
+        let attemptedAt = Date()
+        let operationGeneration = UUID()
+        contextGeneration = operationGeneration
+        beginOperation(progress: scope.initialProgress)
 
-        for date in context.dates {
+        var attemptedContext: SyncRequestContext?
+        var requestedDateRange: String?
+        var uploadedDayCount = 0
+        var latestAcceptedSyncID: String?
+        var combinedIdempotent: Bool?
+        var latestDeliveryState: SyncDeliveryState?
+
+        do {
+            let context = try SyncRequestContext(settings: settings)
+            attemptedContext = context
+            let dates = try await resolveDates(
+                scope: scope,
+                uploadHealthEnabled: context.uploadHealthEnabled
+            )
+            guard isCurrent(operationGeneration) else {
+                return false
+            }
+
+            requestedDateRange = SyncDatePlanner.dateRangeDescription(dates)
+            let totalDays = context.uploadHealthEnabled ? dates.count : 0
+            updateProgress(
+                SyncProgress(
+                    completedDays: 0,
+                    totalDays: totalDays,
+                    currentDateRange: nil
+                )
+            )
+
+            let dateBatches: [[Date]] = context.uploadHealthEnabled
+                ? SyncDatePlanner.batches(dates)
+                : [[]]
+            var latestSummary: DailyHealthSummary?
+            var processedDayCount = 0
+
+            for dateBatch in dateBatches {
+                let healthSummaries = try await buildHealthSummaries(
+                    dates: dateBatch,
+                    uploadHealthEnabled: context.uploadHealthEnabled
+                )
+                guard isCurrent(operationGeneration) else {
+                    return false
+                }
+
+                updateProgress(
+                    SyncProgress(
+                        completedDays: processedDayCount,
+                        totalDays: totalDays,
+                        currentDateRange: SyncDatePlanner.dateRangeDescription(dateBatch)
+                    )
+                )
+
+                let request = try makeHealthSyncRequest(
+                    healthSummaries,
+                    context: context,
+                    settings: settings
+                )
+                let uploadResult = try await uploadHealthSyncRequest(request)
+                guard isCurrent(operationGeneration) else {
+                    return false
+                }
+
+                uploadedDayCount += uploadResult.response.health_daily_count
+                latestAcceptedSyncID = uploadResult.response.accepted_sync_id
+                latestDeliveryState = uploadResult.deliveryState
+                if let currentIdempotent = combinedIdempotent {
+                    combinedIdempotent = currentIdempotent && uploadResult.response.idempotent
+                } else {
+                    combinedIdempotent = uploadResult.response.idempotent
+                }
+                latestSummary = healthSummaries.last ?? latestSummary
+                processedDayCount += dateBatch.count
+
+                updateProgress(
+                    SyncProgress(
+                        completedDays: processedDayCount,
+                        totalDays: totalDays,
+                        currentDateRange: SyncDatePlanner.dateRangeDescription(dateBatch)
+                    )
+                )
+            }
+
+            guard let acceptedSyncID = latestAcceptedSyncID,
+                  let deliveryState = latestDeliveryState else {
+                throw SyncCoordinatorError.missingUploadResponse
+            }
+
+            let syncedAt = Date()
+            let detail = LastSyncDetail(
+                attemptedAt: attemptedAt,
+                completedAt: syncedAt,
+                trigger: trigger.displayName,
+                serverURL: context.displayServerURL,
+                agentName: context.agentName,
+                requestedDateRange: requestedDateRange,
+                uploadedDayCount: uploadedDayCount,
+                acceptedSyncID: acceptedSyncID,
+                isIdempotent: combinedIdempotent,
+                deliveryState: deliveryState,
+                failureCategory: nil,
+                failureMessage: nil
+            )
+
+            finishOperation { state in
+                if let latestSummary {
+                    state.latestHealthSummary = latestSummary
+                    state.status.lastHealthSyncAt = syncedAt
+                }
+                state.status.lastSuccessMessage = self.successMessage(
+                    count: uploadedDayCount,
+                    trigger: trigger,
+                    deliveryState: deliveryState
+                )
+                state.status.lastSyncDetail = detail
+            }
+            settings.recordSyncDetail(detail)
+            recordResult(settings: settings, trigger: trigger, success: true, error: nil)
+            return true
+        } catch {
+            guard isCurrent(operationGeneration) else {
+                return false
+            }
+
+            let category = Self.failureCategory(for: error)
+            let message = error.localizedDescription
+            let detail = LastSyncDetail(
+                attemptedAt: attemptedAt,
+                completedAt: nil,
+                trigger: trigger.displayName,
+                serverURL: attemptedContext?.displayServerURL ?? settings.serverURL?.absoluteString,
+                agentName: attemptedContext?.agentName ?? settings.pairedAgentName,
+                requestedDateRange: requestedDateRange,
+                uploadedDayCount: uploadedDayCount,
+                acceptedSyncID: nil,
+                isIdempotent: nil,
+                deliveryState: latestDeliveryState,
+                failureCategory: category,
+                failureMessage: message
+            )
+            finishOperation { state in
+                state.status.lastError = message
+                state.status.lastSyncDetail = detail
+            }
+            settings.recordSyncDetail(detail)
+            recordResult(settings: settings, trigger: trigger, success: false, error: message)
+            return false
+        }
+    }
+
+    private func resolveDates(
+        scope: SyncScope,
+        uploadHealthEnabled: Bool
+    ) async throws -> [Date] {
+        switch scope {
+        case .recent(let dayCount):
+            return SyncDatePlanner.recentDates(dayCount: dayCount)
+        case .allHistory:
+            guard uploadHealthEnabled else {
+                return SyncDatePlanner.recentDates(dayCount: 1)
+            }
             do {
-                healthSummaries.append(try await healthService.buildDailySummary(for: date))
+                let earliestDate = try await healthService.earliestAvailableSampleDate() ?? Date()
+                return SyncDatePlanner.allDates(startingAt: earliestDate)
             } catch GatewayError.healthKitUnavailable {
                 throw GatewayError.healthKitUnavailable
             } catch {
                 throw GatewayError.healthPermissionRequired
             }
         }
+    }
 
-        return healthSummaries
+    private func buildHealthSummaries(
+        dates: [Date],
+        uploadHealthEnabled: Bool
+    ) async throws -> [DailyHealthSummary] {
+        guard uploadHealthEnabled else {
+            return []
+        }
+
+        do {
+            return try await healthService.buildDailySummaries(for: dates)
+        } catch GatewayError.healthKitUnavailable {
+            throw GatewayError.healthKitUnavailable
+        } catch {
+            throw GatewayError.healthPermissionRequired
+        }
+    }
+
+    private func makeSyncID() -> String {
+        "sync_\(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased())"
     }
 
     private func makeHealthSyncRequest(
@@ -207,10 +348,10 @@ final class SyncCoordinator: ObservableObject {
                 relayAPIToken: relayOnboarding.relay_api_token,
                 envelope: envelope,
                 localResponse: HealthSyncResponse(
-                ok: true,
-                accepted_sync_id: payload.sync_id,
-                health_daily_count: payload.health_daily_summaries.count,
-                idempotent: false
+                    ok: true,
+                    accepted_sync_id: payload.sync_id,
+                    health_daily_count: payload.health_daily_summaries.count,
+                    idempotent: false
                 )
             )
         }
@@ -248,11 +389,10 @@ final class SyncCoordinator: ObservableObject {
     }
 
     private func successMessage(
-        response: HealthSyncResponse,
+        count: Int,
         trigger: SyncTrigger,
         deliveryState: SyncDeliveryState
     ) -> String {
-        let count = response.health_daily_count
         switch (trigger, deliveryState) {
         case (.manual, .receiverAccepted):
             return String.localizedStringWithFormat(
@@ -279,17 +419,43 @@ final class SyncCoordinator: ObservableObject {
         }
     }
 
-    private func beginOperation() {
+    private func recordResult(
+        settings: GatewaySettings,
+        trigger: SyncTrigger,
+        success: Bool,
+        error: String?
+    ) {
+        switch trigger {
+        case .manual:
+            settings.recordManualSyncResult(success: success, error: error)
+        case .automatic:
+            settings.recordAutoSyncResult(success: success, error: error)
+        }
+    }
+
+    private func isCurrent(_ generation: UUID) -> Bool {
+        generation == contextGeneration && !Task.isCancelled
+    }
+
+    private func beginOperation(progress: SyncProgress? = nil) {
         var next = state
         next.isSyncing = true
+        next.progress = progress
         next.status.lastError = nil
         next.status.lastSuccessMessage = nil
+        state = next
+    }
+
+    private func updateProgress(_ progress: SyncProgress) {
+        var next = state
+        next.progress = progress
         state = next
     }
 
     private func finishOperation(_ update: (inout SyncCoordinatorState) -> Void) {
         var next = state
         next.isSyncing = false
+        next.progress = nil
         update(&next)
         state = next
     }
@@ -305,6 +471,7 @@ final class SyncCoordinator: ObservableObject {
         var isSyncing = false
         var status: SyncStatus = .empty
         var latestHealthSummary: DailyHealthSummary?
+        var progress: SyncProgress?
     }
 
     private struct SyncRequestContext {
@@ -314,11 +481,10 @@ final class SyncCoordinator: ObservableObject {
         let deviceID: String
         let agentName: String?
         let uploadHealthEnabled: Bool
-        let dates: [Date]
         let relayOnboarding: RelayOnboardingPayload?
 
         @MainActor
-        init(settings: GatewaySettings, daysBack: Int) throws {
+        init(settings: GatewaySettings) throws {
             if let relayOnboarding = settings.relayOnboarding {
                 self.serverURL = URL(string: relayOnboarding.relay_url)
                 self.apiToken = nil
@@ -326,7 +492,6 @@ final class SyncCoordinator: ObservableObject {
                 self.deviceID = relayOnboarding.source_device_id
                 self.agentName = relayOnboarding.agent_name
                 self.uploadHealthEnabled = settings.uploadHealthEnabled
-                self.dates = Self.datesToSync(daysBack: daysBack)
                 self.relayOnboarding = relayOnboarding
                 return
             }
@@ -350,31 +515,11 @@ final class SyncCoordinator: ObservableObject {
             self.deviceID = deviceID
             self.agentName = settings.pairedAgentName
             self.uploadHealthEnabled = settings.uploadHealthEnabled
-            self.dates = Self.datesToSync(daysBack: daysBack)
             self.relayOnboarding = nil
-        }
-
-        var dateRangeDescription: String? {
-            guard let first = dates.first,
-                  let last = dates.last else {
-                return nil
-            }
-            let start = DateFormatter.gatewayDate.string(from: first)
-            let end = DateFormatter.gatewayDate.string(from: last)
-            return start == end ? start : "\(start) - \(end)"
         }
 
         var displayServerURL: String? {
             serverURL?.absoluteString ?? relayOnboarding?.relay_url
-        }
-
-        private static func datesToSync(daysBack: Int) -> [Date] {
-            let calendar = Calendar.current
-            let today = calendar.startOfDay(for: Date())
-            let clamped = max(0, min(daysBack, SyncHistoryRange.thirtyDays.daysBack))
-            return stride(from: clamped, through: 0, by: -1).compactMap {
-                calendar.date(byAdding: .day, value: -$0, to: today)
-            }
         }
     }
 
@@ -392,6 +537,14 @@ final class SyncCoordinator: ObservableObject {
     private struct SyncUploadResult {
         let response: HealthSyncResponse
         let deliveryState: SyncDeliveryState
+    }
+
+    private enum SyncCoordinatorError: LocalizedError {
+        case missingUploadResponse
+
+        var errorDescription: String? {
+            String(localized: "Sync completed without an upload response.")
+        }
     }
 }
 

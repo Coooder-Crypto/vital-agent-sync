@@ -62,18 +62,28 @@ final class GatewaySettingsTests: XCTestCase {
     }
 
     @MainActor
-    func testSyncHistoryRangeDefaultsToFourteenDaysAndPersists() {
+    func testSyncHistoryRangeDefaultsToThirtyDaysAndPersistsAllHistory() {
         let settings = GatewaySettings(defaults: defaults, keychain: keychain)
 
-        XCTAssertEqual(settings.syncHistoryRange, .fourteenDays)
-        XCTAssertEqual(settings.syncHistoryRange.daysBack, 13)
+        XCTAssertEqual(settings.syncHistoryRange, .thirtyDays)
+        XCTAssertEqual(settings.syncHistoryRange.dayCount, 30)
 
-        settings.syncHistoryRange = .thirtyDays
+        settings.syncHistoryRange = .allHistory
         settings.saveSyncHistoryRange()
 
         let restored = GatewaySettings(defaults: defaults, keychain: keychain)
-        XCTAssertEqual(restored.syncHistoryRange, .thirtyDays)
-        XCTAssertEqual(restored.syncHistoryRange.daysBack, 29)
+        XCTAssertEqual(restored.syncHistoryRange, .allHistory)
+        XCTAssertNil(restored.syncHistoryRange.dayCount)
+    }
+
+    @MainActor
+    func testLegacyIntegerSyncHistoryRangeMigrates() {
+        defaults.set(14, forKey: "gateway.syncHistoryRange")
+
+        let settings = GatewaySettings(defaults: defaults, keychain: keychain)
+
+        XCTAssertEqual(settings.syncHistoryRange, .fourteenDays)
+        XCTAssertEqual(settings.syncHistoryRange.dayCount, 14)
     }
 
     @MainActor

@@ -38,17 +38,48 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     }
 }
 
-enum SyncHistoryRange: Int, CaseIterable, Identifiable {
-    case twoDays = 2
-    case sevenDays = 7
-    case fourteenDays = 14
-    case thirtyDays = 30
+enum SyncHistoryRange: String, CaseIterable, Identifiable {
+    case twoDays
+    case sevenDays
+    case fourteenDays
+    case thirtyDays
+    case ninetyDays
+    case allHistory
 
-    var id: Int { rawValue }
-    var daysBack: Int { rawValue - 1 }
+    var id: String { rawValue }
+
+    var dayCount: Int? {
+        switch self {
+        case .twoDays:
+            return 2
+        case .sevenDays:
+            return 7
+        case .fourteenDays:
+            return 14
+        case .thirtyDays:
+            return 30
+        case .ninetyDays:
+            return 90
+        case .allHistory:
+            return nil
+        }
+    }
 
     var title: String {
-        NSLocalizedString("\(rawValue) days", comment: "Number of Health history days to sync")
+        switch self {
+        case .twoDays:
+            return NSLocalizedString("2 days", comment: "Number of Health history days to sync")
+        case .sevenDays:
+            return NSLocalizedString("7 days", comment: "Number of Health history days to sync")
+        case .fourteenDays:
+            return NSLocalizedString("14 days", comment: "Number of Health history days to sync")
+        case .thirtyDays:
+            return NSLocalizedString("30 days", comment: "Number of Health history days to sync")
+        case .ninetyDays:
+            return NSLocalizedString("90 days", comment: "Number of Health history days to sync")
+        case .allHistory:
+            return NSLocalizedString("All history", comment: "All available Health history")
+        }
     }
 }
 
@@ -125,8 +156,7 @@ final class GatewaySettings: ObservableObject {
         self.directTransportPublicKey = defaults.string(forKey: Keys.directTransportPublicKey)
         self.acceptedScopes = defaults.stringArray(forKey: Keys.acceptedScopes) ?? Self.defaultAcceptedScopes
         self.uploadHealthEnabled = defaults.object(forKey: Keys.uploadHealthEnabled) as? Bool ?? true
-        self.syncHistoryRange = SyncHistoryRange(rawValue: defaults.integer(forKey: Keys.syncHistoryRange))
-            ?? .fourteenDays
+        self.syncHistoryRange = Self.loadSyncHistoryRange(from: defaults)
         self.autoSyncEnabled = defaults.object(forKey: Keys.autoSyncEnabled) as? Bool ?? true
         let savedInterval = defaults.integer(forKey: Keys.autoSyncMinimumIntervalMinutes)
         self.autoSyncMinimumIntervalMinutes = savedInterval > 0 ? savedInterval : 30
@@ -512,6 +542,27 @@ final class GatewaySettings: ObservableObject {
         try? keychain.delete(account: Keys.relayUploadAuthSecret)
         try? keychain.delete(account: Keys.relayAccessToken)
         try? keychain.delete(account: Keys.relayAPIToken)
+    }
+
+    private static func loadSyncHistoryRange(from defaults: UserDefaults) -> SyncHistoryRange {
+        if let rawValue = defaults.string(forKey: Keys.syncHistoryRange),
+           let range = SyncHistoryRange(rawValue: rawValue) {
+            return range
+        }
+
+        let legacyDays = (defaults.object(forKey: Keys.syncHistoryRange) as? NSNumber)?.intValue
+        switch legacyDays {
+        case 2:
+            return .twoDays
+        case 7:
+            return .sevenDays
+        case 14:
+            return .fourteenDays
+        case 30:
+            return .thirtyDays
+        default:
+            return .thirtyDays
+        }
     }
 
     private static func loadSyncHistory(from defaults: UserDefaults) -> [LastSyncDetail] {
