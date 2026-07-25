@@ -47,7 +47,7 @@ struct ContentView: View {
                         let paired = await settings.confirmPairing(preview)
                         if paired {
                             sync.reset()
-                            await sync.attemptAutoSync(settings: settings, reason: "pairing")
+                            await sync.syncConfiguredHistory(settings: settings, reason: "pairing")
                         }
                     }
                 }
@@ -64,7 +64,12 @@ struct ContentView: View {
                     let paired = settings.confirmRelayOnboarding(preview)
                     if paired {
                         sync.reset()
-                        Task { await sync.attemptAutoSync(settings: settings, reason: "relay_onboarding") }
+                        Task {
+                            await sync.syncConfiguredHistory(
+                                settings: settings,
+                                reason: "relay_onboarding"
+                            )
+                        }
                     }
                 }
             )
@@ -226,7 +231,7 @@ struct SyncRangePanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionTitle("Manual Sync Range")
+            SectionTitle("Sync Range")
 
             VStack(alignment: .leading, spacing: 14) {
                 Menu {
@@ -274,7 +279,7 @@ struct SyncRangePanel: View {
                 .accessibilityLabel("History included")
                 .accessibilityValue(selection.title)
 
-                Text("Manual sync uses this range. Automatic and agent-triggered syncs refresh today and yesterday.")
+                Text("Manual and agent-triggered syncs use this range. Background refreshes today and yesterday.")
                     .font(.footnote)
                     .foregroundStyle(GatewayStyle.mutedText)
                     .fixedSize(horizontal: false, vertical: true)

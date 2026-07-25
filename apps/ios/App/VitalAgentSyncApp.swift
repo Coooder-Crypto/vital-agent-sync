@@ -19,10 +19,9 @@ struct VitalAgentSyncApp: App {
                     Task {
                         if AppDeepLinkScheme.isSupported(url.scheme), url.host?.lowercased() == "sync" {
                             let link = Self.syncDeepLink(from: url)
-                            let succeeded = await syncCoordinator.sync(
+                            let succeeded = await syncCoordinator.syncConfiguredHistory(
                                 settings: settings,
-                                daysBack: 1,
-                                trigger: .automatic(reason: "deep_link")
+                                reason: "deep_link"
                             )
                             openSafeCallback(link.callbackURL, requestID: link.requestID, status: succeeded ? "ok" : "failed")
                             return

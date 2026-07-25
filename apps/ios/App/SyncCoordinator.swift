@@ -58,7 +58,7 @@ final class SyncCoordinator: ObservableObject {
         }
 
         if succeeded, let settings {
-            await attemptAutoSync(settings: settings, reason: "health_permission")
+            await syncConfiguredHistory(settings: settings, reason: "health_permission")
         }
     }
 
@@ -83,6 +83,15 @@ final class SyncCoordinator: ObservableObject {
     ) async -> Bool {
         let scope = range.dayCount.map(SyncScope.recent(dayCount:)) ?? .allHistory
         return await performSync(settings: settings, scope: scope, trigger: trigger)
+    }
+
+    @discardableResult
+    func syncConfiguredHistory(settings: GatewaySettings, reason: String) async -> Bool {
+        await syncHistory(
+            settings: settings,
+            range: settings.syncHistoryRange,
+            trigger: .automatic(reason: reason)
+        )
     }
 
     func cancelCurrentSync() {
