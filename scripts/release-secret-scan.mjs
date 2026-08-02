@@ -61,6 +61,9 @@ for (const relativePath of listFiles()) {
     if (containsLiteralVitalAgentSecret(line)) {
       findings.push({ rule: "vital-agent-sync-secret-literal", path: normalizedPath, line: index + 1 });
     }
+    if (containsAppleDevelopmentTeam(normalizedPath, line)) {
+      findings.push({ rule: "apple-development-team-id", path: normalizedPath, line: index + 1 });
+    }
   }
 }
 
@@ -244,6 +247,15 @@ function containsLiteralVitalAgentSecret(line) {
   return /[A-Za-z]/.test(value) && /[0-9_-]/.test(value);
 }
 
+function containsAppleDevelopmentTeam(path, line) {
+  if (!path.endsWith(".xcodeproj/project.pbxproj")) {
+    return false;
+  }
+  const match = /\bDEVELOPMENT_TEAM\s*=\s*([^;]*);/.exec(line);
+  const value = match?.[1].trim();
+  return Boolean(value && value !== "\"\"" && value !== "''");
+}
+
 function isClearlyNonSecret(value) {
   return /(?:\$\{|process\.env|<[^>]+>|replace|example|placeholder|changeme|dummy|fixture|local[-_ ]?audit|test[-_ ])/i.test(value);
 }
@@ -276,5 +288,11 @@ function runSelfTest() {
       classifySensitivePath("tmp/health.sqlite") !== "sensitive-artifact-file" ||
       classifySensitivePath(".vital-agent-sync/secrets/private.key") !== "sensitive-artifact-file") {
     throw new Error("Secret scan self-test failed for sensitive file paths.");
+  }
+  if (!containsAppleDevelopmentTeam("apps/ios/VitalAgentSync.xcodeproj/project.pbxproj", "DEVELOPMENT_TEAM = ABC123XYZ;")) {
+    throw new Error("Secret scan self-test failed for an Apple development team identifier.");
+  }
+  if (containsAppleDevelopmentTeam("apps/ios/VitalAgentSync.xcodeproj/project.pbxproj", "DEVELOPMENT_TEAM = \"\";")) {
+    throw new Error("Secret scan self-test incorrectly rejected an empty Apple development team identifier.");
   }
 }

@@ -9,13 +9,22 @@ The project coordinates preview releases across the iOS app, `vitalmcp` runtime,
 ### Added
 
 - Open-source license, security policy, contribution guide, support policy, and repository templates.
+- MIT license text in the published `vitalmcp` package, enforced by the npm release preflight.
+- A release audit guard that rejects Apple Developer Team identifiers in shared Xcode projects.
 - Full-repository and Git-history secret scanning for the public release gate.
 
 ### Changed
 
+- Synchronized the English, Simplified Chinese, and npm package documentation with the `0.5.3` Local Preview flow.
+- Expanded the open-source release gate into a reviewable checklist covering repository settings, privacy, asset provenance, package contents, and rollback.
 - Product scope is now a strict three-phase roadmap: WorkBuddy Local, local Hermes/other Agents, then a user-owned Agent server over Tailscale.
 - Hosted relay, accounts, billing, App Store launch, public VPS, and marketing are explicitly outside the active roadmap.
 - Public documentation now leads with the current pinned npm and SkillHub release and separates current guidance from historical relay research.
+
+### Security
+
+- Updated the MCP and Hono runtime dependency paths to patched releases identified by the public-release audit.
+- Pinned the latest stable Next.js 16 release and exported the website and pitch as static artifacts, keeping their framework toolchains out of the deployed production dependency surface.
 
 ## [0.5.2] - 2026-07-19
 

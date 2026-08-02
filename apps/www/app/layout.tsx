@@ -4,31 +4,94 @@ import { GeistSans } from "geist/font/sans";
 import "lenis/dist/lenis.css";
 import appIcon from "../../ios/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png";
 import "./globals.css";
-
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+import { githubUrl, npmUrl, productSummary, siteUrl, skillHubUrl } from "./site-config";
 
 export const metadata: Metadata = {
-  title: "Vital Agent Sync | Private Apple Health context for AI agents",
-  description:
-    "Run Vital Agent Sync on your machine, pair over trusted LAN, and optionally use your own Tailscale network for private remote access.",
+  title: {
+    default: "Vital Agent Sync | Private Apple Health context for AI agents",
+    template: "%s | Vital Agent Sync",
+  },
+  description: productSummary,
+  applicationName: "Vital Agent Sync",
+  category: "technology",
+  keywords: [
+    "Apple Health",
+    "HealthKit",
+    "AI agent",
+    "MCP",
+    "Model Context Protocol",
+    "local-first",
+    "personal context",
+    "context scaling",
+    "WorkBuddy",
+  ],
   metadataBase: new URL(siteUrl),
+  alternates: {
+    canonical: "/",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
   icons: {
     icon: [{ url: appIcon.src, type: "image/png", sizes: "1024x1024" }],
     apple: [{ url: appIcon.src, type: "image/png", sizes: "1024x1024" }],
   },
   openGraph: {
     title: "Vital Agent Sync | Apple Health context. Private by design.",
-    description:
-      "Fresh, scoped Apple Health context for your AI agent through a user-owned LAN or Tailscale receiver.",
+    description: productSummary,
     type: "website",
+    url: "/",
+    siteName: "Vital Agent Sync",
     images: [{ url: "/og.png", width: 1730, height: 909, alt: "Vital Agent Sync private Apple Health context" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Vital Agent Sync | Apple Health context. Private by design.",
-    description: "Fresh, scoped Apple Health context for your AI agent.",
+    description: productSummary,
     images: ["/og.png"],
   },
+};
+
+const structuredData = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": `${siteUrl}/#website`,
+      url: siteUrl,
+      name: "Vital Agent Sync",
+      description: productSummary,
+      inLanguage: "en",
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": `${siteUrl}/#software`,
+      name: "Vital Agent Sync",
+      url: siteUrl,
+      description: productSummary,
+      applicationCategory: "HealthApplication",
+      operatingSystem: "iOS and macOS",
+      isAccessibleForFree: true,
+      license: `${githubUrl}/blob/main/LICENSE`,
+      downloadUrl: npmUrl,
+      sameAs: [githubUrl, skillHubUrl, npmUrl],
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "USD",
+      },
+      featureList: [
+        "User-authorized Apple Health summaries",
+        "Encrypted iPhone pairing and sync",
+        "User-controlled local SQLite receiver",
+        "Scoped Model Context Protocol tools",
+        "Freshness and source metadata",
+        "Revocable source-device access",
+        "Trusted LAN and optional user-managed Tailscale routes",
+      ],
+    },
+  ],
 };
 
 export default function RootLayout({
@@ -38,7 +101,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
-      <body>{children}</body>
+      <body>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
+        {children}
+      </body>
     </html>
   );
 }

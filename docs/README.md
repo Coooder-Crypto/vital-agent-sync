@@ -14,6 +14,7 @@
 - [Agent connection](agent-connection.md)
 - [Server contract](server-contract.md)
 - [Open-source scope](open-source-scope.md)
+- [Open-source release checklist](open-source-release-checklist.md)
 
 ## Historical and unsupported research
 

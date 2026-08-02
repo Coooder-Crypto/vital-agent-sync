@@ -104,7 +104,7 @@ function inspectPack() {
     throw new Error("npm pack reported an unexpected package or version.");
   }
   const paths = artifact.files.map((entry) => entry.path);
-  for (const required of ["README.md", "package.json", "dist/cli.js", "dist/relay-server.js"]) {
+  for (const required of ["LICENSE", "README.md", "package.json", "dist/cli.js", "dist/relay-server.js"]) {
     if (!paths.includes(required)) {
       throw new Error(`npm release artifact is missing ${required}.`);
     }

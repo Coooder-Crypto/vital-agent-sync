@@ -8,7 +8,7 @@ Vital Agent Sync 是面向个人 AI Agent 的开源 Apple Health 本地桥接器
 
 ## 当前路线
 
-`0.5.2` 是源码分发的 Local Preview，严格按以下顺序推进：
+`0.5.3` 是源码分发的 Local Preview，严格按以下顺序推进：
 
 | 阶段 | 体验 | 状态 |
 | --- | --- | --- |
@@ -22,22 +22,22 @@ Vital Agent Sync 是面向个人 AI Agent 的开源 Apple Health 本地桥接器
 
 从 [SkillHub](https://skillhub.cn/skills/vital-agent-sync) 安装 Vital Agent Sync，然后对 WorkBuddy 说：
 
-> 安装 Vital Agent Sync，使用局域网连接我的 iPhone。先说明所有持久化修改，等我确认后执行，最后在本机打开配对二维码。
+> 启动 Vital Agent Sync，通过局域网连接我的 iPhone。
 
 Skill 会：
 
-- 无 `sudo` 安装固定版本的 `vitalmcp`；
-- 修改文件、服务、网络和 MCP 配置前展示脱敏计划并等待确认；
-- 记录 setup 使用的 Node 路径与原生模块 ABI，让 Terminal、launchd 和 MCP 使用同一兼容运行时；
-- 遇到 WorkBuddy 沙箱边界时暂停，只让用户在 macOS Terminal 执行一条返回的 launchd 激活命令，不使用 `sudo`；
-- 等待用户审批 WorkBuddy MCP、重载并成功调用原生 `vital_agent_status` 后再配对；
+- 无 `sudo` 把固定版本的 `vitalmcp` 安装到用户目录；
+- 用一次安装确认覆盖固定运行时、私有状态、WorkBuddy MCP 配置、可信局域网监听和本地配对页；
+- 记录 setup 使用的 Node 路径与原生模块 ABI，让 CLI、接收端和 MCP 使用同一兼容运行时；
+- 在当前 WorkBuddy 会话中启动 Local Preview 接收端，不要求 Terminal 或 `sudo`；WorkBuddy 退出后该预览进程可能停止；
+- 在 MCP 审批前即可打开本机私有配对页，但读取健康数据前仍须明确批准 WorkBuddy MCP；
 - 只在用户本地浏览器打开包含凭据的二维码；
 - 第一次读取健康数据前说明模型隐私边界并等待确认。
 
 手动备用入口：
 
 ```bash
-npx -y vitalmcp@0.5.2 setup --agent workbuddy --transport lan
+npx -y vitalmcp@0.5.3 setup --agent workbuddy --transport lan
 ```
 
 首次同步后检查：
@@ -52,9 +52,9 @@ vitalmcp doctor --agent workbuddy --transport lan
 所有 Agent 复用同一个接收端、SQLite、setup 状态和 MCP 工具：
 
 ```bash
-npx -y vitalmcp@0.5.2 setup --agent hermes --transport lan
-npx -y vitalmcp@0.5.2 setup --agent generic --transport lan
-npx -y vitalmcp@0.5.2 setup --agent openclaw --transport lan
+npx -y vitalmcp@0.5.3 setup --agent hermes --transport lan
+npx -y vitalmcp@0.5.3 setup --agent generic --transport lan
+npx -y vitalmcp@0.5.3 setup --agent openclaw --transport lan
 ```
 
 Hermes 是第二阶段的第一优先级，通用 stdio MCP 是可移植基线，不依赖任何 Agent 市场上架。
@@ -64,7 +64,7 @@ Hermes 是第二阶段的第一优先级，通用 stdio MCP 是可移植基线�
 最后阶段让 Agent、`vitalmcp`、SQLite 和 MCP 在同一台用户服务器上运行，Tailscale 只负责 iPhone 到接收端的私有 HTTPS：
 
 ```bash
-npx -y vitalmcp@0.5.2 setup \
+npx -y vitalmcp@0.5.3 setup \
   --agent hermes \
   --manager systemd \
   --transport tailscale \
@@ -110,6 +110,6 @@ npm run test:ios
 npm run audit:oss
 ```
 
-详细文档见[文档索引](docs/README.md)。提交代码前阅读 [CONTRIBUTING.md](CONTRIBUTING.md)，安全问题通过 [SECURITY.md](SECURITY.md) 的私密渠道报告，安装问题使用 [GitHub Discussions](https://github.com/Coooder-Crypto/vital-agent-sync/discussions)。
+详细文档见[文档索引](docs/README.md)。提交代码前阅读 [CONTRIBUTING.md](CONTRIBUTING.md)，安全问题通过 [SECURITY.md](SECURITY.md) 的私密渠道报告，安装问题使用 [GitHub Discussions](https://github.com/Coooder-Crypto/vital-agent-sync/discussions)。公开仓库或发布版本前，请完成[开源发布清单](docs/open-source-release-checklist.md)。
 
 项目使用 [MIT License](LICENSE)。

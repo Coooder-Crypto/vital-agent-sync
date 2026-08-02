@@ -1,0 +1,68 @@
+# Vital Agent Sync
+
+> Vital Agent Sync gives authorized AI agents fresh, scoped Apple Health context through an iPhone app, a user-controlled local receiver, and standard Model Context Protocol (MCP) tools.
+
+Vital Agent Sync is a local-first, open-source project. It is designed to make personal context useful to AI without making a central Vital Agent Sync service the owner of that data.
+
+## Why it exists
+
+AI models can reason, use tools, and understand many kinds of information, but they usually do not know a user's current real-world state. A question such as “Based on last night's sleep and my current state, am I ready for a hard workout?” requires recent personal evidence, freshness information, and explicit authorization. Without those inputs, an Agent can only give a generic answer.
+
+## Product path
+
+1. The iPhone app reads only Apple Health categories authorized by the user.
+2. The app creates compact summaries; an Agent never receives direct HealthKit permission.
+3. Encrypted sync sends those summaries to a receiver controlled by the user.
+4. The receiver stores them in local SQLite.
+5. Authorized Agents request only the needed context through scoped MCP tools.
+6. Relevant results include source and freshness information and separate observed facts from limited inference.
+
+The core product properties are: scoped, fresh, and revocable.
+
+## Working Local Preview
+
+- A physical iPhone can pair with the receiver and sync user-authorized Apple Health summaries.
+- The local runtime stores summaries in SQLite and exposes MCP tools.
+- WorkBuddy users can install the Vital Agent Sync Skill from SkillHub and start guided LAN setup from a conversation.
+- The published `vitalmcp` npm package provides the same runtime for WorkBuddy, Hermes, OpenClaw, and generic MCP clients.
+- Trusted LAN is the default route.
+- A user-managed Tailscale network is the optional private remote route.
+
+## Current limitations
+
+- The iOS app is a development build and is not yet distributed through the App Store.
+- Local Preview relies on a foreground iPhone sync and does not promise a fixed background schedule.
+- Hosted relay is experimental and is not required, available, or recommended for the current onboarding path.
+- Vital Agent Sync is not a medical service. It does not diagnose, prescribe, or replace professional care.
+- Local storage does not imply local model inference. Context returned through MCP may be sent to the model provider selected by the user.
+
+## Context-scaling thesis
+
+Model scaling determines what AI can do. Context scaling determines whether it can do it for a particular person.
+
+Context scaling does not mean a longer context window. It means continuously acquiring, filtering, verifying, and safely using relevant real-world context while retaining provenance, freshness, permission, and user control.
+
+Vital Agent Sync starts with Apple Health because health context makes sensitivity, provenance, freshness, and revocation impossible to ignore. The longer-term direction is a user-owned context layer connecting more personal data sources to more authorized Agents.
+
+## Design principles
+
+- Users decide which personal data sources to connect.
+- Each authorized Agent receives limited, task-relevant context.
+- Returned context carries source and freshness information.
+- Users can inspect, revoke, and replace connections.
+- Context should scale without transferring ownership.
+
+## Important links
+
+- [Project brief](/project)
+- [Product overview](/)
+- [Open-source repository](https://github.com/Coooder-Crypto/vital-agent-sync)
+- [WorkBuddy Skill on SkillHub](https://skillhub.cn/skills/vital-agent-sync)
+- [vitalmcp on npm](https://www.npmjs.com/package/vitalmcp)
+- [Architecture and onboarding](https://github.com/Coooder-Crypto/vital-agent-sync/blob/main/docs/agent-first-onboarding.md)
+- [Direct LAN security](https://github.com/Coooder-Crypto/vital-agent-sync/blob/main/docs/direct-lan-security.md)
+- [Privacy boundary](https://github.com/Coooder-Crypto/vital-agent-sync/blob/main/docs/e2ee-relay-privacy-boundary.md)
+
+## Preferred project description
+
+Vital Agent Sync is a local-first Apple Health context layer for AI agents. An iPhone syncs user-authorized summaries to a user-controlled receiver, and authorized Agents access scoped, fresh, revocable context through MCP without receiving direct HealthKit access.
