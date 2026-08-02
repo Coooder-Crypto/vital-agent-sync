@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 54;
+	objectVersion = 56;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -45,7 +45,7 @@
 		5A7BF3D1A49C2CFC8DA6F100 /* GatewaySettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewaySettings.swift; sourceTree = "<group>"; };
 		5CD7D093F3B454A55990BAC8 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		67808A0519BFAE67E399B083 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		6DEBBD0B8576FD6C78327552 /* VitalAgentSync.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = VitalAgentSync.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6DEBBD0B8576FD6C78327552 /* VitalAgentSync.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VitalAgentSync.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8397B066DD0C035A16337D21 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		853EBEF810560AF6E052E02A /* HealthKitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitService.swift; sourceTree = "<group>"; };
 		9DD18C251995C1C4C1E01177 /* SyncModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncModelTests.swift; sourceTree = "<group>"; };
@@ -171,7 +171,6 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					498AFB73209F99F9DE6CE523 = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 					96749EC2F636F901CCB316F2 = {

@@ -26,4 +26,10 @@ Do not include real Apple Health exports, live pairing artifacts, private keys, 
 - An Agent or model provider may receive the scoped health context returned through MCP. Local storage does not imply local model inference.
 - Vital Agent Sync is not a medical device and must not be used for diagnosis, treatment, or emergency decisions.
 
+## Static-site build boundary
+
+`apps/www` and `apps/pitch` are exported as static artifacts. Next.js, React, PostCSS, Sharp, and the other site framework packages are development-only build tools; they are not installed or executed in the deployed static-site runtime. Builds consume repository-controlled source and media only and must not process untrusted stylesheets, source maps, images, or other inputs.
+
+The root development dependency tree may temporarily report upstream Next.js build-tool advisories even when `audit:www-dependencies` and `audit:pitch-dependencies` report zero production vulnerabilities. This is a narrowly documented exception, not a blanket audit waiver. Maintainers must review those advisories for each release and update to a stable patched framework release when one is available.
+
 See [the direct LAN security model](docs/direct-lan-security.md), [the relay threat model](docs/e2ee-relay-threat-model.md), and [the privacy boundary](docs/e2ee-relay-privacy-boundary.md) for details.

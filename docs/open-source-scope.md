@@ -35,14 +35,4 @@ Hosted relay, accounts, billing, App Store launch, public VPS, public MCP, and m
 
 ## Public-release checklist
 
-Before publishing each release:
-
-1. merge all intended product changes into `main`;
-2. run `npm run audit:oss` from a full clone with complete Git history;
-3. run the typecheck, test, package, dependency, container, and iOS interoperability gates;
-4. review every remote branch, issue, pull request, Actions log, attachment, release artifact, and package for sensitive data;
-5. decide whether historical author email addresses are acceptable to expose;
-6. verify the app icon, screenshots, fonts, and other media have documented provenance and redistribution rights;
-7. confirm GitHub private vulnerability reporting is enabled;
-8. clone the public repository into a clean directory and complete the active phase's documented setup flow;
-9. create the matching signed tag and GitHub release only after the public tree passes all checks.
+Use the [open-source release checklist](open-source-release-checklist.md) before making the repository public or publishing a release. It covers source and Git history, privacy, third-party assets, GitHub community settings, npm artifacts, clean-clone validation, and release rollback.

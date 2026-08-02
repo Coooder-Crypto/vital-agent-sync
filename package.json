@@ -21,6 +21,10 @@
     "dev:www": "npm run dev --workspace vital-agent-sync-www",
     "build:www": "npm run build --workspace vital-agent-sync-www",
     "typecheck:www": "npm run typecheck --workspace vital-agent-sync-www",
+    "dev:pitch": "npm run dev --workspace vital-agent-sync-pitch",
+    "build:pitch": "npm run build --workspace vital-agent-sync-pitch",
+    "start:pitch": "npm run start --workspace vital-agent-sync-pitch",
+    "typecheck:pitch": "npm run typecheck --workspace vital-agent-sync-pitch",
     "test:ios": "node scripts/ios-unit-tests.mjs",
     "dev:local": "npm run dev --workspace vitalmcp",
     "build:local": "npm run build --workspace vitalmcp",
@@ -31,6 +35,7 @@
     "audit:agent-adapters": "node scripts/agent-adapter-audit.mjs",
     "audit:dependencies": "npm audit --omit=dev --workspace vitalmcp",
     "audit:www-dependencies": "npm audit --omit=dev --workspace vital-agent-sync-www",
+    "audit:pitch-dependencies": "npm audit --omit=dev --workspace vital-agent-sync-pitch",
     "audit:secrets": "node scripts/release-secret-scan.mjs",
     "audit:oss": "node scripts/release-secret-scan.mjs --scope repository --history",
     "audit:relay-hosted": "node scripts/e2ee-relay-hosted-audit.mjs",
@@ -42,6 +47,6 @@
     "node": ">=22"
   },
   "overrides": {
-    "postcss": "8.5.16"
+    "postcss": "8.5.25"
   }
 }

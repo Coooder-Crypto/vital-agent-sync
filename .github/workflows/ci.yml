@@ -64,5 +64,8 @@ jobs:
       - name: Audit website production dependencies
         run: npm run audit:www-dependencies
 
+      - name: Audit pitch production dependencies
+        run: npm run audit:pitch-dependencies
+
       - name: Verify npm package contents
         run: npm run pack:check --workspace vitalmcp

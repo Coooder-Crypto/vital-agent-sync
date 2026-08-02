@@ -221,6 +221,7 @@ function PageHeader({ active, onNavigate }: { active: number; onNavigate: (index
                 {item.label}
               </button>
             ))}
+            <a href="/project">Project</a>
           </nav>
 
           <div className="header-actions">
@@ -246,6 +247,7 @@ function PageHeader({ active, onNavigate }: { active: number; onNavigate: (index
                   </button>
                 ))}
               </div>
+              <a href="/project"><Sparkles size={17} /> Project brief <ExternalLink size={14} /></a>
               <a href={githubUrl} target="_blank" rel="noreferrer"><Github size={17} /> View source on GitHub <ExternalLink size={14} /></a>
             </motion.div>
           )}
@@ -553,7 +555,7 @@ function FinalPage({ copied, onCopy, onNavigate }: { copied: boolean; onCopy: ()
         <CommandBar copied={copied} onCopy={onCopy} inverse />
         <button type="button" className="back-to-top" onClick={() => onNavigate(0)}>Back to overview <ArrowRight size={15} /></button>
       </div>
-      <footer className="page-width final-footer"><span><BrandMark className="footer-brand-mark" /> Vital Agent Sync</span><p>Private Apple Health context for MCP-compatible agents.</p><div><a href={githubUrl}>GitHub</a><button type="button" onClick={() => onNavigate(3)}>Privacy</button><button type="button" onClick={() => onNavigate(4)}>Self-host</button></div></footer>
+      <footer className="page-width final-footer"><span><BrandMark className="footer-brand-mark" /> Vital Agent Sync</span><p>Private Apple Health context for MCP-compatible agents.</p><div><a href="/project">Project brief</a><a href={githubUrl}>GitHub</a><button type="button" onClick={() => onNavigate(3)}>Privacy</button><button type="button" onClick={() => onNavigate(4)}>Self-host</button></div></footer>
     </SnapPage>
   );
 }

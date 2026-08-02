@@ -140,5 +140,6 @@ Use synthetic fixtures only. For component details, release checks, and diagnost
 - Use the issue templates for reproducible bugs and proposals.
 - Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 - Review the public/private boundary in [Open-source scope](docs/open-source-scope.md).
+- Complete the [open-source release checklist](docs/open-source-release-checklist.md) before a public release.
 
 Vital Agent Sync is licensed under the [MIT License](LICENSE).

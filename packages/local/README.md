@@ -63,9 +63,9 @@ Before the Agent reads any health context, it must disclose that the selected mo
 Every adapter uses the same receiver, SQLite database, setup state, and `vitalmcp mcp` implementation:
 
 ```bash
-npx -y vitalmcp@0.5.2 setup --agent hermes --transport lan
-npx -y vitalmcp@0.5.2 setup --agent generic --transport lan
-npx -y vitalmcp@0.5.2 setup --agent openclaw --transport lan
+npx -y vitalmcp@0.5.3 setup --agent hermes --transport lan
+npx -y vitalmcp@0.5.3 setup --agent generic --transport lan
+npx -y vitalmcp@0.5.3 setup --agent openclaw --transport lan
 ```
 
 Hermes is the next first-class adapter. Generic stdio MCP is the portability baseline. Marketplace publication is not required.
@@ -94,7 +94,7 @@ An adapter must:
 Phase 3 keeps the Agent, runtime, SQLite, and stdio MCP on the same user-owned macOS or Linux server. Tailscale exposes only the iPhone receiver:
 
 ```bash
-npx -y vitalmcp@0.5.2 setup \
+npx -y vitalmcp@0.5.3 setup \
   --agent hermes \
   --manager systemd \
   --transport tailscale \
